@@ -72,4 +72,4 @@
 - [x] Run `npm run build`.
 - [x] Run `cargo test` inside `src-tauri`.
 - [x] Run `npm run tauri build`.
-- [ ] Commit and push to GitHub.
+- [x] Commit and push to GitHub.
