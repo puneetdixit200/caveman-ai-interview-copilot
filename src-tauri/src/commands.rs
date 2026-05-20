@@ -2,8 +2,8 @@ use tauri::State;
 
 use crate::ai;
 use crate::audio::{self, AudioCaptureState};
-use crate::db::{Database, NewSession};
-use crate::models::{PromptTemplate, Session, Transcript};
+use crate::db::{Database, NewAiResponse, NewSession};
+use crate::models::{AiResponse, PromptTemplate, Session, Transcript};
 use crate::stt;
 
 #[tauri::command]
@@ -37,6 +37,24 @@ pub fn list_transcripts(
 ) -> Result<Vec<Transcript>, String> {
     database
         .list_transcripts(&session_id)
+        .map_err(to_command_error)
+}
+
+#[tauri::command]
+pub fn add_ai_response(
+    database: State<'_, Database>,
+    input: NewAiResponse,
+) -> Result<AiResponse, String> {
+    database.add_ai_response(input).map_err(to_command_error)
+}
+
+#[tauri::command]
+pub fn list_ai_responses(
+    database: State<'_, Database>,
+    session_id: String,
+) -> Result<Vec<AiResponse>, String> {
+    database
+        .list_ai_responses(&session_id)
         .map_err(to_command_error)
 }
 

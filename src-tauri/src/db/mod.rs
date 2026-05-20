@@ -7,7 +7,7 @@ use rusqlite::{params, Connection};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use crate::models::{Session, Transcript};
+use crate::models::{AiResponse, Session, Transcript};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -18,6 +18,20 @@ pub struct NewSession {
     pub interview_type: String,
     pub tags: Vec<String>,
     pub notes: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct NewAiResponse {
+    pub session_id: String,
+    pub trigger_transcript_id: Option<i64>,
+    pub prompt_messages: String,
+    pub response: String,
+    pub model: String,
+    pub provider: String,
+    pub input_tokens: Option<i64>,
+    pub output_tokens: Option<i64>,
+    pub latency_ms: Option<i64>,
 }
 
 pub struct Database {
@@ -117,6 +131,46 @@ impl Database {
             .map_err(Into::into)
     }
 
+    pub fn add_ai_response(&self, input: NewAiResponse) -> Result<AiResponse> {
+        let now = Utc::now().to_rfc3339();
+        let connection = self.lock()?;
+        connection.execute(
+            "INSERT INTO ai_responses (
+                session_id, trigger_transcript_id, prompt_messages, response, model, provider,
+                input_tokens, output_tokens, latency_ms, created_at
+             ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
+            params![
+                input.session_id,
+                input.trigger_transcript_id,
+                input.prompt_messages,
+                input.response,
+                input.model,
+                input.provider,
+                input.input_tokens,
+                input.output_tokens,
+                input.latency_ms,
+                now
+            ],
+        )?;
+        let id = connection.last_insert_rowid();
+        drop(connection);
+        self.get_ai_response(id)
+    }
+
+    pub fn list_ai_responses(&self, session_id: &str) -> Result<Vec<AiResponse>> {
+        let connection = self.lock()?;
+        let mut statement = connection.prepare(
+            "SELECT id, session_id, trigger_transcript_id, prompt_messages, response, model,
+                    provider, input_tokens, output_tokens, latency_ms, created_at
+             FROM ai_responses
+             WHERE session_id = ?1
+             ORDER BY created_at ASC, id ASC",
+        )?;
+        let rows = statement.query_map(params![session_id], map_ai_response)?;
+        rows.collect::<rusqlite::Result<Vec<_>>>()
+            .map_err(Into::into)
+    }
+
     pub fn save_setting(&self, key: &str, value: &str) -> Result<()> {
         let now = Utc::now().to_rfc3339();
         let connection = self.lock()?;
@@ -162,6 +216,19 @@ impl Database {
                  FROM transcripts WHERE id = ?1",
                 params![id],
                 map_transcript,
+            )
+            .map_err(Into::into)
+    }
+
+    fn get_ai_response(&self, id: i64) -> Result<AiResponse> {
+        let connection = self.lock()?;
+        connection
+            .query_row(
+                "SELECT id, session_id, trigger_transcript_id, prompt_messages, response, model,
+                        provider, input_tokens, output_tokens, latency_ms, created_at
+                 FROM ai_responses WHERE id = ?1",
+                params![id],
+                map_ai_response,
             )
             .map_err(Into::into)
     }
@@ -283,5 +350,21 @@ fn map_transcript(row: &rusqlite::Row<'_>) -> rusqlite::Result<Transcript> {
         confidence: row.get(4)?,
         timestamp_ms: row.get(5)?,
         created_at: row.get(6)?,
+    })
+}
+
+fn map_ai_response(row: &rusqlite::Row<'_>) -> rusqlite::Result<AiResponse> {
+    Ok(AiResponse {
+        id: row.get(0)?,
+        session_id: row.get(1)?,
+        trigger_transcript_id: row.get(2)?,
+        prompt_messages: row.get(3)?,
+        response: row.get(4)?,
+        model: row.get(5)?,
+        provider: row.get(6)?,
+        input_tokens: row.get(7)?,
+        output_tokens: row.get(8)?,
+        latency_ms: row.get(9)?,
+        created_at: row.get(10)?,
     })
 }

@@ -1,4 +1,4 @@
-use caveman_lib::db::{Database, NewSession};
+use caveman_lib::db::{Database, NewAiResponse, NewSession};
 
 #[test]
 fn session_and_transcript_records_round_trip_through_sqlite() {
@@ -47,4 +47,50 @@ fn settings_round_trip_by_key() {
         db.get_setting("overlay.opacity").expect("get setting"),
         Some("0.64".to_string())
     );
+}
+
+#[test]
+fn ai_response_records_round_trip_through_sqlite() {
+    let db = Database::in_memory().expect("in-memory database");
+    let session = db
+        .create_session(NewSession {
+            title: "Real Provider Session".to_string(),
+            company: Some("Acme".to_string()),
+            role: Some("Backend Engineer".to_string()),
+            interview_type: "system_design".to_string(),
+            tags: vec!["real-provider".to_string()],
+            notes: None,
+        })
+        .expect("create session");
+
+    db.add_ai_response(NewAiResponse {
+        session_id: session.id.clone(),
+        trigger_transcript_id: None,
+        prompt_messages: r#"[{"role":"user","content":"Explain sharding"}]"#.to_string(),
+        response: "Use consistent hashing when you need smoother shard movement.".to_string(),
+        model: "llama3.1:8b".to_string(),
+        provider: "ollama".to_string(),
+        input_tokens: Some(42),
+        output_tokens: Some(16),
+        latency_ms: Some(820),
+    })
+    .expect("add ai response");
+
+    let responses = db
+        .list_ai_responses(&session.id)
+        .expect("list ai responses");
+
+    assert_eq!(responses.len(), 1);
+    assert_eq!(responses[0].session_id, session.id);
+    assert_eq!(
+        responses[0].prompt_messages,
+        r#"[{"role":"user","content":"Explain sharding"}]"#
+    );
+    assert_eq!(
+        responses[0].response,
+        "Use consistent hashing when you need smoother shard movement."
+    );
+    assert_eq!(responses[0].model, "llama3.1:8b");
+    assert_eq!(responses[0].provider, "ollama");
+    assert_eq!(responses[0].latency_ms, Some(820));
 }

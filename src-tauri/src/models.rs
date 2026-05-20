@@ -33,6 +33,22 @@ pub struct Transcript {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
+pub struct AiResponse {
+    pub id: i64,
+    pub session_id: String,
+    pub trigger_transcript_id: Option<i64>,
+    pub prompt_messages: String,
+    pub response: String,
+    pub model: String,
+    pub provider: String,
+    pub input_tokens: Option<i64>,
+    pub output_tokens: Option<i64>,
+    pub latency_ms: Option<i64>,
+    pub created_at: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
 pub struct PromptTemplate {
     pub id: String,
     pub name: String,
