@@ -611,8 +611,25 @@ input[type="checkbox"] {
   padding: 14px;
 }
 
+.session-row-button {
+  width: 100%;
+  color: inherit;
+  text-align: left;
+}
+
+.session-row-button.selected {
+  border-color: var(--accent);
+  background: #1d2a22;
+}
+
 .session-row h2 {
   margin-bottom: 4px;
+}
+
+.page-status {
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 0.82rem;
 }
 
 .tag-list {
