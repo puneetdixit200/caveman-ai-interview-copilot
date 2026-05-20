@@ -322,6 +322,7 @@ export function Dashboard() {
       try {
         const saved = await runLiveTranscriptionPass({
           sessionId: session.id,
+          sessionStartedAt: session.createdAt,
           config,
           seenTranscriptKeys: seenLiveTranscriptKeys.current
         });

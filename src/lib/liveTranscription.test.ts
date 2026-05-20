@@ -152,4 +152,64 @@ describe("liveTranscription", () => {
     });
     expect(saved).toHaveLength(2);
   });
+
+  it("anchors snapshot transcript timestamps to the active session clock", async () => {
+    const saveCaptureSnapshot = vi.fn(async () => ({
+      source: "system" as const,
+      audioPath: "C:\\tmp\\system.wav",
+      sampleRateHz: 16000,
+      channels: 1,
+      durationMs: 6000,
+      sampleCount: 96000
+    }));
+    const transcribeWithLocalWhisper = vi.fn(async () => [
+      {
+        speaker: "interviewer" as const,
+        text: "Walk me through your API design.",
+        startMs: 1500,
+        endMs: 3000,
+        confidence: 0.9,
+        language: "en"
+      }
+    ]);
+    const addTranscript = vi.fn(async (input) => ({
+      id: 3,
+      sessionId: input.sessionId,
+      speaker: input.speaker,
+      content: input.content,
+      timestampMs: input.timestampMs,
+      confidence: input.confidence
+    }));
+
+    await runLiveTranscriptionPass({
+      sessionId: "s1",
+      sessionStartedAt: "2026-05-20T00:00:00.000Z",
+      now: new Date("2026-05-20T00:02:00.000Z"),
+      config: {
+        ...DEFAULT_APP_CONFIG,
+        audio: {
+          ...DEFAULT_APP_CONFIG.audio,
+          captureMode: "system"
+        },
+        stt: {
+          ...DEFAULT_APP_CONFIG.stt,
+          selectedMode: "local_whisper",
+          localWhisperBinaryPath: "C:\\tools\\whisper.exe",
+          localWhisperModelPath: "C:\\models\\ggml-base.en.bin"
+        }
+      },
+      seenTranscriptKeys: new Set<string>(),
+      saveCaptureSnapshot,
+      transcribeWithLocalWhisper,
+      addTranscript
+    });
+
+    expect(addTranscript).toHaveBeenCalledWith({
+      sessionId: "s1",
+      speaker: "interviewer",
+      content: "Walk me through your API design.",
+      timestampMs: 115500,
+      confidence: 0.9
+    });
+  });
 });

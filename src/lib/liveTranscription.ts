@@ -21,6 +21,8 @@ export interface LiveTranscriptionDeps {
 
 export async function runLiveTranscriptionPass(input: {
   sessionId: string;
+  sessionStartedAt?: string | Date;
+  now?: Date;
   config: AppConfig;
   seenTranscriptKeys: Set<string>;
   maxSeconds?: number;
@@ -70,7 +72,12 @@ export async function runLiveTranscriptionPass(input: {
           sessionId: input.sessionId,
           speaker,
           content: text,
-          timestampMs: Math.max(0, Math.round(event.startMs)),
+          timestampMs: transcriptTimestampMs({
+            eventStartMs: event.startMs,
+            snapshotDurationMs: snapshot.durationMs,
+            sessionStartedAt: input.sessionStartedAt,
+            now: input.now ?? new Date()
+          }),
           confidence: event.confidence
         })
       );
@@ -162,6 +169,30 @@ function normalizeSpeakerForSource(speaker: SttTranscriptEvent["speaker"], sourc
   }
 
   return speaker;
+}
+
+function transcriptTimestampMs(input: {
+  eventStartMs: number;
+  snapshotDurationMs: number;
+  sessionStartedAt?: string | Date;
+  now: Date;
+}): number {
+  const eventStartMs = Math.max(0, Math.round(input.eventStartMs));
+  if (!input.sessionStartedAt) {
+    return eventStartMs;
+  }
+
+  const startedAt =
+    input.sessionStartedAt instanceof Date ? input.sessionStartedAt : new Date(input.sessionStartedAt);
+  const startedAtMs = startedAt.getTime();
+  const nowMs = input.now.getTime();
+  if (!Number.isFinite(startedAtMs) || !Number.isFinite(nowMs)) {
+    return eventStartMs;
+  }
+
+  const sessionElapsedMs = Math.max(0, nowMs - startedAtMs);
+  const snapshotStartMs = Math.max(0, sessionElapsedMs - Math.max(0, Math.round(input.snapshotDurationMs)));
+  return snapshotStartMs + eventStartMs;
 }
 
 function transcriptKey(speaker: string, text: string): string {
