@@ -141,4 +141,57 @@ describe("createConfiguredProvider", () => {
       })
     );
   });
+
+  it("uses Anthropic message format, headers, and streaming parser", async () => {
+    const fetchImpl = vi.fn(async () =>
+      streamingResponse(
+        [
+          'event: content_block_delta\ndata: {"type":"content_block_delta","delta":{"type":"text_delta","text":"Start "}}',
+          'event: content_block_delta\ndata: {"type":"content_block_delta","delta":{"type":"text_delta","text":"with tradeoffs"}}',
+          'event: message_stop\ndata: {"type":"message_stop"}'
+        ].join("\n\n")
+      )
+    );
+    const configured = createConfiguredProvider(
+      provider({
+        id: "anthropic",
+        label: "Anthropic",
+        kind: "cloud",
+        endpoint: "https://api.anthropic.com/v1/messages",
+        model: "claude-3-5-sonnet-latest",
+        apiKeyStored: true,
+        apiKey: "sk-ant-test"
+      }),
+      fetchImpl
+    );
+
+    const chunks: string[] = [];
+    for await (const chunk of configured.chatStream({
+      messages: [
+        { role: "system", content: "You are concise." },
+        { role: "user", content: "How should I answer?" }
+      ],
+      maxTokens: 512
+    })) {
+      chunks.push(chunk);
+    }
+
+    expect(chunks).toEqual(["Start ", "with tradeoffs"]);
+    expect(fetchImpl).toHaveBeenCalledWith(
+      "https://api.anthropic.com/v1/messages",
+      expect.objectContaining({
+        headers: expect.objectContaining({
+          "x-api-key": "sk-ant-test",
+          "anthropic-version": "2023-06-01"
+        }),
+        body: JSON.stringify({
+          model: "claude-3-5-sonnet-latest",
+          max_tokens: 512,
+          stream: true,
+          system: "You are concise.",
+          messages: [{ role: "user", content: "How should I answer?" }]
+        })
+      })
+    );
+  });
 });

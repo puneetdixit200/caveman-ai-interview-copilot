@@ -24,8 +24,11 @@ describe("Settings", () => {
     render(<Settings />);
 
     expect(await screen.findByText("API Key Vault")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Save Key" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Delete Key" })).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: "OpenAI" })).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: "Anthropic" })).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: "Groq" })).toBeInTheDocument();
+    expect(screen.getAllByRole("button", { name: "Save Key" }).length).toBeGreaterThanOrEqual(4);
+    expect(screen.getAllByRole("button", { name: "Delete Key" }).length).toBeGreaterThanOrEqual(4);
     expect(screen.getByText(/OS keychain/i)).toBeInTheDocument();
   });
 

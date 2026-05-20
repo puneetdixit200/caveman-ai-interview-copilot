@@ -84,6 +84,11 @@ async function* chatStream(
     return;
   }
 
+  if (config.id === "anthropic") {
+    yield* parseAnthropicStream(response.body);
+    return;
+  }
+
   yield* parseSseStream(response.body);
 }
 
@@ -94,7 +99,12 @@ function requestHeaders(config: ModelProviderConfig): Record<string, string> {
   };
 
   if (config.apiKey?.trim()) {
-    headers.Authorization = `Bearer ${config.apiKey.trim()}`;
+    if (config.id === "anthropic") {
+      headers["x-api-key"] = config.apiKey.trim();
+      headers["anthropic-version"] = "2023-06-01";
+    } else {
+      headers.Authorization = `Bearer ${config.apiKey.trim()}`;
+    }
   }
 
   if (config.id === "openrouter") {
@@ -115,6 +125,25 @@ function requestBody(config: ModelProviderConfig, params: ChatStreamParams): Rec
         temperature: params.temperature,
         num_predict: params.maxTokens
       }
+    };
+  }
+
+  if (config.id === "anthropic") {
+    const systemMessages = params.messages
+      .filter((message) => message.role === "system")
+      .map((message) => message.content.trim())
+      .filter(Boolean);
+    return {
+      model: params.model ?? config.model,
+      max_tokens: params.maxTokens ?? 1024,
+      stream: true,
+      ...(systemMessages.length > 0 ? { system: systemMessages.join("\n\n") } : {}),
+      messages: params.messages
+        .filter((message) => message.role !== "system")
+        .map((message) => ({
+          role: message.role === "assistant" ? "assistant" : "user",
+          content: message.content
+        }))
     };
   }
 
@@ -146,6 +175,10 @@ function healthEndpoint(config: ModelProviderConfig): string {
 
   if (config.endpoint.includes("/v1/chat/completions")) {
     return config.endpoint.replace(/\/v1\/chat\/completions\/?$/, "/v1/models");
+  }
+
+  if (config.id === "anthropic") {
+    return config.endpoint;
   }
 
   return config.endpoint;
@@ -220,6 +253,48 @@ function parseSseEvent(event: string): string {
 
     const parsed = JSON.parse(payload) as { choices?: Array<{ delta?: { content?: string }; text?: string }> };
     content += parsed.choices?.map((choice) => choice.delta?.content ?? choice.text ?? "").join("") ?? "";
+  }
+
+  return content;
+}
+
+async function* parseAnthropicStream(body: ReadableStream<Uint8Array>): AsyncGenerator<string> {
+  let buffer = "";
+
+  for await (const chunk of decodeBody(body)) {
+    buffer += chunk;
+    const events = buffer.split(/\r?\n\r?\n/);
+    buffer = events.pop() ?? "";
+
+    for (const event of events) {
+      const content = parseAnthropicEvent(event);
+      if (content) {
+        yield content;
+      }
+    }
+  }
+
+  const finalContent = parseAnthropicEvent(buffer);
+  if (finalContent) {
+    yield finalContent;
+  }
+}
+
+function parseAnthropicEvent(event: string): string {
+  const lines = event
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter((line) => line.startsWith("data:"));
+
+  let content = "";
+  for (const line of lines) {
+    const payload = line.slice("data:".length).trim();
+    if (!payload) {
+      continue;
+    }
+
+    const parsed = JSON.parse(payload) as { delta?: { text?: string } };
+    content += parsed.delta?.text ?? "";
   }
 
   return content;

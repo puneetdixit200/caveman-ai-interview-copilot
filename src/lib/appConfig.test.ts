@@ -6,6 +6,9 @@ describe("appConfig", () => {
     const ollama = DEFAULT_APP_CONFIG.providers.find((provider) => provider.id === "ollama");
     const lmstudio = DEFAULT_APP_CONFIG.providers.find((provider) => provider.id === "lmstudio");
     const openrouter = DEFAULT_APP_CONFIG.providers.find((provider) => provider.id === "openrouter");
+    const openai = DEFAULT_APP_CONFIG.providers.find((provider) => provider.id === "openai");
+    const anthropic = DEFAULT_APP_CONFIG.providers.find((provider) => provider.id === "anthropic");
+    const groq = DEFAULT_APP_CONFIG.providers.find((provider) => provider.id === "groq");
 
     expect(ollama).toMatchObject({
       enabled: true,
@@ -20,6 +23,21 @@ describe("appConfig", () => {
       enabled: false,
       endpoint: "https://openrouter.ai/api/v1/chat/completions",
       apiKeyStored: false
+    });
+    expect(openai).toMatchObject({
+      enabled: false,
+      endpoint: "https://api.openai.com/v1/chat/completions",
+      model: "gpt-4o-mini"
+    });
+    expect(anthropic).toMatchObject({
+      enabled: false,
+      endpoint: "https://api.anthropic.com/v1/messages",
+      model: "claude-3-5-sonnet-latest"
+    });
+    expect(groq).toMatchObject({
+      enabled: false,
+      endpoint: "https://api.groq.com/openai/v1/chat/completions",
+      model: "llama-3.1-8b-instant"
     });
   });
 

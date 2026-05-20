@@ -71,6 +71,33 @@ export const DEFAULT_APP_CONFIG: AppConfig = {
       model: "openai/gpt-4o-mini",
       enabled: false,
       apiKeyStored: false
+    },
+    {
+      id: "openai",
+      label: "OpenAI",
+      kind: "cloud",
+      endpoint: "https://api.openai.com/v1/chat/completions",
+      model: "gpt-4o-mini",
+      enabled: false,
+      apiKeyStored: false
+    },
+    {
+      id: "anthropic",
+      label: "Anthropic",
+      kind: "cloud",
+      endpoint: "https://api.anthropic.com/v1/messages",
+      model: "claude-3-5-sonnet-latest",
+      enabled: false,
+      apiKeyStored: false
+    },
+    {
+      id: "groq",
+      label: "Groq",
+      kind: "cloud",
+      endpoint: "https://api.groq.com/openai/v1/chat/completions",
+      model: "llama-3.1-8b-instant",
+      enabled: false,
+      apiKeyStored: false
     }
   ],
   audio: {
