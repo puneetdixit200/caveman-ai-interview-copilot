@@ -70,4 +70,86 @@ describe("liveTranscription", () => {
     });
     expect(saved).toHaveLength(1);
   });
+
+  it("transcribes microphone and system audio separately in dual capture mode", async () => {
+    const saveCaptureSnapshot = vi.fn(async (input: { source: "microphone" | "system" }) => ({
+      source: input.source,
+      audioPath: `C:\\tmp\\${input.source}.wav`,
+      sampleRateHz: 16000,
+      channels: 1,
+      durationMs: 1600,
+      sampleCount: 25600
+    }));
+    const transcribeWithLocalWhisper = vi.fn(async (input: { audioPath: string }) =>
+      input.audioPath.includes("system")
+        ? [
+            {
+              speaker: "unknown" as const,
+              text: "Explain database indexes.",
+              startMs: 100,
+              endMs: 900,
+              confidence: 0.88,
+              language: "en"
+            }
+          ]
+        : [
+            {
+              speaker: "unknown" as const,
+              text: "I would start with the query pattern.",
+              startMs: 120,
+              endMs: 1200,
+              confidence: 0.86,
+              language: "en"
+            }
+          ]
+    );
+    const addTranscript = vi.fn(async (input) => ({
+      id: input.speaker === "interviewer" ? 1 : 2,
+      sessionId: input.sessionId,
+      speaker: input.speaker,
+      content: input.content,
+      timestampMs: input.timestampMs,
+      confidence: input.confidence
+    }));
+
+    const saved = await runLiveTranscriptionPass({
+      sessionId: "s1",
+      config: {
+        ...DEFAULT_APP_CONFIG,
+        audio: {
+          ...DEFAULT_APP_CONFIG.audio,
+          captureMode: "dual"
+        },
+        stt: {
+          ...DEFAULT_APP_CONFIG.stt,
+          selectedMode: "local_whisper",
+          localWhisperBinaryPath: "C:\\tools\\whisper.exe",
+          localWhisperModelPath: "C:\\models\\ggml-base.en.bin"
+        }
+      },
+      seenTranscriptKeys: new Set<string>(),
+      saveCaptureSnapshot,
+      transcribeWithLocalWhisper,
+      addTranscript
+    });
+
+    expect(saveCaptureSnapshot).toHaveBeenCalledWith({ source: "system", maxSeconds: 6 });
+    expect(saveCaptureSnapshot).toHaveBeenCalledWith({ source: "microphone", maxSeconds: 6 });
+    expect(transcribeWithLocalWhisper).toHaveBeenCalledTimes(2);
+    expect(addTranscript).toHaveBeenNthCalledWith(1, {
+      sessionId: "s1",
+      speaker: "interviewer",
+      content: "Explain database indexes.",
+      timestampMs: 100,
+      confidence: 0.88
+    });
+    expect(addTranscript).toHaveBeenNthCalledWith(2, {
+      sessionId: "s1",
+      speaker: "candidate",
+      content: "I would start with the query pattern.",
+      timestampMs: 120,
+      confidence: 0.86
+    });
+    expect(saved).toHaveLength(2);
+  });
 });
