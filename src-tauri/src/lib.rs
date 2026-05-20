@@ -40,6 +40,7 @@ pub fn run() {
             commands::start_capture,
             commands::stop_capture,
             commands::get_capture_status,
+            commands::save_capture_snapshot,
             commands::list_stt_providers,
             commands::transcribe_with_local_whisper,
             commands::transcribe_with_cloud_stt,

@@ -127,6 +127,18 @@ pub fn get_capture_status(capture_manager: State<'_, AudioCaptureManager>) -> Au
 }
 
 #[tauri::command]
+pub fn save_capture_snapshot(
+    app_handle: AppHandle,
+    capture_manager: State<'_, AudioCaptureManager>,
+    source: String,
+    max_seconds: Option<u32>,
+) -> Result<audio::CaptureSnapshot, String> {
+    capture_manager
+        .save_snapshot(app_handle, &source, max_seconds.unwrap_or(6))
+        .map_err(to_command_error)
+}
+
+#[tauri::command]
 pub fn list_stt_providers() -> Vec<stt::SttProviderStatus> {
     stt::list_stt_providers()
 }

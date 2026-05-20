@@ -1,5 +1,5 @@
 import { Eye, EyeOff, Keyboard, Play, Send, ShieldCheck, Square, Wand2 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AudioControls } from "../components/audio/AudioControls";
 import { CodeAssistantPanel } from "../components/code/CodeAssistantPanel";
 import { Button } from "../components/common/Button";
@@ -32,6 +32,7 @@ import { selectRunnableProviders } from "../lib/providerSelection";
 import { promptTemplates } from "../lib/promptTemplates";
 import { estimateTokens, nextTranscriptTimestampMs } from "../lib/sessionRuntime";
 import { enqueueTtsResponse, playTtsItem } from "../lib/tts";
+import { runLiveTranscriptionPass } from "../lib/liveTranscription";
 import {
   addAiResponse,
   addTranscript,
@@ -90,6 +91,8 @@ export function Dashboard() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [knowledgeBase, setKnowledgeBase] = useState<KnowledgeBase>(createKnowledgeBase());
   const [pluginCatalog, setPluginCatalog] = useState<PluginCatalog>(createEmptyPluginCatalog());
+  const seenLiveTranscriptKeys = useRef(new Set<string>());
+  const liveTranscriptionBusy = useRef(false);
   const { visible, setVisible, opacity, setOpacity, fontSize, setFontSize, locked, setLocked } = useOverlayStore();
 
   const selectedProvider = useMemo(
@@ -298,6 +301,72 @@ export function Dashboard() {
       void cleanup?.();
     };
   }, [config.overlay.hotkey, toggleOverlayWindow]);
+
+  useEffect(() => {
+    seenLiveTranscriptKeys.current.clear();
+  }, [session?.id]);
+
+  useEffect(() => {
+    if (!running || !session || config.stt.selectedMode === "manual") {
+      return;
+    }
+
+    let disposed = false;
+
+    async function transcribeLiveAudio() {
+      if (!session || liveTranscriptionBusy.current) {
+        return;
+      }
+
+      liveTranscriptionBusy.current = true;
+      try {
+        const saved = await runLiveTranscriptionPass({
+          sessionId: session.id,
+          config,
+          seenTranscriptKeys: seenLiveTranscriptKeys.current
+        });
+
+        if (disposed || saved.length === 0) {
+          return;
+        }
+
+        setTranscripts((current) => {
+          const nextTranscripts = [...current, ...saved];
+          const latest = saved[saved.length - 1];
+          const trigger = shouldTriggerAnswer({
+            segments: nextTranscripts,
+            settings: config.autoTrigger,
+            lastTriggeredTranscriptId,
+            nowMs: latest.timestampMs + config.autoTrigger.silenceTimeoutMs
+          });
+
+          if (trigger.shouldTrigger && trigger.transcriptId) {
+            setLastTriggeredTranscriptId(trigger.transcriptId);
+            setStatusMessage(`Live STT detected ${trigger.reason}; generating answer...`);
+            void generateResponse(nextTranscripts, trigger.transcriptId);
+          }
+
+          return nextTranscripts;
+        });
+        setStatusMessage(`Live STT saved ${saved.length} transcript segment${saved.length === 1 ? "" : "s"}`);
+      } catch (error) {
+        if (!disposed) {
+          setStatusMessage("Live STT failed");
+          setErrorMessage(error instanceof Error ? error.message : String(error));
+        }
+      } finally {
+        liveTranscriptionBusy.current = false;
+      }
+    }
+
+    void transcribeLiveAudio();
+    const interval = window.setInterval(() => void transcribeLiveAudio(), 6500);
+
+    return () => {
+      disposed = true;
+      window.clearInterval(interval);
+    };
+  }, [config, lastTriggeredTranscriptId, running, session?.id]);
 
   async function toggleCapture() {
     if (running) {

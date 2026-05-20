@@ -26,6 +26,15 @@ export interface SecretStatus {
   stored: boolean;
 }
 
+export interface CaptureSnapshot {
+  source: "microphone" | "system" | string;
+  audioPath: string;
+  sampleRateHz: number;
+  channels: number;
+  durationMs: number;
+  sampleCount: number;
+}
+
 declare global {
   interface Window {
     __TAURI_INTERNALS__?: unknown;
@@ -234,6 +243,27 @@ export async function getCaptureStatus(): Promise<AudioCaptureState> {
     noiseGateDb: -80,
     systemCaptureSupported: false
   }));
+}
+
+export async function saveCaptureSnapshot(input: {
+  source: "microphone" | "system";
+  maxSeconds: number;
+}): Promise<CaptureSnapshot> {
+  return invokeStrictOrFallback<CaptureSnapshot>(
+    "save_capture_snapshot",
+    {
+      source: input.source,
+      maxSeconds: input.maxSeconds
+    },
+    () => ({
+      source: input.source,
+      audioPath: "",
+      sampleRateHz: 16000,
+      channels: 1,
+      durationMs: 0,
+      sampleCount: 0
+    })
+  );
 }
 
 export async function onAudioLevel(callback: (event: AudioLevelEvent) => void): Promise<() => void> {
