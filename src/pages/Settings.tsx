@@ -3,6 +3,7 @@ import {
   Bot,
   DownloadCloud,
   FilePlus2,
+  Keyboard,
   KeyRound,
   Mic,
   Play,
@@ -65,6 +66,7 @@ import type {
   AutoTriggerSettings,
   ModelProviderConfig,
   OcrSettings,
+  OverlaySettings,
   PluginSettings,
   ProviderId,
   SecuritySettings,
@@ -425,6 +427,10 @@ export function Settings() {
     setConfig((current) => ({ ...current, tts: { ...current.tts, ...patch } }));
   }
 
+  function updateOverlay(patch: Partial<OverlaySettings>) {
+    setConfig((current) => ({ ...current, overlay: { ...current.overlay, ...patch } }));
+  }
+
   function previewTts() {
     const queue = enqueueTtsResponse(
       [],
@@ -635,6 +641,63 @@ export function Settings() {
               <strong>{provider.apiKeyStored ? "Stored in OS keychain" : "No key configured"}</strong>
             </div>
           ))}
+        </div>
+      </section>
+
+      <section className="panel prompt-panel">
+        <div className="panel-heading">
+          <div>
+            <p className="eyebrow">Stealth</p>
+            <h2>Overlay Hotkeys</h2>
+          </div>
+          <Keyboard size={18} />
+        </div>
+        <div className="settings-two-column">
+          <label className="settings-field">
+            <span>Overlay hotkey</span>
+            <input
+              value={config.overlay.hotkey}
+              placeholder="Ctrl+Shift+H"
+              onChange={(event) => updateOverlay({ hotkey: event.currentTarget.value })}
+            />
+          </label>
+          <label className="settings-field">
+            <span>Overlay opacity</span>
+            <input
+              type="number"
+              min="0.1"
+              max="1"
+              step="0.01"
+              value={config.overlay.opacity}
+              onChange={(event) => updateOverlay({ opacity: Number(event.currentTarget.value) })}
+            />
+          </label>
+          <label className="settings-field">
+            <span>Overlay font size</span>
+            <input
+              type="number"
+              min="12"
+              max="28"
+              value={config.overlay.fontSize}
+              onChange={(event) => updateOverlay({ fontSize: Number(event.currentTarget.value) })}
+            />
+          </label>
+          <label className="toggle-row">
+            <span>Lock overlay position</span>
+            <input
+              type="checkbox"
+              checked={config.overlay.locked}
+              onChange={(event) => updateOverlay({ locked: event.currentTarget.checked })}
+            />
+          </label>
+          <label className="toggle-row">
+            <span>Auto-hide when screen sharing</span>
+            <input
+              type="checkbox"
+              checked={config.overlay.autoHideOnScreenShare}
+              onChange={(event) => updateOverlay({ autoHideOnScreenShare: event.currentTarget.checked })}
+            />
+          </label>
         </div>
       </section>
 

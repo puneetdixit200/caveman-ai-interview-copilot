@@ -162,6 +162,9 @@ export function Dashboard() {
         }
 
         setConfig(hydratedConfig);
+        setOpacity(hydratedConfig.overlay.opacity);
+        setFontSize(hydratedConfig.overlay.fontSize);
+        setLocked(hydratedConfig.overlay.locked);
         setKnowledgeBase(parseKnowledgeBase(rawKnowledgeBase));
         setPluginCatalog(parsePluginCatalog(rawPluginCatalog));
         setAudioDevices(devices);
@@ -240,7 +243,7 @@ export function Dashboard() {
     let cleanup: (() => Promise<void>) | undefined;
 
     registerOverlayToggleShortcut({
-      shortcut: DEFAULT_OVERLAY_SHORTCUT,
+      shortcut: config.overlay.hotkey,
       onToggle: toggleOverlayWindow
     }).then((registration) => {
       if (disposed) {
@@ -259,7 +262,7 @@ export function Dashboard() {
       disposed = true;
       void cleanup?.();
     };
-  }, [toggleOverlayWindow]);
+  }, [config.overlay.hotkey, toggleOverlayWindow]);
 
   async function toggleCapture() {
     if (running) {

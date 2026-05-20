@@ -6,6 +6,7 @@ import type {
   ModelProviderConfig,
   OcrProvider,
   OcrSettings,
+  OverlaySettings,
   PluginSettings,
   ProviderId,
   SecuritySettings,
@@ -13,6 +14,7 @@ import type {
   SttSettings,
   TtsSettings
 } from "../types/settings";
+import { DEFAULT_OVERLAY_SHORTCUT, normalizeShortcut } from "./hotkeys";
 
 export interface AppConfig {
   selectedProviderId: ProviderId;
@@ -24,6 +26,7 @@ export interface AppConfig {
   autoTrigger: AutoTriggerSettings;
   ocr: OcrSettings;
   tts: TtsSettings;
+  overlay: OverlaySettings;
   security: SecuritySettings;
   plugins: PluginSettings;
 }
@@ -107,6 +110,13 @@ export const DEFAULT_APP_CONFIG: AppConfig = {
     volume: 0.8,
     muteInStealth: true
   },
+  overlay: {
+    opacity: 0.82,
+    fontSize: 16,
+    locked: false,
+    hotkey: DEFAULT_OVERLAY_SHORTCUT,
+    autoHideOnScreenShare: false
+  },
   security: {
     localOnlyMode: false,
     captureExclusionEnabled: true,
@@ -146,6 +156,7 @@ export function parseAppConfig(raw: string | null | undefined): AppConfig {
       autoTrigger: mergeAutoTriggerSettings(parsed.autoTrigger),
       ocr: mergeOcrSettings(parsed.ocr),
       tts: mergeTtsSettings(parsed.tts),
+      overlay: mergeOverlaySettings(parsed.overlay),
       security: mergeSecuritySettings(parsed.security),
       plugins: mergePluginSettings(parsed.plugins)
     };
@@ -209,6 +220,7 @@ function cloneConfig(config: AppConfig): AppConfig {
     autoTrigger: { ...config.autoTrigger },
     ocr: { ...config.ocr },
     tts: { ...config.tts },
+    overlay: { ...config.overlay },
     security: { ...config.security },
     plugins: { ...config.plugins }
   };
@@ -328,6 +340,23 @@ function mergeTtsSettings(raw: unknown): TtsSettings {
     volume: clampNumber(value.volume, 0, 1, DEFAULT_APP_CONFIG.tts.volume),
     muteInStealth:
       typeof value.muteInStealth === "boolean" ? value.muteInStealth : DEFAULT_APP_CONFIG.tts.muteInStealth
+  };
+}
+
+function mergeOverlaySettings(raw: unknown): OverlaySettings {
+  const value = isObject(raw) ? raw : {};
+  const normalizedHotkey = normalizeShortcut(readString(value.hotkey, DEFAULT_APP_CONFIG.overlay.hotkey));
+
+  return {
+    ...DEFAULT_APP_CONFIG.overlay,
+    opacity: clampNumber(value.opacity, 0.1, 1, DEFAULT_APP_CONFIG.overlay.opacity),
+    fontSize: Math.round(clampNumber(value.fontSize, 12, 28, DEFAULT_APP_CONFIG.overlay.fontSize)),
+    locked: typeof value.locked === "boolean" ? value.locked : DEFAULT_APP_CONFIG.overlay.locked,
+    hotkey: normalizedHotkey || DEFAULT_APP_CONFIG.overlay.hotkey,
+    autoHideOnScreenShare:
+      typeof value.autoHideOnScreenShare === "boolean"
+        ? value.autoHideOnScreenShare
+        : DEFAULT_APP_CONFIG.overlay.autoHideOnScreenShare
   };
 }
 

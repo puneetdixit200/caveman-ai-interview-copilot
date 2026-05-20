@@ -56,4 +56,11 @@ describe("Settings", () => {
     expect(await screen.findByRole("button", { name: "Add Knowledge Document" })).toBeInTheDocument();
     expect(screen.getByRole("textbox", { name: "Knowledge text" })).toBeInTheDocument();
   });
+
+  it("shows global overlay hotkey controls", async () => {
+    render(<Settings />);
+
+    expect(await screen.findByRole("textbox", { name: "Overlay hotkey" })).toBeInTheDocument();
+    expect(screen.getByLabelText("Auto-hide when screen sharing")).toBeInTheDocument();
+  });
 });

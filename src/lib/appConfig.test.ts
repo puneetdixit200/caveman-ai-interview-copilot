@@ -122,6 +122,13 @@ describe("appConfig", () => {
       captureExclusionEnabled: true,
       blockCloudWhenLocalOnly: true
     });
+    expect(config.overlay).toMatchObject({
+      opacity: 0.82,
+      fontSize: 16,
+      locked: false,
+      hotkey: "CommandOrControl+Shift+H",
+      autoHideOnScreenShare: false
+    });
   });
 
   it("sanitizes invalid live feature settings while preserving valid values", () => {
@@ -151,6 +158,13 @@ describe("appConfig", () => {
           rate: 5,
           volume: 4,
           muteInStealth: false
+        },
+        overlay: {
+          opacity: 0.02,
+          fontSize: 64,
+          locked: true,
+          hotkey: "control + alt + space",
+          autoHideOnScreenShare: true
         }
       })
     );
@@ -179,6 +193,13 @@ describe("appConfig", () => {
       rate: 2,
       volume: 1,
       muteInStealth: false
+    });
+    expect(parsed.overlay).toMatchObject({
+      opacity: 0.1,
+      fontSize: 28,
+      locked: true,
+      hotkey: "CommandOrControl+Alt+Space",
+      autoHideOnScreenShare: true
     });
   });
 });
