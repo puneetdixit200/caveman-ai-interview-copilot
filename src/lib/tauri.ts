@@ -180,12 +180,16 @@ export async function listAudioDevices(): Promise<AudioDevice[]> {
 export async function startCapture(input: {
   systemDeviceId: string;
   microphoneDeviceId: string;
+  gainDb: number;
+  noiseGateDb: number;
 }): Promise<AudioCaptureState> {
   return invokeStrictOrFallback<AudioCaptureState>(
     "start_capture",
     {
       systemDeviceId: input.systemDeviceId,
-      microphoneDeviceId: input.microphoneDeviceId
+      microphoneDeviceId: input.microphoneDeviceId,
+      gainDb: input.gainDb,
+      noiseGateDb: input.noiseGateDb
     },
     () => ({
       running: true,
@@ -195,6 +199,8 @@ export async function startCapture(input: {
       channels: 1,
       microphoneLevel: 0,
       systemLevel: 0,
+      gainDb: input.gainDb,
+      noiseGateDb: input.noiseGateDb,
       systemCaptureSupported: false
     })
   );
@@ -209,6 +215,8 @@ export async function stopCapture(): Promise<AudioCaptureState> {
     channels: 1,
     microphoneLevel: 0,
     systemLevel: 0,
+    gainDb: 0,
+    noiseGateDb: -80,
     systemCaptureSupported: false
   }));
 }
@@ -222,6 +230,8 @@ export async function getCaptureStatus(): Promise<AudioCaptureState> {
     channels: 1,
     microphoneLevel: 0,
     systemLevel: 0,
+    gainDb: 0,
+    noiseGateDb: -80,
     systemCaptureSupported: false
   }));
 }

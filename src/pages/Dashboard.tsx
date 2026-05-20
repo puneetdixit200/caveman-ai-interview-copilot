@@ -64,6 +64,8 @@ const DEFAULT_CAPTURE_STATUS: AudioCaptureState = {
   channels: 1,
   microphoneLevel: 0,
   systemLevel: 0,
+  gainDb: 0,
+  noiseGateDb: -80,
   systemCaptureSupported: false
 };
 
@@ -272,7 +274,9 @@ export function Dashboard() {
     try {
       const started = await startCapture({
         systemDeviceId: config.audio.systemDeviceId,
-        microphoneDeviceId: config.audio.microphoneDeviceId
+        microphoneDeviceId: config.audio.microphoneDeviceId,
+        gainDb: config.audio.gainDb,
+        noiseGateDb: config.audio.noiseGateDb
       });
       setCaptureStatus(started);
       setRunning(started.running);

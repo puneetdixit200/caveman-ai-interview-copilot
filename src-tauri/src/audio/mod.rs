@@ -1,4 +1,4 @@
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use std::sync::{mpsc, Arc, Mutex};
 use std::thread::{self, JoinHandle};
@@ -27,8 +27,36 @@ pub struct AudioCaptureState {
     pub channels: u16,
     pub microphone_level: f32,
     pub system_level: f32,
+    pub gain_db: f32,
+    pub noise_gate_db: f32,
     pub system_capture_supported: bool,
     pub error: Option<String>,
+}
+
+#[derive(Debug, Copy, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AudioProcessingSettings {
+    pub gain_db: f32,
+    pub noise_gate_db: f32,
+}
+
+impl AudioProcessingSettings {
+    pub fn from_optional(gain_db: Option<f32>, noise_gate_db: Option<f32>) -> Self {
+        Self::new(gain_db.unwrap_or(0.0), noise_gate_db.unwrap_or(-80.0))
+    }
+
+    fn new(gain_db: f32, noise_gate_db: f32) -> Self {
+        Self {
+            gain_db: gain_db.clamp(-24.0, 12.0),
+            noise_gate_db: noise_gate_db.clamp(-80.0, 0.0),
+        }
+    }
+}
+
+impl Default for AudioProcessingSettings {
+    fn default() -> Self {
+        Self::new(0.0, -80.0)
+    }
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -110,6 +138,7 @@ impl AudioCaptureManager {
         app_handle: AppHandle,
         system_device_id: &str,
         microphone_device_id: &str,
+        processing_settings: AudioProcessingSettings,
     ) -> anyhow::Result<AudioCaptureState> {
         self.stop();
 
@@ -123,6 +152,7 @@ impl AudioCaptureManager {
                 app_handle,
                 system_device_id,
                 microphone_device_id,
+                processing_settings,
                 shared_state,
                 stop_rx,
                 ready_tx,
@@ -305,8 +335,8 @@ fn stable_device_id(kind: &str, label: &str, index: usize) -> String {
 #[cfg(test)]
 mod tests {
     use super::{
-        apply_audio_level_to_state, classify_device_kind, stable_device_id, AudioCaptureManager,
-        AudioCaptureState, AudioLevelEvent,
+        apply_audio_level_to_state, apply_audio_processing, classify_device_kind, stable_device_id,
+        AudioCaptureManager, AudioCaptureState, AudioLevelEvent, AudioProcessingSettings,
     };
 
     #[test]
@@ -368,6 +398,8 @@ mod tests {
             channels: 2,
             microphone_level: 0.0,
             system_level: 0.0,
+            gain_db: 0.0,
+            noise_gate_db: -80.0,
             system_capture_supported: true,
             error: None,
         };
@@ -384,6 +416,20 @@ mod tests {
         assert!((state.system_level - 0.8).abs() < 0.001);
         assert!(state.system_capture_supported);
     }
+
+    #[test]
+    fn applies_gain_and_noise_gate_to_pcm_samples() {
+        let settings = AudioProcessingSettings {
+            gain_db: 6.0,
+            noise_gate_db: -40.0,
+        };
+
+        let processed = apply_audio_processing(&[0.005, 0.2, -0.6], settings);
+
+        assert_eq!(processed[0], 0.0);
+        assert!((processed[1] - 0.399).abs() < 0.001);
+        assert_eq!(processed[2], -1.0);
+    }
 }
 
 fn build_input_stream(
@@ -394,6 +440,7 @@ fn build_input_stream(
     device_id: String,
     sample_rate_hz: u32,
     channels: u16,
+    processing_settings: AudioProcessingSettings,
     shared_state: Arc<Mutex<AudioCaptureState>>,
     app_handle: AppHandle,
 ) -> anyhow::Result<cpal::Stream> {
@@ -410,6 +457,7 @@ fn build_input_stream(
                         &callback_device_id,
                         sample_rate_hz,
                         channels,
+                        processing_settings,
                         &shared_state,
                         &app_handle,
                     );
@@ -430,6 +478,7 @@ fn build_input_stream(
                         &callback_device_id,
                         sample_rate_hz,
                         channels,
+                        processing_settings,
                         &shared_state,
                         &app_handle,
                     );
@@ -451,6 +500,7 @@ fn build_input_stream(
                         &callback_device_id,
                         sample_rate_hz,
                         channels,
+                        processing_settings,
                         &shared_state,
                         &app_handle,
                     );
@@ -469,6 +519,7 @@ fn run_audio_capture_thread(
     app_handle: AppHandle,
     system_device_id: String,
     microphone_device_id: String,
+    processing_settings: AudioProcessingSettings,
     shared_state: Arc<Mutex<AudioCaptureState>>,
     stop_rx: mpsc::Receiver<()>,
     ready_tx: mpsc::Sender<Result<AudioCaptureState, String>>,
@@ -485,6 +536,8 @@ fn run_audio_capture_thread(
             channels: 1,
             microphone_level: 0.0,
             system_level: 0.0,
+            gain_db: processing_settings.gain_db,
+            noise_gate_db: processing_settings.noise_gate_db,
             system_capture_supported: false,
             error: None,
         };
@@ -492,6 +545,7 @@ fn run_audio_capture_thread(
         match build_microphone_stream(
             &host,
             &microphone_device_id,
+            processing_settings,
             shared_state.clone(),
             app_handle.clone(),
         ) {
@@ -507,6 +561,7 @@ fn run_audio_capture_thread(
         match build_system_loopback_stream(
             &host,
             &system_device_id,
+            processing_settings,
             shared_state.clone(),
             app_handle,
         ) {
@@ -577,6 +632,7 @@ struct CaptureStreamSpec {
 fn build_microphone_stream(
     host: &cpal::Host,
     microphone_device_id: &str,
+    processing_settings: AudioProcessingSettings,
     shared_state: Arc<Mutex<AudioCaptureState>>,
     app_handle: AppHandle,
 ) -> anyhow::Result<CaptureStreamSpec> {
@@ -595,6 +651,7 @@ fn build_microphone_stream(
         selected_device_id.clone(),
         sample_rate_hz,
         channels,
+        processing_settings,
         shared_state,
         app_handle,
     )?;
@@ -610,6 +667,7 @@ fn build_microphone_stream(
 fn build_system_loopback_stream(
     host: &cpal::Host,
     system_device_id: &str,
+    processing_settings: AudioProcessingSettings,
     shared_state: Arc<Mutex<AudioCaptureState>>,
     app_handle: AppHandle,
 ) -> anyhow::Result<CaptureStreamSpec> {
@@ -629,6 +687,7 @@ fn build_system_loopback_stream(
         selected_device_id.clone(),
         sample_rate_hz,
         channels,
+        processing_settings,
         shared_state,
         app_handle,
     )?;
@@ -653,12 +712,14 @@ fn process_capture_samples(
     device_id: &str,
     sample_rate_hz: u32,
     channels: u16,
+    processing_settings: AudioProcessingSettings,
     shared_state: &Arc<Mutex<AudioCaptureState>>,
     app_handle: &AppHandle,
 ) {
     let samples = samples
         .map(|sample| sample.clamp(-1.0, 1.0))
         .collect::<Vec<_>>();
+    let samples = apply_audio_processing(&samples, processing_settings);
     let event =
         AudioLevelEvent::from_samples(source, device_id, &samples, sample_rate_hz, channels);
 
@@ -667,6 +728,26 @@ fn process_capture_samples(
     }
 
     let _ = app_handle.emit("audio-level", event);
+}
+
+pub fn apply_audio_processing(
+    samples: &[f32],
+    processing_settings: AudioProcessingSettings,
+) -> Vec<f32> {
+    let gain = 10_f32.powf(processing_settings.gain_db / 20.0);
+    let noise_gate = 10_f32.powf(processing_settings.noise_gate_db / 20.0);
+
+    samples
+        .iter()
+        .map(|sample| {
+            let sample = sample.clamp(-1.0, 1.0);
+            if sample.abs() < noise_gate {
+                0.0
+            } else {
+                (sample * gain).clamp(-1.0, 1.0)
+            }
+        })
+        .collect()
 }
 
 fn apply_audio_level_to_state(state: &mut AudioCaptureState, event: &AudioLevelEvent) {
@@ -775,6 +856,8 @@ fn stopped_state() -> AudioCaptureState {
         channels: 1,
         microphone_level: 0.0,
         system_level: 0.0,
+        gain_db: 0.0,
+        noise_gate_db: -80.0,
         system_capture_supported: false,
         error: None,
     }

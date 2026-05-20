@@ -19,6 +19,8 @@ export interface AudioCaptureState {
   channels: number;
   microphoneLevel: number;
   systemLevel: number;
+  gainDb: number;
+  noiseGateDb: number;
   systemCaptureSupported: boolean;
   error?: string;
 }

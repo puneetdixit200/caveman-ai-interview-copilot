@@ -1,7 +1,7 @@
 use tauri::{AppHandle, State};
 
 use crate::ai;
-use crate::audio::{self, AudioCaptureManager, AudioCaptureState};
+use crate::audio::{self, AudioCaptureManager, AudioCaptureState, AudioProcessingSettings};
 use crate::db::{Database, NewAiResponse, NewSession};
 use crate::models::{AiResponse, PromptTemplate, Session, Transcript};
 use crate::overlay::OverlayProtectionStatus;
@@ -103,9 +103,16 @@ pub fn start_capture(
     capture_manager: State<'_, AudioCaptureManager>,
     system_device_id: String,
     microphone_device_id: String,
+    gain_db: Option<f32>,
+    noise_gate_db: Option<f32>,
 ) -> Result<AudioCaptureState, String> {
     capture_manager
-        .start(app_handle, &system_device_id, &microphone_device_id)
+        .start(
+            app_handle,
+            &system_device_id,
+            &microphone_device_id,
+            AudioProcessingSettings::from_optional(gain_db, noise_gate_db),
+        )
         .map_err(to_command_error)
 }
 
