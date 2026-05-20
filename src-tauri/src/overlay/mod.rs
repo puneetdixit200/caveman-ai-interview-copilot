@@ -1,4 +1,5 @@
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
+use tauri::{PhysicalPosition, PhysicalSize};
 
 #[derive(Debug, Clone, Serialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
@@ -9,6 +10,16 @@ pub struct OverlayProtectionStatus {
     pub click_through: bool,
     pub visible: bool,
     pub message: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct OverlayWindowBounds {
+    pub x: i32,
+    pub y: i32,
+    pub width: u32,
+    pub height: u32,
+    pub monitor_name: Option<String>,
 }
 
 pub fn configure_overlay_security(app: &mut tauri::App) {
@@ -22,6 +33,61 @@ pub fn configure_overlay_security(app: &mut tauri::App) {
         let _ = window.set_ignore_cursor_events(true);
         let _ = apply_capture_exclusion(&window);
     }
+}
+
+pub fn get_overlay_window_bounds(app: &tauri::AppHandle) -> anyhow::Result<OverlayWindowBounds> {
+    use tauri::Manager;
+
+    let window = app
+        .get_webview_window("overlay")
+        .ok_or_else(|| anyhow::anyhow!("Overlay window was not found."))?;
+    read_overlay_window_bounds(&window)
+}
+
+pub fn set_overlay_window_bounds(
+    app: &tauri::AppHandle,
+    bounds: OverlayWindowBounds,
+) -> anyhow::Result<OverlayWindowBounds> {
+    use tauri::Manager;
+
+    let window = app
+        .get_webview_window("overlay")
+        .ok_or_else(|| anyhow::anyhow!("Overlay window was not found."))?;
+    let bounds = sanitize_overlay_bounds(bounds);
+    window.set_position(PhysicalPosition::new(bounds.x, bounds.y))?;
+    window.set_size(PhysicalSize::new(bounds.width, bounds.height))?;
+    let _ = protect_overlay_window(app);
+    read_overlay_window_bounds(&window)
+}
+
+pub fn sanitize_overlay_bounds(bounds: OverlayWindowBounds) -> OverlayWindowBounds {
+    OverlayWindowBounds {
+        x: bounds.x.clamp(-100_000, 100_000),
+        y: bounds.y.clamp(-100_000, 100_000),
+        width: bounds.width.clamp(320, 2_400),
+        height: bounds.height.clamp(180, 1_600),
+        monitor_name: bounds.monitor_name,
+    }
+}
+
+fn read_overlay_window_bounds(
+    window: &tauri::WebviewWindow,
+) -> anyhow::Result<OverlayWindowBounds> {
+    let position = window.outer_position()?;
+    let size = window.outer_size()?;
+    let monitor_name = window
+        .current_monitor()
+        .ok()
+        .flatten()
+        .and_then(|monitor| monitor.name().cloned());
+
+    Ok(OverlayWindowBounds {
+        x: position.x,
+        y: position.y,
+        width: size.width,
+        height: size.height,
+        monitor_name,
+    })
 }
 
 pub fn protect_overlay_window(app: &tauri::AppHandle) -> OverlayProtectionStatus {

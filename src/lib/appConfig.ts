@@ -115,7 +115,13 @@ export const DEFAULT_APP_CONFIG: AppConfig = {
     fontSize: 16,
     locked: false,
     hotkey: DEFAULT_OVERLAY_SHORTCUT,
-    autoHideOnScreenShare: false
+    autoHideOnScreenShare: false,
+    bounds: {
+      x: 80,
+      y: 80,
+      width: 680,
+      height: 420
+    }
   },
   security: {
     localOnlyMode: false,
@@ -356,7 +362,20 @@ function mergeOverlaySettings(raw: unknown): OverlaySettings {
     autoHideOnScreenShare:
       typeof value.autoHideOnScreenShare === "boolean"
         ? value.autoHideOnScreenShare
-        : DEFAULT_APP_CONFIG.overlay.autoHideOnScreenShare
+        : DEFAULT_APP_CONFIG.overlay.autoHideOnScreenShare,
+    bounds: mergeOverlayBounds(value.bounds)
+  };
+}
+
+function mergeOverlayBounds(raw: unknown): OverlaySettings["bounds"] {
+  const value = isObject(raw) ? raw : {};
+
+  return {
+    x: clampInteger(value.x, -100_000, 100_000, DEFAULT_APP_CONFIG.overlay.bounds.x),
+    y: clampInteger(value.y, -100_000, 100_000, DEFAULT_APP_CONFIG.overlay.bounds.y),
+    width: clampInteger(value.width, 320, 2_400, DEFAULT_APP_CONFIG.overlay.bounds.width),
+    height: clampInteger(value.height, 180, 1_600, DEFAULT_APP_CONFIG.overlay.bounds.height),
+    monitorName: typeof value.monitorName === "string" && value.monitorName.trim() ? value.monitorName : undefined
   };
 }
 
@@ -416,6 +435,10 @@ function clampNumber(value: unknown, min: number, max: number, fallback: number)
   }
 
   return Math.min(max, Math.max(min, value));
+}
+
+function clampInteger(value: unknown, min: number, max: number, fallback: number): number {
+  return Math.round(clampNumber(value, min, max, fallback));
 }
 
 function readNoiseGateDb(value: unknown, fallback: number): number {

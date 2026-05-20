@@ -4,7 +4,7 @@ use crate::ai;
 use crate::audio::{self, AudioCaptureManager, AudioCaptureState, AudioProcessingSettings};
 use crate::db::{Database, NewAiResponse, NewSession};
 use crate::models::{AiResponse, PromptTemplate, Session, Transcript};
-use crate::overlay::OverlayProtectionStatus;
+use crate::overlay::{OverlayProtectionStatus, OverlayWindowBounds};
 use crate::plugins::PluginManifestFile;
 use crate::secrets::SecretStatus;
 use crate::stt;
@@ -153,6 +153,19 @@ pub fn protect_overlay_window(app_handle: AppHandle) -> OverlayProtectionStatus 
 #[tauri::command]
 pub fn set_overlay_window_visible(app_handle: AppHandle, visible: bool) -> OverlayProtectionStatus {
     crate::overlay::set_overlay_window_visible(&app_handle, visible)
+}
+
+#[tauri::command]
+pub fn get_overlay_window_bounds(app_handle: AppHandle) -> Result<OverlayWindowBounds, String> {
+    crate::overlay::get_overlay_window_bounds(&app_handle).map_err(to_command_error)
+}
+
+#[tauri::command]
+pub fn set_overlay_window_bounds(
+    app_handle: AppHandle,
+    bounds: OverlayWindowBounds,
+) -> Result<OverlayWindowBounds, String> {
+    crate::overlay::set_overlay_window_bounds(&app_handle, bounds).map_err(to_command_error)
 }
 
 #[tauri::command]

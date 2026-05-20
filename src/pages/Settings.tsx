@@ -50,10 +50,12 @@ import {
   deleteProviderApiKey,
   getProviderApiKey,
   getSetting,
+  getOverlayWindowBounds,
   loadPluginManifests,
   listAudioDevices,
   saveProviderApiKey,
   saveSetting,
+  setOverlayWindowBounds,
   transcribeWithCloudStt,
   transcribeWithLocalWhisper
 } from "../lib/tauri";
@@ -431,6 +433,39 @@ export function Settings() {
     setConfig((current) => ({ ...current, overlay: { ...current.overlay, ...patch } }));
   }
 
+  function updateOverlayBounds(patch: Partial<OverlaySettings["bounds"]>) {
+    setConfig((current) => ({
+      ...current,
+      overlay: {
+        ...current.overlay,
+        bounds: {
+          ...current.overlay.bounds,
+          ...patch
+        }
+      }
+    }));
+  }
+
+  async function readOverlayBounds() {
+    try {
+      const bounds = await getOverlayWindowBounds();
+      updateOverlayBounds(bounds);
+      setStatus(`Overlay position read from ${bounds.monitorName ?? "current display"}`);
+    } catch (error) {
+      setStatus(`Could not read overlay position: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
+  async function applyOverlayBounds() {
+    try {
+      const bounds = await setOverlayWindowBounds(config.overlay.bounds);
+      updateOverlayBounds(bounds);
+      setStatus(`Overlay position applied on ${bounds.monitorName ?? "current display"}`);
+    } catch (error) {
+      setStatus(`Could not apply overlay position: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
   function previewTts() {
     const queue = enqueueTtsResponse(
       [],
@@ -682,6 +717,48 @@ export function Settings() {
               onChange={(event) => updateOverlay({ fontSize: Number(event.currentTarget.value) })}
             />
           </label>
+          <label className="settings-field">
+            <span>Overlay X</span>
+            <input
+              type="number"
+              value={config.overlay.bounds.x}
+              onChange={(event) => updateOverlayBounds({ x: Number(event.currentTarget.value) })}
+            />
+          </label>
+          <label className="settings-field">
+            <span>Overlay Y</span>
+            <input
+              type="number"
+              value={config.overlay.bounds.y}
+              onChange={(event) => updateOverlayBounds({ y: Number(event.currentTarget.value) })}
+            />
+          </label>
+          <label className="settings-field">
+            <span>Overlay width</span>
+            <input
+              type="number"
+              min="320"
+              value={config.overlay.bounds.width}
+              onChange={(event) => updateOverlayBounds({ width: Number(event.currentTarget.value) })}
+            />
+          </label>
+          <label className="settings-field">
+            <span>Overlay height</span>
+            <input
+              type="number"
+              min="180"
+              value={config.overlay.bounds.height}
+              onChange={(event) => updateOverlayBounds({ height: Number(event.currentTarget.value) })}
+            />
+          </label>
+          <div className="button-row settings-actions">
+            <Button variant="secondary" icon={<Keyboard size={16} />} onClick={readOverlayBounds}>
+              Read Overlay Position
+            </Button>
+            <Button variant="primary" icon={<Save size={16} />} onClick={applyOverlayBounds}>
+              Apply Overlay Position
+            </Button>
+          </div>
           <label className="toggle-row">
             <span>Lock overlay position</span>
             <input

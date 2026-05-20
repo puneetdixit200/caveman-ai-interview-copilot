@@ -1,4 +1,7 @@
-use super::{capture_exclusion_unavailable_status, OverlayProtectionStatus};
+use super::{
+    capture_exclusion_unavailable_status, sanitize_overlay_bounds, OverlayProtectionStatus,
+    OverlayWindowBounds,
+};
 
 #[test]
 fn reports_unavailable_capture_exclusion_for_unsupported_platforms() {
@@ -15,6 +18,28 @@ fn reports_unavailable_capture_exclusion_for_unsupported_platforms() {
             message: Some(
                 "Capture exclusion is only implemented on Windows in this build.".to_string()
             )
+        }
+    );
+}
+
+#[test]
+fn sanitizes_overlay_bounds_without_breaking_multi_monitor_coordinates() {
+    let bounds = sanitize_overlay_bounds(OverlayWindowBounds {
+        x: -1920,
+        y: 40,
+        width: 100,
+        height: 90,
+        monitor_name: Some("Left Display".to_string()),
+    });
+
+    assert_eq!(
+        bounds,
+        OverlayWindowBounds {
+            x: -1920,
+            y: 40,
+            width: 320,
+            height: 180,
+            monitor_name: Some("Left Display".to_string()),
         }
     );
 }

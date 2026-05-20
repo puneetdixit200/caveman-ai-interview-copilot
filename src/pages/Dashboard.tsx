@@ -44,6 +44,7 @@ import {
   listTranscripts,
   onAudioLevel,
   protectOverlayWindow,
+  setOverlayWindowBounds,
   setOverlayWindowVisible,
   startCapture,
   stopCapture
@@ -107,6 +108,9 @@ export function Dashboard() {
 
   const setNativeOverlayVisible = useCallback(
     async (nextVisible: boolean) => {
+      if (nextVisible) {
+        await setOverlayWindowBounds(config.overlay.bounds);
+      }
       setVisible(nextVisible);
       const status = await setOverlayWindowVisible(nextVisible);
       setOverlayProtection(status);
@@ -116,7 +120,7 @@ export function Dashboard() {
         setVisible(status.visible);
       }
     },
-    [setVisible]
+    [config.overlay.bounds, setVisible]
   );
 
   const toggleOverlayWindow = useCallback(() => {
@@ -165,6 +169,7 @@ export function Dashboard() {
         setOpacity(hydratedConfig.overlay.opacity);
         setFontSize(hydratedConfig.overlay.fontSize);
         setLocked(hydratedConfig.overlay.locked);
+        await setOverlayWindowBounds(hydratedConfig.overlay.bounds);
         setKnowledgeBase(parseKnowledgeBase(rawKnowledgeBase));
         setPluginCatalog(parsePluginCatalog(rawPluginCatalog));
         setAudioDevices(devices);

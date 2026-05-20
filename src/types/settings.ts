@@ -98,6 +98,15 @@ export interface OverlaySettings {
   locked: boolean;
   hotkey: string;
   autoHideOnScreenShare: boolean;
+  bounds: OverlayWindowBounds;
+}
+
+export interface OverlayWindowBounds {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  monitorName?: string;
 }
 
 export interface AppProfile {

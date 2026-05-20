@@ -127,7 +127,13 @@ describe("appConfig", () => {
       fontSize: 16,
       locked: false,
       hotkey: "CommandOrControl+Shift+H",
-      autoHideOnScreenShare: false
+      autoHideOnScreenShare: false,
+      bounds: {
+        x: 80,
+        y: 80,
+        width: 680,
+        height: 420
+      }
     });
   });
 
@@ -164,7 +170,13 @@ describe("appConfig", () => {
           fontSize: 64,
           locked: true,
           hotkey: "control + alt + space",
-          autoHideOnScreenShare: true
+          autoHideOnScreenShare: true,
+          bounds: {
+            x: -1920,
+            y: 40,
+            width: 120,
+            height: 90
+          }
         }
       })
     );
@@ -199,7 +211,13 @@ describe("appConfig", () => {
       fontSize: 28,
       locked: true,
       hotkey: "CommandOrControl+Alt+Space",
-      autoHideOnScreenShare: true
+      autoHideOnScreenShare: true,
+      bounds: {
+        x: -1920,
+        y: 40,
+        width: 320,
+        height: 180
+      }
     });
   });
 });

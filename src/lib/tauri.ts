@@ -9,7 +9,7 @@ import type {
   SttTranscriptEvent,
   TranscriptSegment
 } from "../types/session";
-import type { AudioDevice } from "../types/settings";
+import type { AudioDevice, OverlayWindowBounds } from "../types/settings";
 import type { PluginManifestFile } from "./pluginLoader";
 
 export interface OverlayProtectionStatus {
@@ -285,6 +285,19 @@ export async function setOverlayWindowVisible(visible: boolean): Promise<Overlay
     visible,
     message: "Native overlay visibility is available only inside the Tauri desktop app."
   }));
+}
+
+export async function getOverlayWindowBounds(): Promise<OverlayWindowBounds> {
+  return invokeOrFallback<OverlayWindowBounds>("get_overlay_window_bounds", {}, () => ({
+    x: 80,
+    y: 80,
+    width: 680,
+    height: 420
+  }));
+}
+
+export async function setOverlayWindowBounds(bounds: OverlayWindowBounds): Promise<OverlayWindowBounds> {
+  return invokeOrFallback<OverlayWindowBounds>("set_overlay_window_bounds", { bounds }, () => bounds);
 }
 
 export async function loadPluginManifests(directory: string): Promise<PluginManifestFile[]> {

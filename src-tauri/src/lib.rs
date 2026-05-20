@@ -45,6 +45,8 @@ pub fn run() {
             commands::transcribe_with_cloud_stt,
             commands::protect_overlay_window,
             commands::set_overlay_window_visible,
+            commands::get_overlay_window_bounds,
+            commands::set_overlay_window_bounds,
             commands::list_prompt_templates,
             commands::load_plugin_manifests
         ])

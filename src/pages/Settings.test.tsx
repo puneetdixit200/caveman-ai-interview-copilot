@@ -62,5 +62,9 @@ describe("Settings", () => {
 
     expect(await screen.findByRole("textbox", { name: "Overlay hotkey" })).toBeInTheDocument();
     expect(screen.getByLabelText("Auto-hide when screen sharing")).toBeInTheDocument();
+    expect(screen.getByRole("spinbutton", { name: "Overlay X" })).toBeInTheDocument();
+    expect(screen.getByRole("spinbutton", { name: "Overlay width" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Read Overlay Position" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Apply Overlay Position" })).toBeInTheDocument();
   });
 });

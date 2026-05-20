@@ -138,7 +138,13 @@ export const profiles: AppProfile[] = [
       fontSize: 16,
       locked: false,
       hotkey: "Ctrl+Shift+H",
-      autoHideOnScreenShare: true
+      autoHideOnScreenShare: true,
+      bounds: {
+        x: 80,
+        y: 80,
+        width: 680,
+        height: 420
+      }
     }
   },
   {
@@ -152,8 +158,13 @@ export const profiles: AppProfile[] = [
       fontSize: 17,
       locked: true,
       hotkey: "Ctrl+Shift+H",
-      autoHideOnScreenShare: true
+      autoHideOnScreenShare: true,
+      bounds: {
+        x: 120,
+        y: 120,
+        width: 720,
+        height: 460
+      }
     }
   }
 ];
-
