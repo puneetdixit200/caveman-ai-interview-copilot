@@ -10,8 +10,13 @@ import { applyAudioLevelEvent, type AudioCaptureState } from "../lib/audioEvents
 import { shouldTriggerAnswer } from "../lib/autoTrigger";
 import { buildChatMessages } from "../lib/contextBuilder";
 import { canSendOcrContext } from "../lib/ocr";
-import { registerOverlayToggleShortcut } from "../lib/globalHotkeys";
-import { DEFAULT_OVERLAY_SHORTCUT, overlayShortcutLabel } from "../lib/hotkeys";
+import { registerGlobalActionShortcuts } from "../lib/globalHotkeys";
+import {
+  DEFAULT_CAPTURE_SHORTCUT,
+  DEFAULT_GENERATE_SHORTCUT,
+  DEFAULT_OVERLAY_SHORTCUT,
+  overlayShortcutLabel
+} from "../lib/hotkeys";
 import { shouldAutoHideOverlay } from "../lib/overlaySafety";
 import {
   KNOWLEDGE_BASE_SETTING_KEY,
@@ -93,6 +98,8 @@ export function Dashboard() {
   const [pluginCatalog, setPluginCatalog] = useState<PluginCatalog>(createEmptyPluginCatalog());
   const seenLiveTranscriptKeys = useRef(new Set<string>());
   const liveTranscriptionBusy = useRef(false);
+  const captureShortcutAction = useRef<() => void>(() => undefined);
+  const generateShortcutAction = useRef<() => void>(() => undefined);
   const { visible, setVisible, opacity, setOpacity, fontSize, setFontSize, locked, setLocked } = useOverlayStore();
 
   const selectedProvider = useMemo(
@@ -280,9 +287,24 @@ export function Dashboard() {
     let disposed = false;
     let cleanup: (() => Promise<void>) | undefined;
 
-    registerOverlayToggleShortcut({
-      shortcut: config.overlay.hotkey,
-      onToggle: toggleOverlayWindow
+    registerGlobalActionShortcuts({
+      actions: [
+        {
+          id: "overlay",
+          shortcut: config.overlay.hotkey,
+          onPressed: toggleOverlayWindow
+        },
+        {
+          id: "capture",
+          shortcut: DEFAULT_CAPTURE_SHORTCUT,
+          onPressed: () => captureShortcutAction.current()
+        },
+        {
+          id: "generate",
+          shortcut: DEFAULT_GENERATE_SHORTCUT,
+          onPressed: () => generateShortcutAction.current()
+        }
+      ]
     }).then((registration) => {
       if (disposed) {
         void registration.dispose();
@@ -290,9 +312,10 @@ export function Dashboard() {
       }
 
       cleanup = registration.dispose;
-      setOverlayShortcut(registration.registeredShortcut);
-      if (registration.error) {
-        setOverlayMessage(`Global shortcut unavailable: ${registration.error}`);
+      setOverlayShortcut(registration.registeredShortcuts.overlay ?? config.overlay.hotkey);
+      const firstError = Object.entries(registration.errors)[0];
+      if (firstError) {
+        setOverlayMessage(`Global shortcut unavailable (${firstError[0]}): ${firstError[1]}`);
       }
     });
 
@@ -517,6 +540,13 @@ export function Dashboard() {
       setStreaming(false);
     }
   }
+
+  captureShortcutAction.current = () => {
+    void toggleCapture();
+  };
+  generateShortcutAction.current = () => {
+    void generateResponse();
+  };
 
   return (
     <main className="dashboard-grid">

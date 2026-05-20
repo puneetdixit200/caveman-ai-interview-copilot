@@ -22,11 +22,75 @@ export interface OverlayShortcutRegistration {
   error?: string;
 }
 
+export interface GlobalActionShortcut {
+  id: string;
+  shortcut: string;
+  onPressed: () => void;
+  enabled?: boolean;
+}
+
+export interface GlobalActionShortcutRegistration {
+  registeredShortcuts: Record<string, string>;
+  errors: Record<string, string>;
+  dispose: () => Promise<void>;
+}
+
 const defaultGlobalShortcutApi: GlobalShortcutApi = {
   isRegistered,
   register,
   unregister
 };
+
+export async function registerGlobalActionShortcuts(input: {
+  actions: GlobalActionShortcut[];
+  enabled?: boolean;
+  api?: GlobalShortcutApi;
+}): Promise<GlobalActionShortcutRegistration> {
+  const api = input.api ?? defaultGlobalShortcutApi;
+  const registeredShortcuts: Record<string, string> = {};
+  const errors: Record<string, string> = {};
+  const disposers: Array<() => Promise<void>> = [];
+
+  if (!(input.enabled ?? isRunningInTauri())) {
+    return {
+      registeredShortcuts,
+      errors,
+      dispose: async () => undefined
+    };
+  }
+
+  for (const action of input.actions) {
+    const shortcut = normalizeShortcut(action.shortcut);
+    if (!shortcut || action.enabled === false) {
+      continue;
+    }
+
+    try {
+      if (await api.isRegistered(shortcut)) {
+        await api.unregister(shortcut);
+      }
+
+      await api.register(shortcut, (event) => {
+        if (event.state === "Pressed") {
+          action.onPressed();
+        }
+      });
+
+      registeredShortcuts[action.id] = shortcut;
+      disposers.push(() => api.unregister(shortcut));
+    } catch (error) {
+      errors[action.id] = error instanceof Error ? error.message : String(error);
+    }
+  }
+
+  return {
+    registeredShortcuts,
+    errors,
+    dispose: async () => {
+      await Promise.all(disposers.map((dispose) => dispose()));
+    }
+  };
+}
 
 export async function registerOverlayToggleShortcut(input: {
   shortcut: string;
@@ -35,7 +99,6 @@ export async function registerOverlayToggleShortcut(input: {
   api?: GlobalShortcutApi;
 }): Promise<OverlayShortcutRegistration> {
   const registeredShortcut = normalizeShortcut(input.shortcut);
-  const api = input.api ?? defaultGlobalShortcutApi;
 
   if (!registeredShortcut) {
     return {
@@ -45,33 +108,21 @@ export async function registerOverlayToggleShortcut(input: {
     };
   }
 
-  if (!(input.enabled ?? isRunningInTauri())) {
-    return {
-      registeredShortcut,
-      dispose: async () => undefined
-    };
-  }
-
-  try {
-    if (await api.isRegistered(registeredShortcut)) {
-      await api.unregister(registeredShortcut);
-    }
-
-    await api.register(registeredShortcut, (event) => {
-      if (event.state === "Pressed") {
-        input.onToggle();
+  const registration = await registerGlobalActionShortcuts({
+    enabled: input.enabled,
+    api: input.api,
+    actions: [
+      {
+        id: "overlay",
+        shortcut: registeredShortcut,
+        onPressed: input.onToggle
       }
-    });
+    ]
+  });
 
-    return {
-      registeredShortcut,
-      dispose: () => api.unregister(registeredShortcut)
-    };
-  } catch (error) {
-    return {
-      registeredShortcut,
-      error: error instanceof Error ? error.message : String(error),
-      dispose: async () => undefined
-    };
-  }
+  return {
+    registeredShortcut,
+    error: registration.errors.overlay,
+    dispose: registration.dispose
+  };
 }

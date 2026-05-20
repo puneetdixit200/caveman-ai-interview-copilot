@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { registerOverlayToggleShortcut, type ShortcutHandler } from "./globalHotkeys";
+import { registerGlobalActionShortcuts, registerOverlayToggleShortcut, type ShortcutHandler } from "./globalHotkeys";
 
 describe("globalHotkeys", () => {
   it("registers the overlay shortcut and toggles only on key press", async () => {
@@ -31,5 +31,51 @@ describe("globalHotkeys", () => {
 
     await registration.dispose();
     expect(api.unregister).toHaveBeenCalledWith("CommandOrControl+Shift+H");
+  });
+
+  it("registers multiple interview action shortcuts and cleans them up together", async () => {
+    const handlers = new Map<string, ShortcutHandler>();
+    const onCapture = vi.fn();
+    const onGenerate = vi.fn();
+    const api = {
+      isRegistered: vi.fn(async (shortcut: string) => shortcut === "CommandOrControl+Shift+S"),
+      register: vi.fn(async (shortcut: string, nextHandler: ShortcutHandler) => {
+        handlers.set(shortcut, nextHandler);
+      }),
+      unregister: vi.fn(async () => undefined)
+    };
+
+    const registration = await registerGlobalActionShortcuts({
+      enabled: true,
+      api,
+      actions: [
+        {
+          id: "capture",
+          shortcut: "Ctrl+Shift+S",
+          onPressed: onCapture
+        },
+        {
+          id: "generate",
+          shortcut: "Ctrl+Shift+G",
+          onPressed: onGenerate
+        }
+      ]
+    });
+
+    expect(registration.errors).toEqual({});
+    expect(registration.registeredShortcuts).toEqual({
+      capture: "CommandOrControl+Shift+S",
+      generate: "CommandOrControl+Shift+G"
+    });
+    expect(api.unregister).toHaveBeenCalledWith("CommandOrControl+Shift+S");
+
+    handlers.get("CommandOrControl+Shift+S")?.({ shortcut: "CommandOrControl+Shift+S", id: 1, state: "Pressed" });
+    handlers.get("CommandOrControl+Shift+G")?.({ shortcut: "CommandOrControl+Shift+G", id: 2, state: "Pressed" });
+
+    expect(onCapture).toHaveBeenCalledTimes(1);
+    expect(onGenerate).toHaveBeenCalledTimes(1);
+
+    await registration.dispose();
+    expect(api.unregister).toHaveBeenCalledWith("CommandOrControl+Shift+G");
   });
 });
