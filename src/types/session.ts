@@ -42,6 +42,8 @@ export interface TranscriptSegment {
 export interface AIResponseRecord {
   id: number;
   sessionId: string;
+  triggerTranscriptId?: number;
+  promptMessages?: string;
   response: string;
   model: string;
   provider: string;
@@ -49,6 +51,18 @@ export interface AIResponseRecord {
   outputTokens?: number;
   latencyMs?: number;
   createdAt: string;
+}
+
+export interface NewAIResponseInput {
+  sessionId: string;
+  triggerTranscriptId?: number;
+  promptMessages: string;
+  response: string;
+  model: string;
+  provider: string;
+  inputTokens?: number;
+  outputTokens?: number;
+  latencyMs?: number;
 }
 
 export interface PromptTemplate {
@@ -62,4 +76,3 @@ export interface ChatMessage {
   role: ChatRole;
   content: string;
 }
-
