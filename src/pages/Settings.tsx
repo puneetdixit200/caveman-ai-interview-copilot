@@ -25,10 +25,12 @@ import { createConfiguredProvider } from "../lib/providerClients";
 import { hydrateProviderApiKeys } from "../lib/providerSecrets";
 import {
   deleteProviderApiKey,
+  getProviderApiKey,
   getSetting,
   listAudioDevices,
   saveProviderApiKey,
   saveSetting,
+  transcribeWithCloudStt,
   transcribeWithLocalWhisper
 } from "../lib/tauri";
 import { promptTemplates } from "../lib/promptTemplates";
@@ -53,6 +55,7 @@ export function Settings() {
   const [sttSampleAudioPath, setSttSampleAudioPath] = useState("");
   const [testingStt, setTestingStt] = useState(false);
   const [providerSecretInputs, setProviderSecretInputs] = useState<Partial<Record<ProviderId, string>>>({});
+  const [sttSecretInput, setSttSecretInput] = useState("");
   const [audioDevices, setAudioDevices] = useState<AudioDevice[]>([]);
 
   useEffect(() => {
@@ -62,11 +65,23 @@ export function Settings() {
       const [rawConfig, devices] = await Promise.all([getSetting(APP_CONFIG_SETTING_KEY), listAudioDevices()]);
       const stored = parseAppConfig(rawConfig);
       const hydrated = await hydrateProviderApiKeys(stored);
+      const sttSecret = isCloudSttMode(hydrated.stt.selectedMode)
+        ? await getProviderApiKey(sttSecretProviderId(hydrated.stt.selectedMode))
+        : undefined;
+      const nextConfig = {
+        ...hydrated,
+        stt: {
+          ...hydrated.stt,
+          apiKey: sttSecret,
+          apiKeyStored: Boolean(sttSecret)
+        }
+      };
       if (!cancelled) {
-        setConfig(hydrated);
+        setConfig(nextConfig);
+        setSttSecretInput(sttSecret ?? "");
         setAudioDevices(devices);
         setProviderSecretInputs(
-          hydrated.providers.reduce<Partial<Record<ProviderId, string>>>((values, provider) => {
+          nextConfig.providers.reduce<Partial<Record<ProviderId, string>>>((values, provider) => {
             if (provider.kind === "cloud") {
               values[provider.id] = provider.apiKey ?? "";
             }
@@ -116,6 +131,38 @@ export function Settings() {
       setStatus(`Local Whisper returned ${events.length} transcript segment${events.length === 1 ? "" : "s"}`);
     } catch (error) {
       setStatus(`Local Whisper failed: ${error instanceof Error ? error.message : String(error)}`);
+    } finally {
+      setTestingStt(false);
+    }
+  }
+
+  async function testCloudStt() {
+    if (!isCloudSttMode(config.stt.selectedMode)) {
+      setStatus("Choose Deepgram, AssemblyAI, or Google STT before testing cloud transcription.");
+      return;
+    }
+
+    const apiKey = (sttSecretInput || config.stt.apiKey || "").trim();
+    if (!apiKey) {
+      setStatus(`Save a ${config.stt.selectedMode} STT API key before testing.`);
+      return;
+    }
+
+    setTestingStt(true);
+    setStatus(`Running ${config.stt.selectedMode} STT test...`);
+
+    try {
+      const events = await transcribeWithCloudStt({
+        provider: config.stt.selectedMode,
+        apiKey,
+        audioPath: sttSampleAudioPath,
+        language: config.stt.language || "en-US",
+        diarizationEnabled: config.stt.diarizationEnabled,
+        endpoint: config.stt.cloudEndpoint || undefined
+      });
+      setStatus(`${config.stt.selectedMode} returned ${events.length} transcript segment${events.length === 1 ? "" : "s"}`);
+    } catch (error) {
+      setStatus(`${config.stt.selectedMode} failed: ${error instanceof Error ? error.message : String(error)}`);
     } finally {
       setTestingStt(false);
     }
@@ -213,6 +260,67 @@ export function Settings() {
 
   function updateStt(patch: Partial<SttSettings>) {
     setConfig((current) => ({ ...current, stt: { ...current.stt, ...patch } }));
+  }
+
+  async function updateSelectedSttMode(selectedMode: SttSettings["selectedMode"]) {
+    updateStt({ selectedMode, apiKey: undefined, apiKeyStored: false });
+    updateAudio({ sttMode: selectedMode });
+    if (!isCloudSttMode(selectedMode)) {
+      setSttSecretInput("");
+      return;
+    }
+
+    const secret = await getProviderApiKey(sttSecretProviderId(selectedMode));
+    setSttSecretInput(secret ?? "");
+    updateStt({ apiKey: secret, apiKeyStored: Boolean(secret) });
+  }
+
+  async function saveSttSecret() {
+    if (!isCloudSttMode(config.stt.selectedMode)) {
+      setStatus("Choose a cloud STT provider before saving a key.");
+      return;
+    }
+
+    const secret = sttSecretInput.trim();
+    if (!secret) {
+      setStatus("Paste a cloud STT API key before saving.");
+      return;
+    }
+
+    try {
+      await saveProviderApiKey(sttSecretProviderId(config.stt.selectedMode), secret);
+      const nextConfig = {
+        ...config,
+        stt: {
+          ...config.stt,
+          apiKey: secret,
+          apiKeyStored: true
+        }
+      };
+      setConfig(nextConfig);
+      await saveSetting(APP_CONFIG_SETTING_KEY, serializeAppConfig(nextConfig));
+      setStatus(`${config.stt.selectedMode} STT key stored in OS keychain`);
+    } catch (error) {
+      setStatus(`Could not store STT key: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
+  async function deleteSttSecret() {
+    if (isCloudSttMode(config.stt.selectedMode)) {
+      await deleteProviderApiKey(sttSecretProviderId(config.stt.selectedMode));
+    }
+    const nextConfig = {
+      ...config,
+      stt: {
+        ...config.stt,
+        apiKey: undefined,
+        apiKeyStored: false
+      }
+    };
+    setSttSecretInput("");
+    setConfig(nextConfig);
+    await saveSetting(APP_CONFIG_SETTING_KEY, serializeAppConfig(nextConfig));
+    setStatus("Cloud STT key removed from OS keychain");
   }
 
   function updateAutoTrigger(patch: Partial<AutoTriggerSettings>) {
@@ -437,11 +545,9 @@ export function Settings() {
             <span>STT provider</span>
             <select
               value={config.stt.selectedMode}
-              onChange={(event) => {
-                const selectedMode = event.currentTarget.value as SttSettings["selectedMode"];
-                updateStt({ selectedMode });
-                updateAudio({ sttMode: selectedMode });
-              }}
+              onChange={(event) =>
+                void updateSelectedSttMode(event.currentTarget.value as SttSettings["selectedMode"])
+              }
             >
               <option value="manual">Manual</option>
               <option value="local_whisper">Local Whisper</option>
@@ -450,6 +556,26 @@ export function Settings() {
               <option value="google">Google STT</option>
             </select>
           </label>
+          <label className="settings-field">
+            <span>Cloud STT API key</span>
+            <input
+              type="password"
+              value={sttSecretInput}
+              placeholder="Paste Deepgram, AssemblyAI, or Google key"
+              onChange={(event) => {
+                setSttSecretInput(event.currentTarget.value);
+                updateStt({ apiKey: event.currentTarget.value });
+              }}
+            />
+          </label>
+          <div className="button-row settings-actions">
+            <Button variant="primary" icon={<Save size={16} />} onClick={saveSttSecret}>
+              Save STT Key
+            </Button>
+            <Button variant="secondary" icon={<Trash2 size={16} />} onClick={deleteSttSecret}>
+              Delete STT Key
+            </Button>
+          </div>
           <label className="settings-field">
             <span>Microphone device</span>
             <select
@@ -521,6 +647,14 @@ export function Settings() {
             />
           </label>
           <label className="settings-field">
+            <span>Cloud STT endpoint</span>
+            <input
+              value={config.stt.cloudEndpoint}
+              placeholder="Optional provider endpoint override"
+              onChange={(event) => updateStt({ cloudEndpoint: event.currentTarget.value })}
+            />
+          </label>
+          <label className="settings-field">
             <span>Language</span>
             <input value={config.stt.language} onChange={(event) => updateStt({ language: event.currentTarget.value })} />
           </label>
@@ -534,6 +668,9 @@ export function Settings() {
           </label>
           <Button icon={<Wifi size={16} />} onClick={testLocalWhisper} disabled={testingStt}>
             {testingStt ? "Testing STT" : "Test Local Whisper"}
+          </Button>
+          <Button icon={<Wifi size={16} />} onClick={testCloudStt} disabled={testingStt}>
+            {testingStt ? "Testing STT" : "Test Cloud STT"}
           </Button>
         </div>
       </section>
@@ -820,4 +957,12 @@ export function Settings() {
       </section>
     </main>
   );
+}
+
+function isCloudSttMode(mode: SttSettings["selectedMode"]): mode is "deepgram" | "assemblyai" | "google" {
+  return mode === "deepgram" || mode === "assemblyai" || mode === "google";
+}
+
+function sttSecretProviderId(mode: "deepgram" | "assemblyai" | "google"): string {
+  return `stt-${mode}`;
 }

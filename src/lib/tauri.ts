@@ -243,6 +243,17 @@ export async function transcribeWithLocalWhisper(input: {
   return invokeStrictOrFallback<SttTranscriptEvent[]>("transcribe_with_local_whisper", { input }, () => []);
 }
 
+export async function transcribeWithCloudStt(input: {
+  provider: "deepgram" | "assemblyai" | "google";
+  apiKey: string;
+  audioPath: string;
+  language?: string;
+  diarizationEnabled?: boolean;
+  endpoint?: string;
+}): Promise<SttTranscriptEvent[]> {
+  return invokeStrictOrFallback<SttTranscriptEvent[]>("transcribe_with_cloud_stt", { input }, () => []);
+}
+
 export async function protectOverlayWindow(): Promise<OverlayProtectionStatus> {
   return invokeOrFallback<OverlayProtectionStatus>("protect_overlay_window", {}, () => ({
     alwaysOnTop: false,

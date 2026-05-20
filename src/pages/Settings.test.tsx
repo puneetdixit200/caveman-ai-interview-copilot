@@ -33,4 +33,11 @@ describe("Settings", () => {
     expect(await screen.findByRole("combobox", { name: "Microphone device" })).toBeInTheDocument();
     expect(screen.getByRole("combobox", { name: "System audio device" })).toBeInTheDocument();
   });
+
+  it("shows OS keychain controls for cloud STT provider keys", async () => {
+    render(<Settings />);
+
+    expect(await screen.findByRole("button", { name: "Save STT Key" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Delete STT Key" })).toBeInTheDocument();
+  });
 });

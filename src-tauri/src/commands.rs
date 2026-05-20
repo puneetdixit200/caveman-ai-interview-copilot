@@ -131,6 +131,13 @@ pub fn transcribe_with_local_whisper(
 }
 
 #[tauri::command]
+pub fn transcribe_with_cloud_stt(
+    input: stt::CloudSttRequest,
+) -> Result<Vec<stt::TranscriptEvent>, String> {
+    stt::transcribe_with_cloud_stt(input).map_err(to_command_error)
+}
+
+#[tauri::command]
 pub fn protect_overlay_window(app_handle: AppHandle) -> OverlayProtectionStatus {
     crate::overlay::protect_overlay_window(&app_handle)
 }

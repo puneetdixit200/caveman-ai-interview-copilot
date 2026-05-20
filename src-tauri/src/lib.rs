@@ -39,6 +39,7 @@ pub fn run() {
             commands::get_capture_status,
             commands::list_stt_providers,
             commands::transcribe_with_local_whisper,
+            commands::transcribe_with_cloud_stt,
             commands::protect_overlay_window,
             commands::set_overlay_window_visible,
             commands::list_prompt_templates
