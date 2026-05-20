@@ -47,6 +47,20 @@ export function exportSessionMarkdown({ session, transcripts, responses }: Expor
   ].join("\n");
 }
 
+export function exportSessionJson({ session, transcripts, responses }: ExportSessionInput): string {
+  return JSON.stringify(
+    {
+      exportVersion: 1,
+      exportedAt: new Date().toISOString(),
+      session,
+      transcripts,
+      responses
+    },
+    null,
+    2
+  );
+}
+
 function formatProviderName(provider: string): string {
   const knownProviders: Record<string, string> = {
     lmstudio: "LM Studio",

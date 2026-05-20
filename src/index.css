@@ -681,6 +681,39 @@ input[type="checkbox"] {
   display: block;
 }
 
+.session-stats small {
+  display: block;
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 0.72rem;
+}
+
+.replay-panel {
+  padding: 16px;
+}
+
+.replay-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 14px;
+}
+
+.replay-column {
+  min-width: 0;
+}
+
+.replay-column h3 {
+  margin-bottom: 10px;
+  font-size: 0.9rem;
+}
+
+.button-row {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
 .export-panel pre {
   overflow: auto;
   max-height: 440px;
@@ -837,7 +870,8 @@ code {
   }
 
   .dashboard-grid,
-  .settings-grid {
+  .settings-grid,
+  .replay-grid {
     grid-template-columns: 1fr;
   }
 

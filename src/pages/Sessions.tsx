@@ -1,8 +1,10 @@
-import { Download, Search } from "lucide-react";
+import { Copy, FileJson, Search } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Button } from "../components/common/Button";
-import { exportSessionMarkdown } from "../lib/sessionExport";
-import { formatDuration } from "../lib/formatters";
+import { ResponseCard } from "../components/overlay/ResponseCard";
+import { exportSessionJson, exportSessionMarkdown } from "../lib/sessionExport";
+import { filterSessionSummaries } from "../lib/sessionSearch";
+import { formatDuration, formatTimestampMs } from "../lib/formatters";
 import { listAiResponses, listSessions, listTranscripts } from "../lib/tauri";
 import type { AIResponseRecord, SessionRecord, TranscriptSegment } from "../types/session";
 
@@ -11,16 +13,16 @@ export function Sessions() {
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
   const [transcripts, setTranscripts] = useState<TranscriptSegment[]>([]);
   const [responses, setResponses] = useState<AIResponseRecord[]>([]);
+  const [transcriptsBySession, setTranscriptsBySession] = useState<Record<string, string[]>>({});
+  const [responsesBySession, setResponsesBySession] = useState<Record<string, string[]>>({});
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState("Loading sessions...");
 
-  const selectedSession = sessions.find((session) => session.id === selectedSessionId) ?? sessions[0];
-  const filteredSessions = sessions.filter((session) =>
-    [session.title, session.company, session.role, session.tags.join(" ")]
-      .join(" ")
-      .toLowerCase()
-      .includes(query.toLowerCase())
+  const filteredSessions = useMemo(
+    () => filterSessionSummaries({ query, sessions, transcriptsBySession, responsesBySession }),
+    [query, responsesBySession, sessions, transcriptsBySession]
   );
+  const selectedSession = sessions.find((session) => session.id === selectedSessionId) ?? filteredSessions[0] ?? sessions[0];
 
   const markdownExport = useMemo(() => {
     if (!selectedSession) {
@@ -28,6 +30,18 @@ export function Sessions() {
     }
 
     return exportSessionMarkdown({
+      session: selectedSession,
+      transcripts,
+      responses
+    });
+  }, [responses, selectedSession, transcripts]);
+
+  const jsonExport = useMemo(() => {
+    if (!selectedSession) {
+      return "{}";
+    }
+
+    return exportSessionJson({
       session: selectedSession,
       transcripts,
       responses
@@ -52,6 +66,38 @@ export function Sessions() {
       cancelled = true;
     };
   }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function buildSearchIndex() {
+      const transcriptEntries = await Promise.all(
+        sessions.map(async (session) => [
+          session.id,
+          (await listTranscripts(session.id)).map((transcript) => transcript.content)
+        ])
+      );
+      const responseEntries = await Promise.all(
+        sessions.map(async (session) => [
+          session.id,
+          (await listAiResponses(session.id)).map((response) => response.response)
+        ])
+      );
+
+      if (!cancelled) {
+        setTranscriptsBySession(Object.fromEntries(transcriptEntries));
+        setResponsesBySession(Object.fromEntries(responseEntries));
+      }
+    }
+
+    if (sessions.length > 0) {
+      void buildSearchIndex();
+    }
+
+    return () => {
+      cancelled = true;
+    };
+  }, [sessions]);
 
   useEffect(() => {
     let cancelled = false;
@@ -81,9 +127,14 @@ export function Sessions() {
     };
   }, [selectedSession?.id]);
 
-  async function copyExport() {
+  async function copyMarkdownExport() {
     await navigator.clipboard?.writeText(markdownExport);
     setStatus("Markdown export copied");
+  }
+
+  async function copyJsonExport() {
+    await navigator.clipboard?.writeText(jsonExport);
+    setStatus("JSON export copied");
   }
 
   return (
@@ -98,7 +149,7 @@ export function Sessions() {
           <Search size={16} />
           <input
             aria-label="Search sessions"
-            placeholder="Search company, role, tag"
+            placeholder="Search sessions, transcript, answers"
             value={query}
             onChange={(event) => setQuery(event.currentTarget.value)}
           />
@@ -127,6 +178,11 @@ export function Sessions() {
               <div className="session-stats">
                 <span>{session.status}</span>
                 <strong>{formatDuration(session.durationSeconds)}</strong>
+                <small>
+                  {(transcriptsBySession[session.id]?.length ?? 0) +
+                    (responsesBySession[session.id]?.length ?? 0)}{" "}
+                  replay items
+                </small>
               </div>
             </button>
           ))
@@ -135,15 +191,59 @@ export function Sessions() {
         )}
       </section>
 
+      <section className="panel replay-panel">
+        <div className="panel-heading">
+          <div>
+            <p className="eyebrow">Replay</p>
+            <h2>{selectedSession?.title ?? "No session selected"}</h2>
+          </div>
+        </div>
+        <div className="replay-grid">
+          <div className="replay-column">
+            <h3>Transcript</h3>
+            <div className="transcript-feed">
+              {transcripts.length > 0 ? (
+                transcripts.map((segment) => (
+                  <article className={`transcript-row speaker-${segment.speaker}`} key={segment.id}>
+                    <div className="transcript-meta">
+                      <span>{segment.speaker}</span>
+                      <span>{formatTimestampMs(segment.timestampMs)}</span>
+                    </div>
+                    <p>{segment.content}</p>
+                  </article>
+                ))
+              ) : (
+                <p className="empty-copy">No transcript lines saved for this session.</p>
+              )}
+            </div>
+          </div>
+          <div className="replay-column">
+            <h3>Answers</h3>
+            <div className="overlay-responses">
+              {responses.length > 0 ? (
+                responses.map((response) => <ResponseCard key={response.id} response={response} />)
+              ) : (
+                <p className="empty-copy">No AI responses saved for this session.</p>
+              )}
+            </div>
+          </div>
+        </div>
+      </section>
+
       <section className="panel export-panel">
         <div className="panel-heading">
           <div>
             <p className="eyebrow">Export</p>
             <h2>Markdown Preview</h2>
           </div>
-          <Button icon={<Download size={16} />} onClick={copyExport} disabled={!selectedSession}>
-            Copy Export
-          </Button>
+          <div className="button-row">
+            <Button icon={<Copy size={16} />} onClick={copyMarkdownExport} disabled={!selectedSession}>
+              Copy Markdown
+            </Button>
+            <Button icon={<FileJson size={16} />} onClick={copyJsonExport} disabled={!selectedSession}>
+              Copy JSON
+            </Button>
+          </div>
         </div>
         <pre>{markdownExport}</pre>
       </section>
