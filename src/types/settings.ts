@@ -101,6 +101,12 @@ export interface OverlaySettings {
   bounds: OverlayWindowBounds;
 }
 
+export interface ShortcutSettings {
+  overlayToggle: string;
+  captureToggle: string;
+  generateAnswer: string;
+}
+
 export interface OverlayWindowBounds {
   x: number;
   y: number;
@@ -116,4 +122,5 @@ export interface AppProfile {
   providerId: ProviderId;
   sttMode: SttMode;
   overlay: OverlaySettings;
+  shortcuts: ShortcutSettings;
 }

@@ -72,6 +72,7 @@ import type {
   PluginSettings,
   ProviderId,
   SecuritySettings,
+  ShortcutSettings,
   SttSettings,
   TtsSettings
 } from "../types/settings";
@@ -468,6 +469,17 @@ export function Settings() {
     setConfig((current) => ({ ...current, overlay: { ...current.overlay, ...patch } }));
   }
 
+  function updateShortcuts(patch: Partial<ShortcutSettings>) {
+    setConfig((current) => {
+      const nextShortcuts = { ...current.shortcuts, ...patch };
+      return {
+        ...current,
+        shortcuts: nextShortcuts,
+        overlay: patch.overlayToggle ? { ...current.overlay, hotkey: patch.overlayToggle } : current.overlay
+      };
+    });
+  }
+
   function updateOverlayBounds(patch: Partial<OverlaySettings["bounds"]>) {
     setConfig((current) => ({
       ...current,
@@ -726,9 +738,25 @@ export function Settings() {
           <label className="settings-field">
             <span>Overlay hotkey</span>
             <input
-              value={config.overlay.hotkey}
+              value={config.shortcuts.overlayToggle}
               placeholder="Ctrl+Shift+H"
-              onChange={(event) => updateOverlay({ hotkey: event.currentTarget.value })}
+              onChange={(event) => updateShortcuts({ overlayToggle: event.currentTarget.value })}
+            />
+          </label>
+          <label className="settings-field">
+            <span>Capture hotkey</span>
+            <input
+              value={config.shortcuts.captureToggle}
+              placeholder="Ctrl+Shift+S"
+              onChange={(event) => updateShortcuts({ captureToggle: event.currentTarget.value })}
+            />
+          </label>
+          <label className="settings-field">
+            <span>Generate answer hotkey</span>
+            <input
+              value={config.shortcuts.generateAnswer}
+              placeholder="Ctrl+Shift+G"
+              onChange={(event) => updateShortcuts({ generateAnswer: event.currentTarget.value })}
             />
           </label>
           <label className="settings-field">

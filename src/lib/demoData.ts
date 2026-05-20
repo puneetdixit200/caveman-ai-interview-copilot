@@ -145,6 +145,11 @@ export const profiles: AppProfile[] = [
         width: 680,
         height: 420
       }
+    },
+    shortcuts: {
+      overlayToggle: "Ctrl+Shift+H",
+      captureToggle: "Ctrl+Shift+S",
+      generateAnswer: "Ctrl+Shift+G"
     }
   },
   {
@@ -165,6 +170,11 @@ export const profiles: AppProfile[] = [
         width: 720,
         height: 460
       }
+    },
+    shortcuts: {
+      overlayToggle: "Ctrl+Shift+H",
+      captureToggle: "Ctrl+Shift+S",
+      generateAnswer: "Ctrl+Shift+G"
     }
   }
 ];

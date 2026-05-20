@@ -10,11 +10,17 @@ import type {
   PluginSettings,
   ProviderId,
   SecuritySettings,
+  ShortcutSettings,
   SttMode,
   SttSettings,
   TtsSettings
 } from "../types/settings";
-import { DEFAULT_OVERLAY_SHORTCUT, normalizeShortcut } from "./hotkeys";
+import {
+  DEFAULT_CAPTURE_SHORTCUT,
+  DEFAULT_GENERATE_SHORTCUT,
+  DEFAULT_OVERLAY_SHORTCUT,
+  normalizeShortcut
+} from "./hotkeys";
 
 export interface AppConfig {
   selectedProviderId: ProviderId;
@@ -27,6 +33,7 @@ export interface AppConfig {
   ocr: OcrSettings;
   tts: TtsSettings;
   overlay: OverlaySettings;
+  shortcuts: ShortcutSettings;
   security: SecuritySettings;
   plugins: PluginSettings;
 }
@@ -123,6 +130,11 @@ export const DEFAULT_APP_CONFIG: AppConfig = {
       height: 420
     }
   },
+  shortcuts: {
+    overlayToggle: DEFAULT_OVERLAY_SHORTCUT,
+    captureToggle: DEFAULT_CAPTURE_SHORTCUT,
+    generateAnswer: DEFAULT_GENERATE_SHORTCUT
+  },
   security: {
     localOnlyMode: false,
     captureExclusionEnabled: true,
@@ -151,6 +163,8 @@ export function parseAppConfig(raw: string | null | undefined): AppConfig {
         ? parsed.selectedProviderId
         : DEFAULT_APP_CONFIG.selectedProviderId;
 
+    const overlay = mergeOverlaySettings(parsed.overlay);
+
     return {
       selectedProviderId,
       resumeContext: typeof parsed.resumeContext === "string" ? parsed.resumeContext : "",
@@ -162,7 +176,8 @@ export function parseAppConfig(raw: string | null | undefined): AppConfig {
       autoTrigger: mergeAutoTriggerSettings(parsed.autoTrigger),
       ocr: mergeOcrSettings(parsed.ocr),
       tts: mergeTtsSettings(parsed.tts),
-      overlay: mergeOverlaySettings(parsed.overlay),
+      overlay,
+      shortcuts: mergeShortcutSettings(parsed.shortcuts, overlay.hotkey),
       security: mergeSecuritySettings(parsed.security),
       plugins: mergePluginSettings(parsed.plugins)
     };
@@ -227,6 +242,7 @@ function cloneConfig(config: AppConfig): AppConfig {
     ocr: { ...config.ocr },
     tts: { ...config.tts },
     overlay: { ...config.overlay },
+    shortcuts: { ...config.shortcuts },
     security: { ...config.security },
     plugins: { ...config.plugins }
   };
@@ -379,6 +395,15 @@ function mergeOverlayBounds(raw: unknown): OverlaySettings["bounds"] {
   };
 }
 
+function mergeShortcutSettings(raw: unknown, overlayHotkey: string): ShortcutSettings {
+  const value = isObject(raw) ? raw : {};
+  return {
+    overlayToggle: readShortcut(value.overlayToggle, overlayHotkey || DEFAULT_OVERLAY_SHORTCUT),
+    captureToggle: readShortcut(value.captureToggle, DEFAULT_CAPTURE_SHORTCUT),
+    generateAnswer: readShortcut(value.generateAnswer, DEFAULT_GENERATE_SHORTCUT)
+  };
+}
+
 function mergeSecuritySettings(raw: unknown): SecuritySettings {
   const value = isObject(raw) ? raw : {};
   return {
@@ -427,6 +452,11 @@ function isObject(value: unknown): value is Record<string, unknown> {
 
 function readString(value: unknown, fallback: string): string {
   return typeof value === "string" ? value : fallback;
+}
+
+function readShortcut(value: unknown, fallback: string): string {
+  const normalized = normalizeShortcut(readString(value, fallback));
+  return normalized || fallback;
 }
 
 function clampNumber(value: unknown, min: number, max: number, fallback: number): number {

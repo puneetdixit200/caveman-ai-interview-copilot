@@ -11,12 +11,7 @@ import { shouldTriggerAnswer } from "../lib/autoTrigger";
 import { buildChatMessages } from "../lib/contextBuilder";
 import { canSendOcrContext } from "../lib/ocr";
 import { registerGlobalActionShortcuts } from "../lib/globalHotkeys";
-import {
-  DEFAULT_CAPTURE_SHORTCUT,
-  DEFAULT_GENERATE_SHORTCUT,
-  DEFAULT_OVERLAY_SHORTCUT,
-  overlayShortcutLabel
-} from "../lib/hotkeys";
+import { DEFAULT_OVERLAY_SHORTCUT, overlayShortcutLabel } from "../lib/hotkeys";
 import { shouldAutoHideOverlay } from "../lib/overlaySafety";
 import {
   KNOWLEDGE_BASE_SETTING_KEY,
@@ -291,17 +286,17 @@ export function Dashboard() {
       actions: [
         {
           id: "overlay",
-          shortcut: config.overlay.hotkey,
+          shortcut: config.shortcuts.overlayToggle,
           onPressed: toggleOverlayWindow
         },
         {
           id: "capture",
-          shortcut: DEFAULT_CAPTURE_SHORTCUT,
+          shortcut: config.shortcuts.captureToggle,
           onPressed: () => captureShortcutAction.current()
         },
         {
           id: "generate",
-          shortcut: DEFAULT_GENERATE_SHORTCUT,
+          shortcut: config.shortcuts.generateAnswer,
           onPressed: () => generateShortcutAction.current()
         }
       ]
@@ -312,7 +307,7 @@ export function Dashboard() {
       }
 
       cleanup = registration.dispose;
-      setOverlayShortcut(registration.registeredShortcuts.overlay ?? config.overlay.hotkey);
+      setOverlayShortcut(registration.registeredShortcuts.overlay ?? config.shortcuts.overlayToggle);
       const firstError = Object.entries(registration.errors)[0];
       if (firstError) {
         setOverlayMessage(`Global shortcut unavailable (${firstError[0]}): ${firstError[1]}`);
@@ -323,7 +318,7 @@ export function Dashboard() {
       disposed = true;
       void cleanup?.();
     };
-  }, [config.overlay.hotkey, toggleOverlayWindow]);
+  }, [config.shortcuts, toggleOverlayWindow]);
 
   useEffect(() => {
     seenLiveTranscriptKeys.current.clear();

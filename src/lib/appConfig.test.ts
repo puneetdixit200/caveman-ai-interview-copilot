@@ -135,6 +135,11 @@ describe("appConfig", () => {
         height: 420
       }
     });
+    expect(config.shortcuts).toMatchObject({
+      overlayToggle: "CommandOrControl+Shift+H",
+      captureToggle: "CommandOrControl+Shift+S",
+      generateAnswer: "CommandOrControl+Shift+G"
+    });
   });
 
   it("sanitizes invalid live feature settings while preserving valid values", () => {
@@ -177,6 +182,11 @@ describe("appConfig", () => {
             width: 120,
             height: 90
           }
+        },
+        shortcuts: {
+          overlayToggle: "control + alt + h",
+          captureToggle: "control + alt + s",
+          generateAnswer: "control + alt + g"
         }
       })
     );
@@ -218,6 +228,11 @@ describe("appConfig", () => {
         width: 320,
         height: 180
       }
+    });
+    expect(parsed.shortcuts).toMatchObject({
+      overlayToggle: "CommandOrControl+Alt+H",
+      captureToggle: "CommandOrControl+Alt+S",
+      generateAnswer: "CommandOrControl+Alt+G"
     });
   });
 });
