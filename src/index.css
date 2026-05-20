@@ -185,6 +185,7 @@ h2 {
 }
 
 .command-panel,
+.code-panel,
 .toolbar-panel,
 .export-panel,
 .prompt-panel {
@@ -739,10 +740,54 @@ input[type="checkbox"] {
 }
 
 .provider-editor-list,
+.code-list,
 .context-grid,
 .settings-two-column {
   display: grid;
   gap: 12px;
+}
+
+.code-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 12px;
+}
+
+.code-snippet {
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #0f1412;
+}
+
+.code-snippet-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  border-bottom: 1px solid var(--line);
+  padding: 8px 10px;
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.code-snippet pre {
+  overflow: auto;
+  max-height: 320px;
+  margin: 0;
+  padding: 12px;
+  background: #0b100e;
+}
+
+.code-snippet code {
+  display: block;
+  border: 0;
+  padding: 0;
+  color: #dff7e7;
+  background: transparent;
+  white-space: pre;
 }
 
 .settings-two-column {

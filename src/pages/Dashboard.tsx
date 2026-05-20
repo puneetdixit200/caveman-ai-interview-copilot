@@ -1,6 +1,7 @@
 import { Eye, EyeOff, Keyboard, Play, Send, ShieldCheck, Square, Wand2 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { AudioControls } from "../components/audio/AudioControls";
+import { CodeAssistantPanel } from "../components/code/CodeAssistantPanel";
 import { Button } from "../components/common/Button";
 import { OverlayWindow } from "../components/overlay/OverlayWindow";
 import { TranscriptFeed } from "../components/overlay/TranscriptFeed";
@@ -540,6 +541,8 @@ export function Dashboard() {
           </label>
         </div>
       </section>
+
+      <CodeAssistantPanel responses={responses.filter((item) => item.id !== TEMP_STREAM_ID)} />
     </main>
   );
 }
