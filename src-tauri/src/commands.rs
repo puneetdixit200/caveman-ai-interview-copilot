@@ -1,7 +1,7 @@
-use tauri::State;
+use tauri::{AppHandle, State};
 
 use crate::ai;
-use crate::audio::{self, AudioCaptureState};
+use crate::audio::{self, AudioCaptureManager, AudioCaptureState};
 use crate::db::{Database, NewAiResponse, NewSession};
 use crate::models::{AiResponse, PromptTemplate, Session, Transcript};
 use crate::stt;
@@ -80,8 +80,25 @@ pub fn list_audio_devices() -> Vec<audio::AudioDevice> {
 }
 
 #[tauri::command]
-pub fn start_capture(system_device_id: String, microphone_device_id: String) -> AudioCaptureState {
-    audio::start_capture(&system_device_id, &microphone_device_id)
+pub fn start_capture(
+    app_handle: AppHandle,
+    capture_manager: State<'_, AudioCaptureManager>,
+    system_device_id: String,
+    microphone_device_id: String,
+) -> Result<AudioCaptureState, String> {
+    capture_manager
+        .start(app_handle, &system_device_id, &microphone_device_id)
+        .map_err(to_command_error)
+}
+
+#[tauri::command]
+pub fn stop_capture(capture_manager: State<'_, AudioCaptureManager>) -> AudioCaptureState {
+    capture_manager.stop()
+}
+
+#[tauri::command]
+pub fn get_capture_status(capture_manager: State<'_, AudioCaptureManager>) -> AudioCaptureState {
+    capture_manager.status()
 }
 
 #[tauri::command]

@@ -5,6 +5,7 @@ import { Button } from "../components/common/Button";
 import { OverlayWindow } from "../components/overlay/OverlayWindow";
 import { TranscriptFeed } from "../components/overlay/TranscriptFeed";
 import { APP_CONFIG_SETTING_KEY, DEFAULT_APP_CONFIG, parseAppConfig } from "../lib/appConfig";
+import { applyAudioLevelEvent, type AudioCaptureState } from "../lib/audioEvents";
 import { shouldTriggerAnswer } from "../lib/autoTrigger";
 import { buildChatMessages } from "../lib/contextBuilder";
 import { createConfiguredProvider } from "../lib/providerClients";
@@ -15,11 +16,15 @@ import {
   addAiResponse,
   addTranscript,
   createSession,
+  getCaptureStatus,
   getSetting,
   listAudioDevices,
   listAiResponses,
   listSessions,
-  listTranscripts
+  listTranscripts,
+  onAudioLevel,
+  startCapture,
+  stopCapture
 } from "../lib/tauri";
 import { ProviderRouter } from "../lib/providerRouter";
 import { useOverlayStore } from "../stores/overlayStore";
@@ -28,13 +33,24 @@ import type { AudioDevice } from "../types/settings";
 import type { AppConfig } from "../lib/appConfig";
 
 const TEMP_STREAM_ID = -1;
+const DEFAULT_CAPTURE_STATUS: AudioCaptureState = {
+  running: false,
+  systemDeviceId: "default",
+  microphoneDeviceId: "default",
+  sampleRateHz: 16000,
+  channels: 1,
+  microphoneLevel: 0,
+  systemLevel: 0,
+  systemCaptureSupported: false
+};
 
 export function Dashboard() {
-  const [running, setRunning] = useState(true);
+  const [running, setRunning] = useState(false);
   const [session, setSession] = useState<SessionRecord | null>(null);
   const [transcripts, setTranscripts] = useState<TranscriptSegment[]>([]);
   const [responses, setResponses] = useState<AIResponseRecord[]>([]);
   const [audioDevices, setAudioDevices] = useState<AudioDevice[]>([]);
+  const [captureStatus, setCaptureStatus] = useState<AudioCaptureState>(DEFAULT_CAPTURE_STATUS);
   const [config, setConfig] = useState<AppConfig>(DEFAULT_APP_CONFIG);
   const [manualSpeaker, setManualSpeaker] = useState<Speaker>("interviewer");
   const [manualTranscript, setManualTranscript] = useState("");
@@ -69,7 +85,7 @@ export function Dashboard() {
     async function load() {
       try {
         const storedConfig = parseAppConfig(await getSetting(APP_CONFIG_SETTING_KEY));
-        const [sessions, devices] = await Promise.all([listSessions(), listAudioDevices()]);
+        const [sessions, devices, status] = await Promise.all([listSessions(), listAudioDevices(), getCaptureStatus()]);
         const activeSession =
           sessions.find((item) => item.status === "active") ??
           (await createSession({
@@ -87,6 +103,8 @@ export function Dashboard() {
 
         setConfig(storedConfig);
         setAudioDevices(devices);
+        setCaptureStatus(status);
+        setRunning(status.running);
         setSession(activeSession);
         await refreshSessionData(activeSession.id);
         setStatusMessage(`Ready with ${storedConfig.selectedProviderId}`);
@@ -104,6 +122,66 @@ export function Dashboard() {
       cancelled = true;
     };
   }, [refreshSessionData]);
+
+  useEffect(() => {
+    let disposed = false;
+    let unlisten: (() => void) | undefined;
+
+    onAudioLevel((event) => {
+      if (disposed) {
+        return;
+      }
+
+      setAudioDevices((current) => applyAudioLevelEvent(current, event));
+      setCaptureStatus((current) => ({
+        ...current,
+        microphoneLevel: event.source === "microphone" ? event.level : current.microphoneLevel,
+        systemLevel: event.source === "system" ? event.level : current.systemLevel
+      }));
+    }).then((cleanup) => {
+      if (disposed) {
+        cleanup();
+        return;
+      }
+
+      unlisten = cleanup;
+    });
+
+    return () => {
+      disposed = true;
+      unlisten?.();
+    };
+  }, []);
+
+  async function toggleCapture() {
+    if (running) {
+      const stopped = await stopCapture();
+      setCaptureStatus(stopped);
+      setRunning(false);
+      setAudioDevices((current) => current.map((device) => ({ ...device, level: 0 })));
+      setStatusMessage("Audio capture stopped");
+      return;
+    }
+
+    try {
+      const started = await startCapture({
+        systemDeviceId: config.audio.systemDeviceId,
+        microphoneDeviceId: config.audio.microphoneDeviceId
+      });
+      setCaptureStatus(started);
+      setRunning(started.running);
+      setErrorMessage(null);
+      setStatusMessage(
+        started.running
+          ? `Microphone capture running at ${started.sampleRateHz}Hz`
+          : started.error ?? "Audio capture did not start"
+      );
+    } catch (error) {
+      setRunning(false);
+      setErrorMessage(error instanceof Error ? error.message : String(error));
+      setStatusMessage("Audio capture failed");
+    }
+  }
 
   async function saveManualTranscript() {
     if (!session) {
@@ -235,7 +313,7 @@ export function Dashboard() {
           <Button
             variant={running ? "danger" : "primary"}
             icon={running ? <Square size={16} /> : <Play size={16} />}
-            onClick={() => setRunning((value) => !value)}
+            onClick={toggleCapture}
           >
             {running ? "Stop" : "Start"}
           </Button>
@@ -250,7 +328,13 @@ export function Dashboard() {
         <div className="metric-strip">
           <div>
             <span>Mode</span>
-            <strong>{config.audio.captureMode === "manual" ? "manual transcript" : config.audio.captureMode}</strong>
+            <strong>
+              {captureStatus.running
+                ? `${config.audio.captureMode === "manual" ? "microphone" : config.audio.captureMode} live`
+                : config.audio.captureMode === "manual"
+                  ? "manual transcript"
+                  : config.audio.captureMode}
+            </strong>
           </div>
           <div>
             <span>Provider</span>
@@ -296,7 +380,7 @@ export function Dashboard() {
 
       <AudioControls
         devices={audioDevices}
-        status={config.audio.captureMode === "manual" ? "Manual" : config.audio.captureMode}
+        status={captureStatus.running ? "Live" : config.audio.captureMode === "manual" ? "Manual" : config.audio.captureMode}
       />
       <TranscriptFeed transcripts={transcripts} />
 

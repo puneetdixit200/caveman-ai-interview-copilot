@@ -15,6 +15,7 @@ pub fn run() {
             std::fs::create_dir_all(&app_data_dir)?;
             let database = db::Database::open(app_data_dir.join("caveman.sqlite3"))?;
             app.manage(database);
+            app.manage(audio::AudioCaptureManager::default());
             overlay::configure_overlay_security(app);
             Ok(())
         })
@@ -29,6 +30,8 @@ pub fn run() {
             commands::get_setting,
             commands::list_audio_devices,
             commands::start_capture,
+            commands::stop_capture,
+            commands::get_capture_status,
             commands::list_stt_providers,
             commands::list_prompt_templates
         ])

@@ -1,4 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
+import type { AudioCaptureState, AudioLevelEvent } from "./audioEvents";
 import type {
   AIResponseRecord,
   NewAIResponseInput,
@@ -33,6 +35,18 @@ export async function invokeOrFallback<T>(
     console.error(`Tauri command failed: ${command}`, error);
     return fallback();
   }
+}
+
+async function invokeStrictOrFallback<T>(
+  command: string,
+  args: Record<string, unknown>,
+  fallback: () => T | Promise<T>
+): Promise<T> {
+  if (!isRunningInTauri()) {
+    return fallback();
+  }
+
+  return invoke<T>(command, args);
 }
 
 export async function getSetting(key: string): Promise<string | undefined> {
@@ -121,4 +135,61 @@ export async function listAiResponses(sessionId: string): Promise<AIResponseReco
 
 export async function listAudioDevices(): Promise<AudioDevice[]> {
   return invokeOrFallback<AudioDevice[]>("list_audio_devices", {}, () => []);
+}
+
+export async function startCapture(input: {
+  systemDeviceId: string;
+  microphoneDeviceId: string;
+}): Promise<AudioCaptureState> {
+  return invokeStrictOrFallback<AudioCaptureState>(
+    "start_capture",
+    {
+      systemDeviceId: input.systemDeviceId,
+      microphoneDeviceId: input.microphoneDeviceId
+    },
+    () => ({
+      running: true,
+      systemDeviceId: input.systemDeviceId,
+      microphoneDeviceId: input.microphoneDeviceId,
+      sampleRateHz: 16000,
+      channels: 1,
+      microphoneLevel: 0,
+      systemLevel: 0,
+      systemCaptureSupported: false
+    })
+  );
+}
+
+export async function stopCapture(): Promise<AudioCaptureState> {
+  return invokeOrFallback<AudioCaptureState>("stop_capture", {}, () => ({
+    running: false,
+    systemDeviceId: "default",
+    microphoneDeviceId: "default",
+    sampleRateHz: 16000,
+    channels: 1,
+    microphoneLevel: 0,
+    systemLevel: 0,
+    systemCaptureSupported: false
+  }));
+}
+
+export async function getCaptureStatus(): Promise<AudioCaptureState> {
+  return invokeOrFallback<AudioCaptureState>("get_capture_status", {}, () => ({
+    running: false,
+    systemDeviceId: "default",
+    microphoneDeviceId: "default",
+    sampleRateHz: 16000,
+    channels: 1,
+    microphoneLevel: 0,
+    systemLevel: 0,
+    systemCaptureSupported: false
+  }));
+}
+
+export async function onAudioLevel(callback: (event: AudioLevelEvent) => void): Promise<() => void> {
+  if (!isRunningInTauri()) {
+    return () => undefined;
+  }
+
+  return listen<AudioLevelEvent>("audio-level", (event) => callback(event.payload));
 }
