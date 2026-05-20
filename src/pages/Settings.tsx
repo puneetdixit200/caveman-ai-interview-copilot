@@ -21,6 +21,7 @@ import {
   parseAppConfig,
   serializeAppConfig
 } from "../lib/appConfig";
+import { runScreenOcr } from "../lib/ocr";
 import { createConfiguredProvider } from "../lib/providerClients";
 import { hydrateProviderApiKeys } from "../lib/providerSecrets";
 import {
@@ -57,6 +58,8 @@ export function Settings() {
   const [providerSecretInputs, setProviderSecretInputs] = useState<Partial<Record<ProviderId, string>>>({});
   const [sttSecretInput, setSttSecretInput] = useState("");
   const [audioDevices, setAudioDevices] = useState<AudioDevice[]>([]);
+  const [ocrReviewText, setOcrReviewText] = useState("");
+  const [capturingOcr, setCapturingOcr] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -79,6 +82,7 @@ export function Settings() {
       if (!cancelled) {
         setConfig(nextConfig);
         setSttSecretInput(sttSecret ?? "");
+        setOcrReviewText(nextConfig.ocr.lastText ?? "");
         setAudioDevices(devices);
         setProviderSecretInputs(
           nextConfig.providers.reduce<Partial<Record<ProviderId, string>>>((values, provider) => {
@@ -329,6 +333,25 @@ export function Settings() {
 
   function updateOcr(patch: Partial<OcrSettings>) {
     setConfig((current) => ({ ...current, ocr: { ...current.ocr, ...patch } }));
+  }
+
+  async function captureOcrContext() {
+    setCapturingOcr(true);
+    setStatus("Capturing screen OCR...");
+    try {
+      const result = await runScreenOcr(config.ocr);
+      setOcrReviewText(result.text);
+      updateOcr({
+        includeInPrompt: result.text.trim().length > 0,
+        lastText: result.text,
+        lastCapturedAtMs: result.capturedAtMs
+      });
+      setStatus(`Screen OCR captured ${result.text.length} characters`);
+    } catch (error) {
+      setStatus(`Screen OCR failed: ${error instanceof Error ? error.message : String(error)}`);
+    } finally {
+      setCapturingOcr(false);
+    }
   }
 
   function updateTts(patch: Partial<TtsSettings>) {
@@ -771,6 +794,24 @@ export function Settings() {
               type="checkbox"
               checked={config.ocr.includeInPrompt}
               onChange={(event) => updateOcr({ includeInPrompt: event.currentTarget.checked })}
+            />
+          </label>
+          <Button icon={<ScanText size={16} />} onClick={captureOcrContext} disabled={capturingOcr}>
+            {capturingOcr ? "Capturing OCR" : "Capture Screen OCR"}
+          </Button>
+          <label className="settings-field">
+            <span>Reviewed OCR text</span>
+            <textarea
+              value={ocrReviewText}
+              onChange={(event) => {
+                setOcrReviewText(event.currentTarget.value);
+                updateOcr({
+                  includeInPrompt: event.currentTarget.value.trim().length > 0,
+                  lastText: event.currentTarget.value,
+                  lastCapturedAtMs: Date.now()
+                });
+              }}
+              placeholder="Captured screen text appears here for review before prompt injection."
             />
           </label>
         </div>

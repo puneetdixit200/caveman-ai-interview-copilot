@@ -46,5 +46,26 @@ describe("buildChatMessages", () => {
     expect(messages.some((message) => message.content.includes("Old setup"))).toBe(false);
     expect(messages.some((message) => message.content.includes("New important question?"))).toBe(true);
   });
-});
 
+  it("includes reviewed screen OCR context when provided", () => {
+    const messages = buildChatMessages({
+      template,
+      transcripts: [
+        {
+          id: 1,
+          sessionId: "s1",
+          speaker: "interviewer",
+          content: "Can you solve what is on screen?",
+          timestampMs: 1000,
+          confidence: 0.9
+        }
+      ],
+      ocrContext: "LeetCode 146 LRU Cache"
+    });
+
+    expect(messages).toContainEqual({
+      role: "system",
+      content: "Reviewed screen OCR context: LeetCode 146 LRU Cache"
+    });
+  });
+});

@@ -4,6 +4,7 @@ interface BuildChatMessagesInput {
   template: PromptTemplate;
   transcripts: TranscriptSegment[];
   resumeContext?: string;
+  ocrContext?: string;
   maxHistoryCharacters?: number;
 }
 
@@ -13,6 +14,7 @@ export function buildChatMessages({
   template,
   transcripts,
   resumeContext,
+  ocrContext,
   maxHistoryCharacters = DEFAULT_MAX_HISTORY_CHARACTERS
 }: BuildChatMessagesInput): ChatMessage[] {
   const ordered = [...transcripts].sort((left, right) => left.timestampMs - right.timestampMs);
@@ -33,6 +35,14 @@ export function buildChatMessages({
     messages.push({
       role: "system",
       content: `Resume/JD context: ${trimmedResumeContext}`
+    });
+  }
+
+  const trimmedOcrContext = ocrContext?.trim();
+  if (trimmedOcrContext) {
+    messages.push({
+      role: "system",
+      content: `Reviewed screen OCR context: ${trimmedOcrContext}`
     });
   }
 
@@ -97,4 +107,3 @@ function speakerLabel(speaker: Speaker): string {
 
   return "UNKNOWN";
 }
-

@@ -40,4 +40,11 @@ describe("Settings", () => {
     expect(await screen.findByRole("button", { name: "Save STT Key" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Delete STT Key" })).toBeInTheDocument();
   });
+
+  it("shows screen OCR capture and review controls", async () => {
+    render(<Settings />);
+
+    expect(await screen.findByRole("button", { name: "Capture Screen OCR" })).toBeInTheDocument();
+    expect(screen.getByRole("textbox", { name: "Reviewed OCR text" })).toBeInTheDocument();
+  });
 });

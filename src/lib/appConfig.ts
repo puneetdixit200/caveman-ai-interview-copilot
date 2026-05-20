@@ -94,7 +94,9 @@ export const DEFAULT_APP_CONFIG: AppConfig = {
     enabled: false,
     provider: "disabled",
     includeInPrompt: false,
-    reviewBeforeSend: true
+    reviewBeforeSend: true,
+    lastText: "",
+    lastCapturedAtMs: undefined
   },
   tts: {
     enabled: false,
@@ -305,7 +307,12 @@ function mergeOcrSettings(raw: unknown): OcrSettings {
     reviewBeforeSend:
       typeof value.reviewBeforeSend === "boolean"
         ? value.reviewBeforeSend
-        : DEFAULT_APP_CONFIG.ocr.reviewBeforeSend
+        : DEFAULT_APP_CONFIG.ocr.reviewBeforeSend,
+    lastText: readString(value.lastText, DEFAULT_APP_CONFIG.ocr.lastText ?? ""),
+    lastCapturedAtMs:
+      typeof value.lastCapturedAtMs === "number" && !Number.isNaN(value.lastCapturedAtMs)
+        ? value.lastCapturedAtMs
+        : DEFAULT_APP_CONFIG.ocr.lastCapturedAtMs
   };
 }
 

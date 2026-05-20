@@ -8,6 +8,7 @@ import { APP_CONFIG_SETTING_KEY, DEFAULT_APP_CONFIG, parseAppConfig } from "../l
 import { applyAudioLevelEvent, type AudioCaptureState } from "../lib/audioEvents";
 import { shouldTriggerAnswer } from "../lib/autoTrigger";
 import { buildChatMessages } from "../lib/contextBuilder";
+import { canSendOcrContext } from "../lib/ocr";
 import { registerOverlayToggleShortcut } from "../lib/globalHotkeys";
 import { DEFAULT_OVERLAY_SHORTCUT, overlayShortcutLabel } from "../lib/hotkeys";
 import { createConfiguredProvider } from "../lib/providerClients";
@@ -521,9 +522,18 @@ function buildPromptMessages(
   transcripts: TranscriptSegment[],
   template: Parameters<typeof buildChatMessages>[0]["template"]
 ): ChatMessage[] {
+  const selectedProvider = config.providers.find((provider) => provider.id === config.selectedProviderId) ?? config.providers[0];
+  const includeOcrContext = canSendOcrContext({
+    settings: config.ocr,
+    reviewed: Boolean(config.ocr.lastText?.trim()),
+    providerKind: selectedProvider.kind,
+    localOnlyMode: config.security.localOnlyMode
+  });
+
   return buildChatMessages({
     template,
     transcripts,
-    resumeContext: [config.resumeContext, config.jobDescriptionContext].filter(Boolean).join("\n\n")
+    resumeContext: [config.resumeContext, config.jobDescriptionContext].filter(Boolean).join("\n\n"),
+    ocrContext: includeOcrContext ? config.ocr.lastText : undefined
   });
 }

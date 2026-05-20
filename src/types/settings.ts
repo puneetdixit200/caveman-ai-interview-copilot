@@ -63,6 +63,8 @@ export interface OcrSettings {
   provider: OcrProvider;
   includeInPrompt: boolean;
   reviewBeforeSend: boolean;
+  lastText?: string;
+  lastCapturedAtMs?: number;
 }
 
 export interface TtsSettings {

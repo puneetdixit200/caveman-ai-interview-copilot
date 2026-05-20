@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { canSendOcrContext, normalizeOcrText } from "./ocr";
+import { canSendOcrContext, normalizeOcrText, runScreenOcr } from "./ocr";
 import type { OcrSettings } from "../types/settings";
 
 describe("ocr", () => {
@@ -20,5 +20,25 @@ describe("ocr", () => {
     expect(canSendOcrContext({ settings, reviewed: false, providerKind: "local", localOnlyMode: false })).toBe(false);
     expect(canSendOcrContext({ settings, reviewed: true, providerKind: "cloud", localOnlyMode: true })).toBe(false);
     expect(canSendOcrContext({ settings, reviewed: true, providerKind: "local", localOnlyMode: true })).toBe(true);
+  });
+
+  it("captures a screen frame and normalizes recognized OCR text", async () => {
+    const settings: OcrSettings = {
+      enabled: true,
+      provider: "local_tesseract",
+      includeInPrompt: true,
+      reviewBeforeSend: true
+    };
+
+    const result = await runScreenOcr(settings, {
+      captureFrame: async () => "data:image/png;base64,abc",
+      recognizeImage: async (image) => `  ${image}\nDesign   a cache  `
+    });
+
+    expect(result).toMatchObject({
+      provider: "local_tesseract",
+      text: "data:image/png;base64,abc\nDesign a cache"
+    });
+    expect(result.capturedAtMs).toBeGreaterThan(0);
   });
 });
