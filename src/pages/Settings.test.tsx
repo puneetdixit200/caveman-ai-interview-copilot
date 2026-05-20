@@ -55,6 +55,7 @@ describe("Settings", () => {
 
     expect(await screen.findByRole("button", { name: "Add Knowledge Document" })).toBeInTheDocument();
     expect(screen.getByRole("textbox", { name: "Knowledge text" })).toBeInTheDocument();
+    expect(screen.getByLabelText("Knowledge files")).toBeInTheDocument();
   });
 
   it("shows global overlay hotkey controls", async () => {

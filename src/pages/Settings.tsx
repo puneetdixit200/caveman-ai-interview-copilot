@@ -421,6 +421,41 @@ export function Settings() {
     setStatus(`Added ${title} to the knowledge base`);
   }
 
+  async function importKnowledgeFiles(files: FileList | null) {
+    const selectedFiles = Array.from(files ?? []);
+    if (selectedFiles.length === 0) {
+      return;
+    }
+
+    let nextKnowledgeBase = knowledgeBase;
+    let importedCount = 0;
+    for (const file of selectedFiles) {
+      const text = (await file.text()).trim();
+      if (!text) {
+        continue;
+      }
+
+      const title = file.name.replace(/\.[^.]+$/, "") || `Knowledge ${nextKnowledgeBase.documents.length + 1}`;
+      nextKnowledgeBase = upsertKnowledgeDocument(nextKnowledgeBase, {
+        id: createKnowledgeDocumentId(`${file.name}-${file.lastModified}`),
+        title,
+        sourceType: knowledgeSourceType.trim() || "file",
+        text,
+        createdAtMs: Date.now()
+      });
+      importedCount += 1;
+    }
+
+    if (importedCount === 0) {
+      setStatus("Selected knowledge files were empty.");
+      return;
+    }
+
+    setKnowledgeBase(nextKnowledgeBase);
+    await saveSetting(KNOWLEDGE_BASE_SETTING_KEY, serializeKnowledgeBase(nextKnowledgeBase));
+    setStatus(`Imported ${importedCount} knowledge file${importedCount === 1 ? "" : "s"}`);
+  }
+
   const knowledgeResults = knowledgeQuery.trim()
     ? searchKnowledgeBase(knowledgeBase, knowledgeQuery, 4)
     : knowledgeBase.chunks.slice(-4).reverse();
@@ -840,6 +875,18 @@ export function Settings() {
               value={knowledgeText}
               placeholder="Paste project notes, implementation details, metrics, interview stories, or codebase facts."
               onChange={(event) => setKnowledgeText(event.currentTarget.value)}
+            />
+          </label>
+          <label className="settings-field">
+            <span>Knowledge files</span>
+            <input
+              type="file"
+              multiple
+              accept=".txt,.md,.json,.csv,.ts,.tsx,.js,.jsx,.py,.go,.rs,.java,.cs,.yml,.yaml"
+              onChange={(event) => {
+                void importKnowledgeFiles(event.currentTarget.files);
+                event.currentTarget.value = "";
+              }}
             />
           </label>
           <div className="settings-field">
