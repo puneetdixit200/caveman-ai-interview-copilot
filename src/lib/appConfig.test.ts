@@ -54,4 +54,96 @@ describe("appConfig", () => {
       apiKeyStored: true
     });
   });
+
+  it("defaults live interview features to safe local-first settings", () => {
+    const config = parseAppConfig(undefined);
+
+    expect(config.audio).toMatchObject({
+      captureMode: "manual",
+      dualStreamEnabled: false,
+      microphoneDeviceId: "default",
+      systemDeviceId: "default",
+      gainDb: 0,
+      noiseGateDb: -45
+    });
+    expect(config.stt).toMatchObject({
+      selectedMode: "manual",
+      diarizationEnabled: true,
+      language: "en"
+    });
+    expect(config.autoTrigger).toMatchObject({
+      mode: "manual",
+      silenceTimeoutMs: 1200,
+      duplicateWindowMs: 30000,
+      requireInterviewerSpeaker: true
+    });
+    expect(config.ocr).toMatchObject({
+      enabled: false,
+      provider: "disabled",
+      reviewBeforeSend: true
+    });
+    expect(config.security).toMatchObject({
+      localOnlyMode: false,
+      captureExclusionEnabled: true,
+      blockCloudWhenLocalOnly: true
+    });
+  });
+
+  it("sanitizes invalid live feature settings while preserving valid values", () => {
+    const parsed = parseAppConfig(
+      JSON.stringify({
+        audio: {
+          captureMode: "dual",
+          dualStreamEnabled: true,
+          microphoneDeviceId: "mic-7",
+          systemDeviceId: "speaker-loopback",
+          gainDb: 18,
+          noiseGateDb: 10
+        },
+        stt: {
+          selectedMode: "deepgram",
+          language: "hi",
+          diarizationEnabled: false
+        },
+        autoTrigger: {
+          mode: "suggest_on_question",
+          silenceTimeoutMs: 350,
+          duplicateWindowMs: -1,
+          requireInterviewerSpeaker: false
+        },
+        tts: {
+          enabled: true,
+          rate: 5,
+          volume: 4,
+          muteInStealth: false
+        }
+      })
+    );
+
+    expect(parsed.audio).toMatchObject({
+      captureMode: "dual",
+      dualStreamEnabled: true,
+      microphoneDeviceId: "mic-7",
+      systemDeviceId: "speaker-loopback",
+      gainDb: 12,
+      noiseGateDb: -45
+    });
+    expect(parsed.stt).toMatchObject({
+      selectedMode: "deepgram",
+      language: "hi",
+      diarizationEnabled: false
+    });
+    expect(parsed.autoTrigger).toMatchObject({
+      mode: "suggest_on_question",
+      silenceTimeoutMs: 500,
+      duplicateWindowMs: 30000,
+      requireInterviewerSpeaker: false
+    });
+    expect(parsed.tts).toMatchObject({
+      enabled: true,
+      rate: 2,
+      volume: 1,
+      muteInStealth: false
+    });
+  });
 });

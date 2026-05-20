@@ -2,7 +2,10 @@ import type { InterviewType } from "./session";
 
 export type ProviderKind = "local" | "cloud";
 export type ProviderId = "ollama" | "lmstudio" | "openrouter" | "openai" | "anthropic" | "groq";
-export type SttMode = "local_whisper" | "deepgram" | "assemblyai" | "google";
+export type AudioCaptureMode = "manual" | "microphone" | "system" | "dual";
+export type SttMode = "manual" | "local_whisper" | "deepgram" | "assemblyai" | "google";
+export type AutoTriggerMode = "manual" | "suggest_on_question" | "continuous_coach";
+export type OcrProvider = "disabled" | "local_tesseract" | "windows_ocr" | "cloud";
 
 export interface ModelProviderConfig {
   id: ProviderId;
@@ -25,11 +28,66 @@ export interface AudioDevice {
 }
 
 export interface AudioSettings {
+  captureMode: AudioCaptureMode;
+  dualStreamEnabled: boolean;
   systemDeviceId: string;
   microphoneDeviceId: string;
+  virtualDeviceId?: string;
   noiseGateDb: number;
   gainDb: number;
   sttMode: SttMode;
+  meterSmoothing: number;
+}
+
+export interface SttSettings {
+  selectedMode: SttMode;
+  language: string;
+  diarizationEnabled: boolean;
+  localWhisperBinaryPath: string;
+  localWhisperModelPath: string;
+  cloudEndpoint: string;
+  apiKeyStored: boolean;
+  apiKey?: string;
+}
+
+export interface AutoTriggerSettings {
+  mode: AutoTriggerMode;
+  silenceTimeoutMs: number;
+  duplicateWindowMs: number;
+  minQuestionCharacters: number;
+  requireInterviewerSpeaker: boolean;
+}
+
+export interface OcrSettings {
+  enabled: boolean;
+  provider: OcrProvider;
+  includeInPrompt: boolean;
+  reviewBeforeSend: boolean;
+}
+
+export interface TtsSettings {
+  enabled: boolean;
+  autoPlay: boolean;
+  voice: string;
+  language: string;
+  rate: number;
+  volume: number;
+  muteInStealth: boolean;
+}
+
+export interface SecuritySettings {
+  localOnlyMode: boolean;
+  captureExclusionEnabled: boolean;
+  blockCloudWhenLocalOnly: boolean;
+  signedUpdatesRequired: boolean;
+}
+
+export interface PluginSettings {
+  enabled: boolean;
+  directory: string;
+  allowPromptTemplates: boolean;
+  allowExportFormats: boolean;
+  allowPracticePacks: boolean;
 }
 
 export interface OverlaySettings {

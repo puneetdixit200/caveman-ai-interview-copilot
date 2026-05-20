@@ -6,6 +6,7 @@ import type {
   SessionRecord,
   TranscriptSegment
 } from "../types/session";
+import type { AudioDevice } from "../types/settings";
 
 declare global {
   interface Window {
@@ -116,4 +117,8 @@ export async function addAiResponse(input: NewAIResponseInput): Promise<AIRespon
 
 export async function listAiResponses(sessionId: string): Promise<AIResponseRecord[]> {
   return invokeOrFallback<AIResponseRecord[]>("list_ai_responses", { sessionId }, () => []);
+}
+
+export async function listAudioDevices(): Promise<AudioDevice[]> {
+  return invokeOrFallback<AudioDevice[]>("list_audio_devices", {}, () => []);
 }

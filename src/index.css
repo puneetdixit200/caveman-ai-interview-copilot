@@ -675,9 +675,14 @@ input[type="checkbox"] {
 }
 
 .provider-editor-list,
-.context-grid {
+.context-grid,
+.settings-two-column {
   display: grid;
   gap: 12px;
+}
+
+.settings-two-column {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .provider-editor {
@@ -823,7 +828,8 @@ code {
   }
 
   .metric-strip,
-  .profile-grid {
+  .profile-grid,
+  .settings-two-column {
     grid-template-columns: 1fr;
   }
 

@@ -1,4 +1,4 @@
-import { KeyRound, Save, Wifi } from "lucide-react";
+import { Bot, KeyRound, Mic, Puzzle, Save, ScanText, ShieldCheck, Volume2, Wifi } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Button } from "../components/common/Button";
 import {
@@ -11,7 +11,17 @@ import {
 import { createConfiguredProvider } from "../lib/providerClients";
 import { getSetting, saveSetting } from "../lib/tauri";
 import { promptTemplates } from "../lib/promptTemplates";
-import type { ModelProviderConfig, ProviderId } from "../types/settings";
+import type {
+  AudioSettings,
+  AutoTriggerSettings,
+  ModelProviderConfig,
+  OcrSettings,
+  PluginSettings,
+  ProviderId,
+  SecuritySettings,
+  SttSettings,
+  TtsSettings
+} from "../types/settings";
 
 export function Settings() {
   const [config, setConfig] = useState<AppConfig>(DEFAULT_APP_CONFIG);
@@ -58,6 +68,34 @@ export function Settings() {
       ...current,
       providers: current.providers.map((provider) => (provider.id === id ? { ...provider, ...patch } : provider))
     }));
+  }
+
+  function updateAudio(patch: Partial<AudioSettings>) {
+    setConfig((current) => ({ ...current, audio: { ...current.audio, ...patch } }));
+  }
+
+  function updateStt(patch: Partial<SttSettings>) {
+    setConfig((current) => ({ ...current, stt: { ...current.stt, ...patch } }));
+  }
+
+  function updateAutoTrigger(patch: Partial<AutoTriggerSettings>) {
+    setConfig((current) => ({ ...current, autoTrigger: { ...current.autoTrigger, ...patch } }));
+  }
+
+  function updateOcr(patch: Partial<OcrSettings>) {
+    setConfig((current) => ({ ...current, ocr: { ...current.ocr, ...patch } }));
+  }
+
+  function updateTts(patch: Partial<TtsSettings>) {
+    setConfig((current) => ({ ...current, tts: { ...current.tts, ...patch } }));
+  }
+
+  function updateSecurity(patch: Partial<SecuritySettings>) {
+    setConfig((current) => ({ ...current, security: { ...current.security, ...patch } }));
+  }
+
+  function updatePlugins(patch: Partial<PluginSettings>) {
+    setConfig((current) => ({ ...current, plugins: { ...current.plugins, ...patch } }));
   }
 
   return (
@@ -201,6 +239,364 @@ export function Settings() {
                 setConfig((current) => ({ ...current, jobDescriptionContext: event.currentTarget.value }))
               }
               placeholder="Paste the target role or interview context..."
+            />
+          </label>
+        </div>
+      </section>
+
+      <section className="panel prompt-panel">
+        <div className="panel-heading">
+          <div>
+            <p className="eyebrow">Live Pipeline</p>
+            <h2>Audio And STT</h2>
+          </div>
+          <Mic size={18} />
+        </div>
+        <div className="settings-two-column">
+          <label className="settings-field">
+            <span>Capture mode</span>
+            <select
+              value={config.audio.captureMode}
+              onChange={(event) =>
+                updateAudio({
+                  captureMode: event.currentTarget.value as AudioSettings["captureMode"],
+                  dualStreamEnabled: event.currentTarget.value === "dual"
+                })
+              }
+            >
+              <option value="manual">Manual transcript</option>
+              <option value="microphone">Microphone only</option>
+              <option value="system">System audio only</option>
+              <option value="dual">System + microphone</option>
+            </select>
+          </label>
+          <label className="settings-field">
+            <span>STT provider</span>
+            <select
+              value={config.stt.selectedMode}
+              onChange={(event) => {
+                const selectedMode = event.currentTarget.value as SttSettings["selectedMode"];
+                updateStt({ selectedMode });
+                updateAudio({ sttMode: selectedMode });
+              }}
+            >
+              <option value="manual">Manual</option>
+              <option value="local_whisper">Local Whisper</option>
+              <option value="deepgram">Deepgram</option>
+              <option value="assemblyai">AssemblyAI</option>
+              <option value="google">Google STT</option>
+            </select>
+          </label>
+          <label className="settings-field">
+            <span>Microphone device id</span>
+            <input
+              value={config.audio.microphoneDeviceId}
+              onChange={(event) => updateAudio({ microphoneDeviceId: event.currentTarget.value })}
+            />
+          </label>
+          <label className="settings-field">
+            <span>System audio device id</span>
+            <input
+              value={config.audio.systemDeviceId}
+              onChange={(event) => updateAudio({ systemDeviceId: event.currentTarget.value })}
+            />
+          </label>
+          <label className="settings-field">
+            <span>Gain dB</span>
+            <input
+              type="number"
+              min="-24"
+              max="12"
+              value={config.audio.gainDb}
+              onChange={(event) => updateAudio({ gainDb: Number(event.currentTarget.value) })}
+            />
+          </label>
+          <label className="settings-field">
+            <span>Noise gate dB</span>
+            <input
+              type="number"
+              min="-80"
+              max="0"
+              value={config.audio.noiseGateDb}
+              onChange={(event) => updateAudio({ noiseGateDb: Number(event.currentTarget.value) })}
+            />
+          </label>
+          <label className="settings-field">
+            <span>Whisper binary path</span>
+            <input
+              value={config.stt.localWhisperBinaryPath}
+              placeholder="C:\\tools\\whisper.cpp\\main.exe"
+              onChange={(event) => updateStt({ localWhisperBinaryPath: event.currentTarget.value })}
+            />
+          </label>
+          <label className="settings-field">
+            <span>Whisper model path</span>
+            <input
+              value={config.stt.localWhisperModelPath}
+              placeholder="C:\\models\\ggml-base.en.bin"
+              onChange={(event) => updateStt({ localWhisperModelPath: event.currentTarget.value })}
+            />
+          </label>
+          <label className="settings-field">
+            <span>Language</span>
+            <input value={config.stt.language} onChange={(event) => updateStt({ language: event.currentTarget.value })} />
+          </label>
+          <label className="toggle-row">
+            <span>Diarization labels</span>
+            <input
+              type="checkbox"
+              checked={config.stt.diarizationEnabled}
+              onChange={(event) => updateStt({ diarizationEnabled: event.currentTarget.checked })}
+            />
+          </label>
+        </div>
+      </section>
+
+      <section className="panel prompt-panel">
+        <div className="panel-heading">
+          <div>
+            <p className="eyebrow">Automation</p>
+            <h2>Automatic Answering</h2>
+          </div>
+          <Bot size={18} />
+        </div>
+        <div className="settings-two-column">
+          <label className="settings-field">
+            <span>Trigger mode</span>
+            <select
+              value={config.autoTrigger.mode}
+              onChange={(event) =>
+                updateAutoTrigger({ mode: event.currentTarget.value as AutoTriggerSettings["mode"] })
+              }
+            >
+              <option value="manual">Manual only</option>
+              <option value="suggest_on_question">Suggest on interviewer question</option>
+              <option value="continuous_coach">Continuous coach</option>
+            </select>
+          </label>
+          <label className="settings-field">
+            <span>Silence timeout ms</span>
+            <input
+              type="number"
+              min="500"
+              max="10000"
+              value={config.autoTrigger.silenceTimeoutMs}
+              onChange={(event) => updateAutoTrigger({ silenceTimeoutMs: Number(event.currentTarget.value) })}
+            />
+          </label>
+          <label className="settings-field">
+            <span>Duplicate window ms</span>
+            <input
+              type="number"
+              min="1000"
+              max="300000"
+              value={config.autoTrigger.duplicateWindowMs}
+              onChange={(event) => updateAutoTrigger({ duplicateWindowMs: Number(event.currentTarget.value) })}
+            />
+          </label>
+          <label className="toggle-row">
+            <span>Only interviewer speech can trigger</span>
+            <input
+              type="checkbox"
+              checked={config.autoTrigger.requireInterviewerSpeaker}
+              onChange={(event) => updateAutoTrigger({ requireInterviewerSpeaker: event.currentTarget.checked })}
+            />
+          </label>
+        </div>
+      </section>
+
+      <section className="panel prompt-panel">
+        <div className="panel-heading">
+          <div>
+            <p className="eyebrow">Screen Context</p>
+            <h2>Screen OCR</h2>
+          </div>
+          <ScanText size={18} />
+        </div>
+        <div className="settings-two-column">
+          <label className="toggle-row">
+            <span>Enable OCR context</span>
+            <input
+              type="checkbox"
+              checked={config.ocr.enabled}
+              onChange={(event) => updateOcr({ enabled: event.currentTarget.checked })}
+            />
+          </label>
+          <label className="settings-field">
+            <span>OCR provider</span>
+            <select
+              value={config.ocr.provider}
+              onChange={(event) => updateOcr({ provider: event.currentTarget.value as OcrSettings["provider"] })}
+            >
+              <option value="disabled">Disabled</option>
+              <option value="local_tesseract">Local Tesseract</option>
+              <option value="windows_ocr">Windows OCR</option>
+              <option value="cloud">Cloud OCR</option>
+            </select>
+          </label>
+          <label className="toggle-row">
+            <span>Review before prompt injection</span>
+            <input
+              type="checkbox"
+              checked={config.ocr.reviewBeforeSend}
+              onChange={(event) => updateOcr({ reviewBeforeSend: event.currentTarget.checked })}
+            />
+          </label>
+          <label className="toggle-row">
+            <span>Include reviewed OCR in prompt</span>
+            <input
+              type="checkbox"
+              checked={config.ocr.includeInPrompt}
+              onChange={(event) => updateOcr({ includeInPrompt: event.currentTarget.checked })}
+            />
+          </label>
+        </div>
+      </section>
+
+      <section className="panel prompt-panel">
+        <div className="panel-heading">
+          <div>
+            <p className="eyebrow">Playback</p>
+            <h2>Text To Speech</h2>
+          </div>
+          <Volume2 size={18} />
+        </div>
+        <div className="settings-two-column">
+          <label className="toggle-row">
+            <span>Enable TTS</span>
+            <input
+              type="checkbox"
+              checked={config.tts.enabled}
+              onChange={(event) => updateTts({ enabled: event.currentTarget.checked })}
+            />
+          </label>
+          <label className="toggle-row">
+            <span>Mute in stealth mode</span>
+            <input
+              type="checkbox"
+              checked={config.tts.muteInStealth}
+              onChange={(event) => updateTts({ muteInStealth: event.currentTarget.checked })}
+            />
+          </label>
+          <label className="settings-field">
+            <span>Voice</span>
+            <input value={config.tts.voice} onChange={(event) => updateTts({ voice: event.currentTarget.value })} />
+          </label>
+          <label className="settings-field">
+            <span>Language</span>
+            <input
+              value={config.tts.language}
+              onChange={(event) => updateTts({ language: event.currentTarget.value })}
+            />
+          </label>
+          <label className="settings-field">
+            <span>Rate</span>
+            <input
+              type="number"
+              min="0.5"
+              max="2"
+              step="0.1"
+              value={config.tts.rate}
+              onChange={(event) => updateTts({ rate: Number(event.currentTarget.value) })}
+            />
+          </label>
+          <label className="settings-field">
+            <span>Volume</span>
+            <input
+              type="number"
+              min="0"
+              max="1"
+              step="0.1"
+              value={config.tts.volume}
+              onChange={(event) => updateTts({ volume: Number(event.currentTarget.value) })}
+            />
+          </label>
+        </div>
+      </section>
+
+      <section className="panel prompt-panel">
+        <div className="panel-heading">
+          <div>
+            <p className="eyebrow">Hardening</p>
+            <h2>Security And Updates</h2>
+          </div>
+          <ShieldCheck size={18} />
+        </div>
+        <div className="settings-two-column">
+          <label className="toggle-row">
+            <span>Local-only mode</span>
+            <input
+              type="checkbox"
+              checked={config.security.localOnlyMode}
+              onChange={(event) => updateSecurity({ localOnlyMode: event.currentTarget.checked })}
+            />
+          </label>
+          <label className="toggle-row">
+            <span>Block cloud calls while local-only</span>
+            <input
+              type="checkbox"
+              checked={config.security.blockCloudWhenLocalOnly}
+              onChange={(event) => updateSecurity({ blockCloudWhenLocalOnly: event.currentTarget.checked })}
+            />
+          </label>
+          <label className="toggle-row">
+            <span>Windows capture exclusion</span>
+            <input
+              type="checkbox"
+              checked={config.security.captureExclusionEnabled}
+              onChange={(event) => updateSecurity({ captureExclusionEnabled: event.currentTarget.checked })}
+            />
+          </label>
+          <label className="toggle-row">
+            <span>Require signed updates</span>
+            <input
+              type="checkbox"
+              checked={config.security.signedUpdatesRequired}
+              onChange={(event) => updateSecurity({ signedUpdatesRequired: event.currentTarget.checked })}
+            />
+          </label>
+        </div>
+      </section>
+
+      <section className="panel prompt-panel">
+        <div className="panel-heading">
+          <div>
+            <p className="eyebrow">Extensions</p>
+            <h2>Plugin System</h2>
+          </div>
+          <Puzzle size={18} />
+        </div>
+        <div className="settings-two-column">
+          <label className="toggle-row">
+            <span>Enable local plugins</span>
+            <input
+              type="checkbox"
+              checked={config.plugins.enabled}
+              onChange={(event) => updatePlugins({ enabled: event.currentTarget.checked })}
+            />
+          </label>
+          <label className="settings-field">
+            <span>Plugin directory</span>
+            <input
+              value={config.plugins.directory}
+              placeholder="C:\\Users\\you\\caveman-plugins"
+              onChange={(event) => updatePlugins({ directory: event.currentTarget.value })}
+            />
+          </label>
+          <label className="toggle-row">
+            <span>Prompt template contributions</span>
+            <input
+              type="checkbox"
+              checked={config.plugins.allowPromptTemplates}
+              onChange={(event) => updatePlugins({ allowPromptTemplates: event.currentTarget.checked })}
+            />
+          </label>
+          <label className="toggle-row">
+            <span>Practice question packs</span>
+            <input
+              type="checkbox"
+              checked={config.plugins.allowPracticePacks}
+              onChange={(event) => updatePlugins({ allowPracticePacks: event.currentTarget.checked })}
             />
           </label>
         </div>

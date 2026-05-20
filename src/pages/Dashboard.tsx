@@ -5,8 +5,10 @@ import { Button } from "../components/common/Button";
 import { OverlayWindow } from "../components/overlay/OverlayWindow";
 import { TranscriptFeed } from "../components/overlay/TranscriptFeed";
 import { APP_CONFIG_SETTING_KEY, DEFAULT_APP_CONFIG, parseAppConfig } from "../lib/appConfig";
+import { shouldTriggerAnswer } from "../lib/autoTrigger";
 import { buildChatMessages } from "../lib/contextBuilder";
 import { createConfiguredProvider } from "../lib/providerClients";
+import { selectRunnableProviders } from "../lib/providerSelection";
 import { promptTemplates } from "../lib/promptTemplates";
 import { estimateTokens, nextTranscriptTimestampMs } from "../lib/sessionRuntime";
 import {
@@ -14,6 +16,7 @@ import {
   addTranscript,
   createSession,
   getSetting,
+  listAudioDevices,
   listAiResponses,
   listSessions,
   listTranscripts
@@ -21,6 +24,7 @@ import {
 import { ProviderRouter } from "../lib/providerRouter";
 import { useOverlayStore } from "../stores/overlayStore";
 import type { AIResponseRecord, ChatMessage, SessionRecord, Speaker, TranscriptSegment } from "../types/session";
+import type { AudioDevice } from "../types/settings";
 import type { AppConfig } from "../lib/appConfig";
 
 const TEMP_STREAM_ID = -1;
@@ -30,10 +34,12 @@ export function Dashboard() {
   const [session, setSession] = useState<SessionRecord | null>(null);
   const [transcripts, setTranscripts] = useState<TranscriptSegment[]>([]);
   const [responses, setResponses] = useState<AIResponseRecord[]>([]);
+  const [audioDevices, setAudioDevices] = useState<AudioDevice[]>([]);
   const [config, setConfig] = useState<AppConfig>(DEFAULT_APP_CONFIG);
   const [manualSpeaker, setManualSpeaker] = useState<Speaker>("interviewer");
   const [manualTranscript, setManualTranscript] = useState("");
   const [streaming, setStreaming] = useState(false);
+  const [lastTriggeredTranscriptId, setLastTriggeredTranscriptId] = useState<number | undefined>();
   const [statusMessage, setStatusMessage] = useState("Loading session...");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const { visible, toggleVisible, opacity, setOpacity, fontSize, setFontSize, locked, setLocked } = useOverlayStore();
@@ -63,7 +69,7 @@ export function Dashboard() {
     async function load() {
       try {
         const storedConfig = parseAppConfig(await getSetting(APP_CONFIG_SETTING_KEY));
-        const sessions = await listSessions();
+        const [sessions, devices] = await Promise.all([listSessions(), listAudioDevices()]);
         const activeSession =
           sessions.find((item) => item.status === "active") ??
           (await createSession({
@@ -80,6 +86,7 @@ export function Dashboard() {
         }
 
         setConfig(storedConfig);
+        setAudioDevices(devices);
         setSession(activeSession);
         await refreshSessionData(activeSession.id);
         setStatusMessage(`Ready with ${storedConfig.selectedProviderId}`);
@@ -118,25 +125,44 @@ export function Dashboard() {
       timestampMs: nextTranscriptTimestampMs(new Date(session.createdAt)),
       confidence: 1
     });
-    setTranscripts((current) => [...current, saved]);
+    const nextTranscripts = [...transcripts, saved];
+    setTranscripts(nextTranscripts);
     setManualTranscript("");
     setStatusMessage("Transcript saved");
+
+    const trigger = shouldTriggerAnswer({
+      segments: nextTranscripts,
+      settings: config.autoTrigger,
+      lastTriggeredTranscriptId,
+      nowMs: saved.timestampMs + config.autoTrigger.silenceTimeoutMs
+    });
+
+    if (running && trigger.shouldTrigger && trigger.transcriptId) {
+      setLastTriggeredTranscriptId(trigger.transcriptId);
+      setStatusMessage(`Question detected by ${trigger.reason}; generating answer...`);
+      await generateResponse(nextTranscripts, trigger.transcriptId);
+    }
   }
 
-  async function generateResponse() {
+  async function generateResponse(transcriptInput = transcripts, triggerTranscriptId?: number) {
     if (!session) {
       setErrorMessage("Session is still loading.");
       return;
     }
 
-    if (transcripts.length === 0) {
+    if (transcriptInput.length === 0) {
       setErrorMessage("Add at least one transcript line before generating an answer.");
       return;
     }
 
-    const providers = orderedEnabledProviders(config).map((provider) => createConfiguredProvider(provider));
+    const runnableProviderConfigs = selectRunnableProviders(config);
+    const providers = runnableProviderConfigs.map((provider) => createConfiguredProvider(provider));
     if (providers.length === 0) {
-      setErrorMessage("Enable at least one provider in Settings.");
+      setErrorMessage(
+        config.security.localOnlyMode
+          ? "Enable at least one local provider or turn off local-only mode in Settings."
+          : "Enable at least one provider in Settings."
+      );
       return;
     }
 
@@ -144,20 +170,21 @@ export function Dashboard() {
     setErrorMessage(null);
     setStatusMessage(`Streaming from ${providers[0].label}...`);
 
-    const messages = buildPromptMessages(config, transcripts, template);
+    const messages = buildPromptMessages(config, transcriptInput, template);
+    const activeModel = runnableProviderConfigs[0]?.model ?? selectedProvider.model;
     const router = new ProviderRouter(providers);
     const startedAt = performance.now();
     let response = "";
 
     try {
-      for await (const chunk of router.chatStream({ messages, model: selectedProvider.model })) {
+      for await (const chunk of router.chatStream({ messages, model: activeModel })) {
         response += chunk;
         setResponses((current) => [
           {
             id: TEMP_STREAM_ID,
             sessionId: session.id,
             provider: providers[0].id,
-            model: selectedProvider.model,
+            model: activeModel,
             response,
             latencyMs: Math.round(performance.now() - startedAt),
             createdAt: new Date().toISOString()
@@ -172,9 +199,10 @@ export function Dashboard() {
 
       const saved = await addAiResponse({
         sessionId: session.id,
+        triggerTranscriptId,
         promptMessages: JSON.stringify(messages),
         response,
-        model: selectedProvider.model,
+        model: activeModel,
         provider: providers[0].id,
         inputTokens: estimateTokens(messages.map((message) => message.content).join("\n")),
         outputTokens: estimateTokens(response),
@@ -214,7 +242,7 @@ export function Dashboard() {
           <Button icon={visible ? <EyeOff size={16} /> : <Eye size={16} />} onClick={toggleVisible}>
             {visible ? "Hide Overlay" : "Show Overlay"}
           </Button>
-          <Button variant="primary" icon={<Wand2 size={16} />} onClick={generateResponse} disabled={streaming}>
+          <Button variant="primary" icon={<Wand2 size={16} />} onClick={() => generateResponse()} disabled={streaming}>
             {streaming ? "Streaming" : "Generate"}
           </Button>
         </div>
@@ -222,7 +250,7 @@ export function Dashboard() {
         <div className="metric-strip">
           <div>
             <span>Mode</span>
-            <strong>manual transcript</strong>
+            <strong>{config.audio.captureMode === "manual" ? "manual transcript" : config.audio.captureMode}</strong>
           </div>
           <div>
             <span>Provider</span>
@@ -266,7 +294,10 @@ export function Dashboard() {
         </div>
       </section>
 
-      <AudioControls devices={[]} status="Manual" />
+      <AudioControls
+        devices={audioDevices}
+        status={config.audio.captureMode === "manual" ? "Manual" : config.audio.captureMode}
+      />
       <TranscriptFeed transcripts={transcripts} />
 
       <section className="panel overlay-control-panel">
@@ -319,20 +350,5 @@ function buildPromptMessages(
     template,
     transcripts,
     resumeContext: [config.resumeContext, config.jobDescriptionContext].filter(Boolean).join("\n\n")
-  });
-}
-
-function orderedEnabledProviders(config: AppConfig) {
-  const enabled = config.providers.filter((provider) => provider.enabled);
-  return enabled.sort((left, right) => {
-    if (left.id === config.selectedProviderId) {
-      return -1;
-    }
-
-    if (right.id === config.selectedProviderId) {
-      return 1;
-    }
-
-    return 0;
   });
 }
