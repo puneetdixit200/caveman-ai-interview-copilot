@@ -1,11 +1,13 @@
 import {
   BookOpen,
   Bot,
+  DownloadCloud,
   FilePlus2,
   KeyRound,
   Mic,
   Play,
   Puzzle,
+  RefreshCw,
   Save,
   ScanText,
   ShieldCheck,
@@ -56,6 +58,7 @@ import {
 } from "../lib/tauri";
 import { promptTemplates } from "../lib/promptTemplates";
 import { enqueueTtsResponse, playTtsItem, stopTtsPlayback } from "../lib/tts";
+import { checkForSignedUpdate, downloadInstallAndRelaunchSignedUpdate } from "../lib/updater";
 import type {
   AudioSettings,
   AudioDevice,
@@ -86,6 +89,9 @@ export function Settings() {
   const [knowledgeText, setKnowledgeText] = useState("");
   const [knowledgeQuery, setKnowledgeQuery] = useState("");
   const [pluginCatalog, setPluginCatalog] = useState<PluginCatalog>(createEmptyPluginCatalog());
+  const [checkingUpdate, setCheckingUpdate] = useState(false);
+  const [installingUpdate, setInstallingUpdate] = useState(false);
+  const [updateProgress, setUpdateProgress] = useState("");
 
   useEffect(() => {
     let cancelled = false;
@@ -437,6 +443,41 @@ export function Settings() {
 
   function updateSecurity(patch: Partial<SecuritySettings>) {
     setConfig((current) => ({ ...current, security: { ...current.security, ...patch } }));
+  }
+
+  async function checkForUpdates() {
+    setCheckingUpdate(true);
+    setStatus("Checking signed update endpoint...");
+    setUpdateProgress("");
+
+    try {
+      const update = await checkForSignedUpdate();
+      setStatus(update.available ? `Signed update ${update.version} is available` : "No signed update is available");
+    } catch (error) {
+      setStatus(`Update check failed: ${error instanceof Error ? error.message : String(error)}`);
+    } finally {
+      setCheckingUpdate(false);
+    }
+  }
+
+  async function installSignedUpdate() {
+    setInstallingUpdate(true);
+    setStatus("Installing signed update...");
+
+    try {
+      const update = await downloadInstallAndRelaunchSignedUpdate((progress) => {
+        setUpdateProgress(
+          progress.totalBytes
+            ? `${progress.downloadedBytes} / ${progress.totalBytes} bytes`
+            : `${progress.downloadedBytes} bytes`
+        );
+      });
+      setStatus(update.available ? `Installed signed update ${update.version}; relaunching` : "No signed update is available");
+    } catch (error) {
+      setStatus(`Update install failed: ${error instanceof Error ? error.message : String(error)}`);
+    } finally {
+      setInstallingUpdate(false);
+    }
   }
 
   function updatePlugins(patch: Partial<PluginSettings>) {
@@ -1089,7 +1130,19 @@ export function Settings() {
               onChange={(event) => updateSecurity({ signedUpdatesRequired: event.currentTarget.checked })}
             />
           </label>
+          <Button icon={<RefreshCw size={16} />} onClick={checkForUpdates} disabled={checkingUpdate || installingUpdate}>
+            {checkingUpdate ? "Checking Updates" : "Check Signed Updates"}
+          </Button>
+          <Button
+            variant="primary"
+            icon={<DownloadCloud size={16} />}
+            onClick={installSignedUpdate}
+            disabled={checkingUpdate || installingUpdate}
+          >
+            {installingUpdate ? "Installing Update" : "Install Signed Update"}
+          </Button>
         </div>
+        {updateProgress ? <p className="page-status">Update download: {updateProgress}</p> : null}
       </section>
 
       <section className="panel prompt-panel">

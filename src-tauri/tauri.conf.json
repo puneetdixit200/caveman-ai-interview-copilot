@@ -42,5 +42,16 @@
     "active": true,
     "targets": "all",
     "icon": ["icons/icon.ico"]
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDgzRTE3MTVCMDY3REJDMDQKUldRRXZIMEdXM0hoZzg0MHFpWEVoZDdkUmI4LzJDNkNtZEkxSUxjTmwrUkNUNTFtUVhFTnhOdjAK",
+      "endpoints": [
+        "https://github.com/puneetdixit200/caveman-ai-interview-copilot/releases/latest/download/latest.json"
+      ],
+      "windows": {
+        "installMode": "passive"
+      }
+    }
   }
 }

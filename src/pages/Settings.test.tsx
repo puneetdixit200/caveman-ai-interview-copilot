@@ -15,6 +15,7 @@ describe("Settings", () => {
     expect(screen.getByText("Screen OCR")).toBeInTheDocument();
     expect(screen.getByText("Text To Speech")).toBeInTheDocument();
     expect(screen.getByText("Security And Updates")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Check Signed Updates" })).toBeInTheDocument();
     expect(screen.getByText("Plugin System")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Load Plugins" })).toBeInTheDocument();
   });
