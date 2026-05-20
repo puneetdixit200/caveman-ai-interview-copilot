@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   buildPracticeScoringPrompt,
+  listPluginPracticeQuestions,
   listPracticeQuestions,
   nextPracticeState,
   scorePracticeAnswer
@@ -53,5 +54,35 @@ describe("practice", () => {
     expect(feedback.score).toBeGreaterThanOrEqual(4);
     expect(feedback.feedback).toContain("Covered");
     expect(feedback.nextAction.length).toBeGreaterThan(10);
+  });
+
+  it("converts plugin practice packs into typed interviewer questions", () => {
+    const questions = listPluginPracticeQuestions(
+      [
+        {
+          id: "queues-pack",
+          name: "Queue Interviews",
+          interviewType: "system_design",
+          questions: [
+            {
+              id: "dead-letter",
+              prompt: "Design dead-letter queue handling.",
+              expectedSignals: ["retry", "backoff", "alert"]
+            }
+          ]
+        }
+      ],
+      "system_design"
+    );
+
+    expect(questions).toEqual([
+      {
+        id: "queues-pack:dead-letter",
+        interviewType: "system_design",
+        question: "Design dead-letter queue handling.",
+        focus: ["Queue Interviews"],
+        expectedSignals: ["retry", "backoff", "alert"]
+      }
+    ]);
   });
 });

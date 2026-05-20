@@ -1,4 +1,5 @@
 import type { InterviewType } from "../types/session";
+import type { PluginPracticePack } from "./pluginManifest";
 
 export interface PracticeQuestion {
   id: string;
@@ -97,6 +98,24 @@ export function listPracticeQuestions(interviewType: InterviewType): PracticeQue
   );
 
   return matching.length > 0 ? matching : practiceQuestions;
+}
+
+export function listPluginPracticeQuestions(
+  packs: PluginPracticePack[],
+  interviewType: InterviewType,
+  packId?: string
+): PracticeQuestion[] {
+  return packs
+    .filter((pack) => (packId ? pack.id === packId : pack.interviewType === interviewType || pack.interviewType === "mixed"))
+    .flatMap((pack) =>
+      pack.questions.map((question) => ({
+        id: `${pack.id}:${question.id}`,
+        interviewType: pack.interviewType,
+        question: question.prompt,
+        focus: [pack.name],
+        expectedSignals: question.expectedSignals
+      }))
+    );
 }
 
 export function scorePracticeAnswer(input: { question: PracticeQuestion; answer: string }): {

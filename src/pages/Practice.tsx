@@ -1,14 +1,22 @@
 import { BrainCircuit, CheckCircle2, Clipboard, RotateCcw } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Button } from "../components/common/Button";
 import {
+  PLUGIN_CATALOG_SETTING_KEY,
+  createEmptyPluginCatalog,
+  parsePluginCatalog,
+  type PluginCatalog
+} from "../lib/pluginLoader";
+import {
   buildPracticeScoringPrompt,
+  listPluginPracticeQuestions,
   listPracticeQuestions,
   nextPracticeState,
   scorePracticeAnswer,
   type PracticeQuestion,
   type PracticeState
 } from "../lib/practice";
+import { getSetting } from "../lib/tauri";
 import type { InterviewType } from "../types/session";
 
 const interviewTypes: Array<{ id: InterviewType; label: string }> = [
@@ -21,7 +29,23 @@ const interviewTypes: Array<{ id: InterviewType; label: string }> = [
 
 export function Practice() {
   const [interviewType, setInterviewType] = useState<InterviewType>("system_design");
-  const questions = useMemo(() => listPracticeQuestions(interviewType), [interviewType]);
+  const [pluginCatalog, setPluginCatalog] = useState<PluginCatalog>(createEmptyPluginCatalog());
+  const [practicePackId, setPracticePackId] = useState("built-in");
+  const pluginPracticePacks = useMemo(
+    () =>
+      pluginCatalog.practicePacks.filter((pack) => pack.interviewType === interviewType || pack.interviewType === "mixed"),
+    [interviewType, pluginCatalog.practicePacks]
+  );
+  const questions = useMemo(() => {
+    if (practicePackId !== "built-in") {
+      const pluginQuestions = listPluginPracticeQuestions(pluginCatalog.practicePacks, interviewType, practicePackId);
+      if (pluginQuestions.length > 0) {
+        return pluginQuestions;
+      }
+    }
+
+    return listPracticeQuestions(interviewType);
+  }, [interviewType, pluginCatalog.practicePacks, practicePackId]);
   const [questionIndex, setQuestionIndex] = useState(0);
   const activeQuestion = questions[questionIndex % questions.length];
   const [state, setState] = useState<PracticeState>(() => createState(activeQuestion));
@@ -29,13 +53,40 @@ export function Practice() {
   const [status, setStatus] = useState("Ready for practice");
   const feedback = state.status === "scored" ? scorePracticeAnswer({ question: activeQuestion, answer: state.answer }) : null;
 
+  useEffect(() => {
+    let cancelled = false;
+
+    getSetting(PLUGIN_CATALOG_SETTING_KEY).then((rawCatalog) => {
+      if (!cancelled) {
+        setPluginCatalog(parsePluginCatalog(rawCatalog));
+      }
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   function changeInterviewType(nextType: InterviewType) {
     const nextQuestions = listPracticeQuestions(nextType);
     setInterviewType(nextType);
+    setPracticePackId("built-in");
     setQuestionIndex(0);
     setState(createState(nextQuestions[0]));
     setDraftAnswer("");
     setStatus("Practice pack loaded");
+  }
+
+  function changePracticePack(nextPackId: string) {
+    const nextQuestions =
+      nextPackId === "built-in"
+        ? listPracticeQuestions(interviewType)
+        : listPluginPracticeQuestions(pluginCatalog.practicePacks, interviewType, nextPackId);
+    setPracticePackId(nextPackId);
+    setQuestionIndex(0);
+    setState(createState(nextQuestions[0] ?? listPracticeQuestions(interviewType)[0]));
+    setDraftAnswer("");
+    setStatus(nextPackId === "built-in" ? "Built-in practice pack loaded" : "Plugin practice pack loaded");
   }
 
   function submitAnswer() {
@@ -88,6 +139,17 @@ export function Practice() {
             {interviewTypes.map((type) => (
               <option key={type.id} value={type.id}>
                 {type.label}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="practice-type-picker">
+          <span>Practice pack</span>
+          <select value={practicePackId} onChange={(event) => changePracticePack(event.currentTarget.value)}>
+            <option value="built-in">Built-in questions</option>
+            {pluginPracticePacks.map((pack) => (
+              <option key={pack.id} value={pack.id}>
+                {pack.name}
               </option>
             ))}
           </select>
