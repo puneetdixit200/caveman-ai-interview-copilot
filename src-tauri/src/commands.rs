@@ -4,6 +4,7 @@ use crate::ai;
 use crate::audio::{self, AudioCaptureManager, AudioCaptureState};
 use crate::db::{Database, NewAiResponse, NewSession};
 use crate::models::{AiResponse, PromptTemplate, Session, Transcript};
+use crate::overlay::OverlayProtectionStatus;
 use crate::stt;
 
 #[tauri::command]
@@ -111,6 +112,16 @@ pub fn transcribe_with_local_whisper(
     input: stt::LocalWhisperRequest,
 ) -> Result<Vec<stt::TranscriptEvent>, String> {
     stt::transcribe_with_local_whisper(input).map_err(to_command_error)
+}
+
+#[tauri::command]
+pub fn protect_overlay_window(app_handle: AppHandle) -> OverlayProtectionStatus {
+    crate::overlay::protect_overlay_window(&app_handle)
+}
+
+#[tauri::command]
+pub fn set_overlay_window_visible(app_handle: AppHandle, visible: bool) -> OverlayProtectionStatus {
+    crate::overlay::set_overlay_window_visible(&app_handle, visible)
 }
 
 #[tauri::command]

@@ -1,4 +1,4 @@
-import { Eye, EyeOff, Play, Send, Square, Wand2 } from "lucide-react";
+import { Eye, EyeOff, Keyboard, Play, Send, ShieldCheck, Square, Wand2 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { AudioControls } from "../components/audio/AudioControls";
 import { Button } from "../components/common/Button";
@@ -8,6 +8,8 @@ import { APP_CONFIG_SETTING_KEY, DEFAULT_APP_CONFIG, parseAppConfig } from "../l
 import { applyAudioLevelEvent, type AudioCaptureState } from "../lib/audioEvents";
 import { shouldTriggerAnswer } from "../lib/autoTrigger";
 import { buildChatMessages } from "../lib/contextBuilder";
+import { registerOverlayToggleShortcut } from "../lib/globalHotkeys";
+import { DEFAULT_OVERLAY_SHORTCUT, overlayShortcutLabel } from "../lib/hotkeys";
 import { createConfiguredProvider } from "../lib/providerClients";
 import { selectRunnableProviders } from "../lib/providerSelection";
 import { promptTemplates } from "../lib/promptTemplates";
@@ -18,11 +20,14 @@ import {
   createSession,
   getCaptureStatus,
   getSetting,
+  isRunningInTauri,
   listAudioDevices,
   listAiResponses,
   listSessions,
   listTranscripts,
   onAudioLevel,
+  protectOverlayWindow,
+  setOverlayWindowVisible,
   startCapture,
   stopCapture
 } from "../lib/tauri";
@@ -31,6 +36,7 @@ import { useOverlayStore } from "../stores/overlayStore";
 import type { AIResponseRecord, ChatMessage, SessionRecord, Speaker, TranscriptSegment } from "../types/session";
 import type { AudioDevice } from "../types/settings";
 import type { AppConfig } from "../lib/appConfig";
+import type { OverlayProtectionStatus } from "../lib/tauri";
 
 const TEMP_STREAM_ID = -1;
 const DEFAULT_CAPTURE_STATUS: AudioCaptureState = {
@@ -51,6 +57,9 @@ export function Dashboard() {
   const [responses, setResponses] = useState<AIResponseRecord[]>([]);
   const [audioDevices, setAudioDevices] = useState<AudioDevice[]>([]);
   const [captureStatus, setCaptureStatus] = useState<AudioCaptureState>(DEFAULT_CAPTURE_STATUS);
+  const [overlayProtection, setOverlayProtection] = useState<OverlayProtectionStatus | null>(null);
+  const [overlayShortcut, setOverlayShortcut] = useState(DEFAULT_OVERLAY_SHORTCUT);
+  const [overlayMessage, setOverlayMessage] = useState<string | null>(null);
   const [config, setConfig] = useState<AppConfig>(DEFAULT_APP_CONFIG);
   const [manualSpeaker, setManualSpeaker] = useState<Speaker>("interviewer");
   const [manualTranscript, setManualTranscript] = useState("");
@@ -58,7 +67,7 @@ export function Dashboard() {
   const [lastTriggeredTranscriptId, setLastTriggeredTranscriptId] = useState<number | undefined>();
   const [statusMessage, setStatusMessage] = useState("Loading session...");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const { visible, toggleVisible, opacity, setOpacity, fontSize, setFontSize, locked, setLocked } = useOverlayStore();
+  const { visible, setVisible, opacity, setOpacity, fontSize, setFontSize, locked, setLocked } = useOverlayStore();
 
   const selectedProvider = useMemo(
     () => config.providers.find((provider) => provider.id === config.selectedProviderId) ?? config.providers[0],
@@ -69,6 +78,25 @@ export function Dashboard() {
     () => promptTemplates.find((item) => item.category === session?.interviewType) ?? promptTemplates[0],
     [session?.interviewType]
   );
+
+  const setNativeOverlayVisible = useCallback(
+    async (nextVisible: boolean) => {
+      setVisible(nextVisible);
+      const status = await setOverlayWindowVisible(nextVisible);
+      setOverlayProtection(status);
+      setOverlayMessage(status.message ?? (nextVisible ? "Overlay shown" : "Overlay hidden"));
+
+      if (isRunningInTauri() && status.visible !== nextVisible) {
+        setVisible(status.visible);
+      }
+    },
+    [setVisible]
+  );
+
+  const toggleOverlayWindow = useCallback(() => {
+    const nextVisible = !useOverlayStore.getState().visible;
+    void setNativeOverlayVisible(nextVisible);
+  }, [setNativeOverlayVisible]);
 
   const refreshSessionData = useCallback(async (sessionId: string) => {
     const [freshTranscripts, freshResponses] = await Promise.all([
@@ -152,6 +180,52 @@ export function Dashboard() {
       unlisten?.();
     };
   }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    protectOverlayWindow().then((status) => {
+      if (cancelled) {
+        return;
+      }
+
+      setOverlayProtection(status);
+      setOverlayMessage(status.message ?? null);
+      if (isRunningInTauri()) {
+        setVisible(status.visible);
+      }
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [setVisible]);
+
+  useEffect(() => {
+    let disposed = false;
+    let cleanup: (() => Promise<void>) | undefined;
+
+    registerOverlayToggleShortcut({
+      shortcut: DEFAULT_OVERLAY_SHORTCUT,
+      onToggle: toggleOverlayWindow
+    }).then((registration) => {
+      if (disposed) {
+        void registration.dispose();
+        return;
+      }
+
+      cleanup = registration.dispose;
+      setOverlayShortcut(registration.registeredShortcut);
+      if (registration.error) {
+        setOverlayMessage(`Global shortcut unavailable: ${registration.error}`);
+      }
+    });
+
+    return () => {
+      disposed = true;
+      void cleanup?.();
+    };
+  }, [toggleOverlayWindow]);
 
   async function toggleCapture() {
     if (running) {
@@ -317,7 +391,7 @@ export function Dashboard() {
           >
             {running ? "Stop" : "Start"}
           </Button>
-          <Button icon={visible ? <EyeOff size={16} /> : <Eye size={16} />} onClick={toggleVisible}>
+          <Button icon={visible ? <EyeOff size={16} /> : <Eye size={16} />} onClick={toggleOverlayWindow}>
             {visible ? "Hide Overlay" : "Show Overlay"}
           </Button>
           <Button variant="primary" icon={<Wand2 size={16} />} onClick={() => generateResponse()} disabled={streaming}>
@@ -391,6 +465,18 @@ export function Dashboard() {
             <h2>Stealth Window</h2>
           </div>
         </div>
+        <div className="overlay-runtime">
+          <span>
+            <Keyboard size={14} />
+            {overlayShortcutLabel(overlayShortcut)}
+          </span>
+          <span>
+            <ShieldCheck size={14} />
+            Capture {overlayProtection?.captureExclusion ?? "checking"}
+          </span>
+          <span>Click-through {overlayProtection?.clickThrough ? "on" : "off"}</span>
+        </div>
+        {overlayMessage ? <p className="overlay-runtime-message">{overlayMessage}</p> : null}
         <OverlayWindow responses={responses} transcripts={transcripts} />
         <div className="control-grid">
           <label>

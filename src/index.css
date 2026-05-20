@@ -477,6 +477,33 @@ h2 {
   grid-row: span 2;
 }
 
+.overlay-runtime {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: -2px 0 12px;
+}
+
+.overlay-runtime span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 26px;
+  border: 1px solid #31413b;
+  border-radius: 8px;
+  padding: 0 9px;
+  color: #dce8e2;
+  background: #111815;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.overlay-runtime-message {
+  margin: -4px 0 12px;
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
 .overlay-surface {
   border: 1px solid rgba(140, 255, 169, 0.38);
   border-radius: 8px;

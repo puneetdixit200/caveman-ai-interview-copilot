@@ -11,6 +11,15 @@ import type {
 } from "../types/session";
 import type { AudioDevice } from "../types/settings";
 
+export interface OverlayProtectionStatus {
+  alwaysOnTop: boolean;
+  skipTaskbar: boolean;
+  captureExclusion: "enabled" | "failed" | "unsupported" | string;
+  clickThrough: boolean;
+  visible: boolean;
+  message?: string | null;
+}
+
 declare global {
   interface Window {
     __TAURI_INTERNALS__?: unknown;
@@ -203,4 +212,26 @@ export async function transcribeWithLocalWhisper(input: {
   diarizationEnabled?: boolean;
 }): Promise<SttTranscriptEvent[]> {
   return invokeStrictOrFallback<SttTranscriptEvent[]>("transcribe_with_local_whisper", { input }, () => []);
+}
+
+export async function protectOverlayWindow(): Promise<OverlayProtectionStatus> {
+  return invokeOrFallback<OverlayProtectionStatus>("protect_overlay_window", {}, () => ({
+    alwaysOnTop: false,
+    skipTaskbar: false,
+    captureExclusion: "unsupported",
+    clickThrough: false,
+    visible: false,
+    message: "Native overlay protection is available only inside the Tauri desktop app."
+  }));
+}
+
+export async function setOverlayWindowVisible(visible: boolean): Promise<OverlayProtectionStatus> {
+  return invokeOrFallback<OverlayProtectionStatus>("set_overlay_window_visible", { visible }, () => ({
+    alwaysOnTop: false,
+    skipTaskbar: false,
+    captureExclusion: "unsupported",
+    clickThrough: false,
+    visible,
+    message: "Native overlay visibility is available only inside the Tauri desktop app."
+  }));
 }

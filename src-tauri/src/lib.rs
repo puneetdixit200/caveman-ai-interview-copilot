@@ -8,6 +8,7 @@ pub mod stt;
 
 pub fn run() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .setup(|app| {
             use tauri::Manager;
 
@@ -34,6 +35,8 @@ pub fn run() {
             commands::get_capture_status,
             commands::list_stt_providers,
             commands::transcribe_with_local_whisper,
+            commands::protect_overlay_window,
+            commands::set_overlay_window_visible,
             commands::list_prompt_templates
         ])
         .run(tauri::generate_context!())
