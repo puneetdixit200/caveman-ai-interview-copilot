@@ -4,6 +4,7 @@ pub mod commands;
 pub mod db;
 pub mod models;
 pub mod overlay;
+pub mod plugins;
 pub mod secrets;
 pub mod stt;
 
@@ -42,7 +43,8 @@ pub fn run() {
             commands::transcribe_with_cloud_stt,
             commands::protect_overlay_window,
             commands::set_overlay_window_visible,
-            commands::list_prompt_templates
+            commands::list_prompt_templates,
+            commands::load_plugin_manifests
         ])
         .run(tauri::generate_context!())
         .expect("failed to run Caveman");

@@ -5,6 +5,7 @@ use crate::audio::{self, AudioCaptureManager, AudioCaptureState};
 use crate::db::{Database, NewAiResponse, NewSession};
 use crate::models::{AiResponse, PromptTemplate, Session, Transcript};
 use crate::overlay::OverlayProtectionStatus;
+use crate::plugins::PluginManifestFile;
 use crate::secrets::SecretStatus;
 use crate::stt;
 
@@ -150,6 +151,11 @@ pub fn set_overlay_window_visible(app_handle: AppHandle, visible: bool) -> Overl
 #[tauri::command]
 pub fn list_prompt_templates() -> Vec<PromptTemplate> {
     ai::prompt_templates()
+}
+
+#[tauri::command]
+pub fn load_plugin_manifests(directory: String) -> Result<Vec<PluginManifestFile>, String> {
+    crate::plugins::load_plugin_manifest_files(directory).map_err(to_command_error)
 }
 
 fn to_command_error(error: anyhow::Error) -> String {

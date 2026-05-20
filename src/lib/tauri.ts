@@ -10,6 +10,7 @@ import type {
   TranscriptSegment
 } from "../types/session";
 import type { AudioDevice } from "../types/settings";
+import type { PluginManifestFile } from "./pluginLoader";
 
 export interface OverlayProtectionStatus {
   alwaysOnTop: boolean;
@@ -274,4 +275,8 @@ export async function setOverlayWindowVisible(visible: boolean): Promise<Overlay
     visible,
     message: "Native overlay visibility is available only inside the Tauri desktop app."
   }));
+}
+
+export async function loadPluginManifests(directory: string): Promise<PluginManifestFile[]> {
+  return invokeStrictOrFallback<PluginManifestFile[]>("load_plugin_manifests", { directory }, () => []);
 }

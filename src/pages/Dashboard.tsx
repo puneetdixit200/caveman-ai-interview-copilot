@@ -18,6 +18,12 @@ import {
   searchKnowledgeBase,
   type KnowledgeBase
 } from "../lib/knowledge";
+import {
+  PLUGIN_CATALOG_SETTING_KEY,
+  createEmptyPluginCatalog,
+  parsePluginCatalog,
+  type PluginCatalog
+} from "../lib/pluginLoader";
 import { createConfiguredProvider } from "../lib/providerClients";
 import { hydrateProviderApiKeys } from "../lib/providerSecrets";
 import { selectRunnableProviders } from "../lib/providerSelection";
@@ -78,6 +84,7 @@ export function Dashboard() {
   const [statusMessage, setStatusMessage] = useState("Loading session...");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [knowledgeBase, setKnowledgeBase] = useState<KnowledgeBase>(createKnowledgeBase());
+  const [pluginCatalog, setPluginCatalog] = useState<PluginCatalog>(createEmptyPluginCatalog());
   const { visible, setVisible, opacity, setOpacity, fontSize, setFontSize, locked, setLocked } = useOverlayStore();
 
   const selectedProvider = useMemo(
@@ -85,9 +92,14 @@ export function Dashboard() {
     [config.providers, config.selectedProviderId]
   );
 
+  const availablePromptTemplates = useMemo(
+    () => [...promptTemplates, ...pluginCatalog.promptTemplates],
+    [pluginCatalog.promptTemplates]
+  );
+
   const template = useMemo(
-    () => promptTemplates.find((item) => item.category === session?.interviewType) ?? promptTemplates[0],
-    [session?.interviewType]
+    () => availablePromptTemplates.find((item) => item.category === session?.interviewType) ?? availablePromptTemplates[0],
+    [availablePromptTemplates, session?.interviewType]
   );
 
   const setNativeOverlayVisible = useCallback(
@@ -123,9 +135,10 @@ export function Dashboard() {
 
     async function load() {
       try {
-        const [rawConfig, rawKnowledgeBase] = await Promise.all([
+        const [rawConfig, rawKnowledgeBase, rawPluginCatalog] = await Promise.all([
           getSetting(APP_CONFIG_SETTING_KEY),
-          getSetting(KNOWLEDGE_BASE_SETTING_KEY)
+          getSetting(KNOWLEDGE_BASE_SETTING_KEY),
+          getSetting(PLUGIN_CATALOG_SETTING_KEY)
         ]);
         const storedConfig = parseAppConfig(rawConfig);
         const hydratedConfig = await hydrateProviderApiKeys(storedConfig);
@@ -147,6 +160,7 @@ export function Dashboard() {
 
         setConfig(hydratedConfig);
         setKnowledgeBase(parseKnowledgeBase(rawKnowledgeBase));
+        setPluginCatalog(parsePluginCatalog(rawPluginCatalog));
         setAudioDevices(devices);
         setCaptureStatus(status);
         setRunning(status.running);

@@ -33,12 +33,21 @@ import {
   type KnowledgeBase
 } from "../lib/knowledge";
 import { runScreenOcr } from "../lib/ocr";
+import {
+  PLUGIN_CATALOG_SETTING_KEY,
+  buildPluginCatalog,
+  createEmptyPluginCatalog,
+  parsePluginCatalog,
+  serializePluginCatalog,
+  type PluginCatalog
+} from "../lib/pluginLoader";
 import { createConfiguredProvider } from "../lib/providerClients";
 import { hydrateProviderApiKeys } from "../lib/providerSecrets";
 import {
   deleteProviderApiKey,
   getProviderApiKey,
   getSetting,
+  loadPluginManifests,
   listAudioDevices,
   saveProviderApiKey,
   saveSetting,
@@ -76,15 +85,17 @@ export function Settings() {
   const [knowledgeSourceType, setKnowledgeSourceType] = useState("project");
   const [knowledgeText, setKnowledgeText] = useState("");
   const [knowledgeQuery, setKnowledgeQuery] = useState("");
+  const [pluginCatalog, setPluginCatalog] = useState<PluginCatalog>(createEmptyPluginCatalog());
 
   useEffect(() => {
     let cancelled = false;
 
     async function load() {
-      const [rawConfig, devices, rawKnowledgeBase] = await Promise.all([
+      const [rawConfig, devices, rawKnowledgeBase, rawPluginCatalog] = await Promise.all([
         getSetting(APP_CONFIG_SETTING_KEY),
         listAudioDevices(),
-        getSetting(KNOWLEDGE_BASE_SETTING_KEY)
+        getSetting(KNOWLEDGE_BASE_SETTING_KEY),
+        getSetting(PLUGIN_CATALOG_SETTING_KEY)
       ]);
       const stored = parseAppConfig(rawConfig);
       const hydrated = await hydrateProviderApiKeys(stored);
@@ -102,6 +113,7 @@ export function Settings() {
       if (!cancelled) {
         setConfig(nextConfig);
         setKnowledgeBase(parseKnowledgeBase(rawKnowledgeBase));
+        setPluginCatalog(parsePluginCatalog(rawPluginCatalog));
         setSttSecretInput(sttSecret ?? "");
         setOcrReviewText(nextConfig.ocr.lastText ?? "");
         setAudioDevices(devices);
@@ -429,6 +441,33 @@ export function Settings() {
 
   function updatePlugins(patch: Partial<PluginSettings>) {
     setConfig((current) => ({ ...current, plugins: { ...current.plugins, ...patch } }));
+  }
+
+  async function loadLocalPlugins() {
+    if (!config.plugins.enabled) {
+      setStatus("Enable local plugins before loading manifests.");
+      return;
+    }
+
+    const directory = config.plugins.directory.trim();
+    if (!directory) {
+      setStatus("Set a plugin directory before loading manifests.");
+      return;
+    }
+
+    try {
+      const files = await loadPluginManifests(directory);
+      const catalog = buildPluginCatalog(files, config.plugins);
+      setPluginCatalog(catalog);
+      await saveSetting(PLUGIN_CATALOG_SETTING_KEY, serializePluginCatalog(catalog));
+      setStatus(
+        `Loaded ${catalog.loaded.length} plugin${catalog.loaded.length === 1 ? "" : "s"} from ${directory}${
+          catalog.errors.length > 0 ? ` with ${catalog.errors.length} warning${catalog.errors.length === 1 ? "" : "s"}` : ""
+        }`
+      );
+    } catch (error) {
+      setStatus(`Could not load plugins: ${error instanceof Error ? error.message : String(error)}`);
+    }
   }
 
   return (
@@ -1094,7 +1133,37 @@ export function Settings() {
               onChange={(event) => updatePlugins({ allowPracticePacks: event.currentTarget.checked })}
             />
           </label>
+          <Button variant="primary" icon={<Puzzle size={16} />} onClick={loadLocalPlugins}>
+            Load Plugins
+          </Button>
+          <div className="settings-field">
+            <span>Loaded contributions</span>
+            <strong>
+              {pluginCatalog.loaded.length} plugin{pluginCatalog.loaded.length === 1 ? "" : "s"} /{" "}
+              {pluginCatalog.promptTemplates.length} prompt template
+              {pluginCatalog.promptTemplates.length === 1 ? "" : "s"} / {pluginCatalog.practicePacks.length} practice pack
+              {pluginCatalog.practicePacks.length === 1 ? "" : "s"}
+            </strong>
+          </div>
         </div>
+        {pluginCatalog.loaded.length > 0 ? (
+          <div className="provider-editor-list">
+            {pluginCatalog.loaded.map((plugin) => (
+              <article className="prompt-row" key={plugin.path}>
+                <strong>
+                  {plugin.manifest.name} {plugin.manifest.version}
+                </strong>
+                <p>{plugin.path}</p>
+              </article>
+            ))}
+          </div>
+        ) : null}
+        {pluginCatalog.errors.length > 0 ? (
+          <div className="runtime-status">
+            <span>Plugin loader warnings</span>
+            <strong>{pluginCatalog.errors.join(" ")}</strong>
+          </div>
+        ) : null}
       </section>
 
       <section className="panel prompt-panel">

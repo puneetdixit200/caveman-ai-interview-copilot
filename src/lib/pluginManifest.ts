@@ -1,12 +1,27 @@
+import type { InterviewType, PromptTemplate } from "../types/session";
+
 export interface PluginManifest {
   id: string;
   name: string;
   version: string;
   contributes: {
-    promptTemplates?: string[];
+    promptTemplates?: PromptTemplate[];
     exportFormats?: string[];
-    practicePacks?: string[];
+    practicePacks?: PluginPracticePack[];
   };
+}
+
+export interface PluginPracticeQuestion {
+  id: string;
+  prompt: string;
+  expectedSignals: string[];
+}
+
+export interface PluginPracticePack {
+  id: string;
+  name: string;
+  interviewType: InterviewType;
+  questions: PluginPracticeQuestion[];
 }
 
 export interface PluginValidationResult {
@@ -49,9 +64,9 @@ export function validatePluginManifest(raw: unknown): PluginValidationResult {
           name: raw.name,
           version: raw.version,
           contributes: {
-            promptTemplates: readStringArray(contributes.promptTemplates),
+            promptTemplates: readPromptTemplates(contributes.promptTemplates),
             exportFormats: readStringArray(contributes.exportFormats),
-            practicePacks: readStringArray(contributes.practicePacks)
+            practicePacks: readPracticePacks(contributes.practicePacks)
           }
         }
       : undefined;
@@ -73,4 +88,64 @@ function readStringArray(value: unknown): string[] | undefined {
   }
 
   return value.filter((item): item is string => typeof item === "string" && item.trim().length > 0);
+}
+
+function readPromptTemplates(value: unknown): PromptTemplate[] | undefined {
+  if (!Array.isArray(value)) {
+    return undefined;
+  }
+
+  const templates = value.filter(isPromptTemplate);
+  return templates.length > 0 ? templates : undefined;
+}
+
+function isPromptTemplate(value: unknown): value is PromptTemplate {
+  return (
+    isRecord(value) &&
+    typeof value.id === "string" &&
+    isSafeId(value.id) &&
+    typeof value.name === "string" &&
+    value.name.trim().length > 0 &&
+    isInterviewType(value.category) &&
+    typeof value.systemPrompt === "string" &&
+    value.systemPrompt.trim().length > 0
+  );
+}
+
+function readPracticePacks(value: unknown): PluginPracticePack[] | undefined {
+  if (!Array.isArray(value)) {
+    return undefined;
+  }
+
+  const packs = value.filter(isPracticePack);
+  return packs.length > 0 ? packs : undefined;
+}
+
+function isPracticePack(value: unknown): value is PluginPracticePack {
+  return (
+    isRecord(value) &&
+    typeof value.id === "string" &&
+    isSafeId(value.id) &&
+    typeof value.name === "string" &&
+    value.name.trim().length > 0 &&
+    isInterviewType(value.interviewType) &&
+    Array.isArray(value.questions) &&
+    value.questions.every(isPracticeQuestion)
+  );
+}
+
+function isPracticeQuestion(value: unknown): value is PluginPracticeQuestion {
+  return (
+    isRecord(value) &&
+    typeof value.id === "string" &&
+    isSafeId(value.id) &&
+    typeof value.prompt === "string" &&
+    value.prompt.trim().length > 0 &&
+    Array.isArray(value.expectedSignals) &&
+    value.expectedSignals.every((signal) => typeof signal === "string" && signal.trim().length > 0)
+  );
+}
+
+function isInterviewType(value: unknown): value is InterviewType {
+  return value === "dsa" || value === "system_design" || value === "behavioral" || value === "hr" || value === "mixed";
 }

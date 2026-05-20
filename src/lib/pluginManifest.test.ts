@@ -9,9 +9,29 @@ describe("pluginManifest", () => {
         name: "Local Practice Pack",
         version: "1.0.0",
         contributes: {
-          promptTemplates: ["behavioral-star"],
+          promptTemplates: [
+            {
+              id: "behavioral-star-plugin",
+              name: "Behavioral STAR Plugin",
+              category: "behavioral",
+              systemPrompt: "Coach a concise STAR response grounded in the candidate context."
+            }
+          ],
           exportFormats: ["markdown"],
-          practicePacks: ["backend-senior"]
+          practicePacks: [
+            {
+              id: "backend-senior",
+              name: "Senior Backend Pack",
+              interviewType: "system_design",
+              questions: [
+                {
+                  id: "queues",
+                  prompt: "Design a durable queue.",
+                  expectedSignals: ["partitioning", "retry", "dead letter"]
+                }
+              ]
+            }
+          ]
         }
       })
     ).toEqual({

@@ -16,6 +16,7 @@ describe("Settings", () => {
     expect(screen.getByText("Text To Speech")).toBeInTheDocument();
     expect(screen.getByText("Security And Updates")).toBeInTheDocument();
     expect(screen.getByText("Plugin System")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Load Plugins" })).toBeInTheDocument();
   });
 
   it("shows OS keychain controls for cloud provider API keys", async () => {
