@@ -149,7 +149,8 @@ export const profiles: AppProfile[] = [
     shortcuts: {
       overlayToggle: "Ctrl+Shift+H",
       captureToggle: "Ctrl+Shift+S",
-      generateAnswer: "Ctrl+Shift+G"
+      generateAnswer: "Ctrl+Shift+G",
+      typeLatestAnswer: "Ctrl+Shift+T"
     }
   },
   {
@@ -174,7 +175,8 @@ export const profiles: AppProfile[] = [
     shortcuts: {
       overlayToggle: "Ctrl+Shift+H",
       captureToggle: "Ctrl+Shift+S",
-      generateAnswer: "Ctrl+Shift+G"
+      generateAnswer: "Ctrl+Shift+G",
+      typeLatestAnswer: "Ctrl+Shift+T"
     }
   }
 ];

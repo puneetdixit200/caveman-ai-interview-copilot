@@ -105,6 +105,7 @@ export interface ShortcutSettings {
   overlayToggle: string;
   captureToggle: string;
   generateAnswer: string;
+  typeLatestAnswer: string;
 }
 
 export interface OverlayWindowBounds {

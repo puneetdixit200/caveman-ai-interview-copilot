@@ -49,7 +49,8 @@ import {
   setOverlayWindowBounds,
   setOverlayWindowVisible,
   startCapture,
-  stopCapture
+  stopCapture,
+  typeTextIntoActiveWindow
 } from "../lib/tauri";
 import { ProviderRouter } from "../lib/providerRouter";
 import { useOverlayStore } from "../stores/overlayStore";
@@ -95,6 +96,7 @@ export function Dashboard() {
   const liveTranscriptionBusy = useRef(false);
   const captureShortcutAction = useRef<() => void>(() => undefined);
   const generateShortcutAction = useRef<() => void>(() => undefined);
+  const typeLatestShortcutAction = useRef<() => void>(() => undefined);
   const { visible, setVisible, opacity, setOpacity, fontSize, setFontSize, locked, setLocked } = useOverlayStore();
 
   const selectedProvider = useMemo(
@@ -298,6 +300,11 @@ export function Dashboard() {
           id: "generate",
           shortcut: config.shortcuts.generateAnswer,
           onPressed: () => generateShortcutAction.current()
+        },
+        {
+          id: "type-latest",
+          shortcut: config.shortcuts.typeLatestAnswer,
+          onPressed: () => typeLatestShortcutAction.current()
         }
       ]
     }).then((registration) => {
@@ -536,11 +543,32 @@ export function Dashboard() {
     }
   }
 
+  async function typeLatestAnswer() {
+    const latestResponse = responses.find((item) => item.id !== TEMP_STREAM_ID && item.response.trim());
+    if (!latestResponse) {
+      setErrorMessage("Generate or save an AI response before typing it into another app.");
+      setStatusMessage("No AI response available to type");
+      return;
+    }
+
+    try {
+      const typed = await typeTextIntoActiveWindow(latestResponse.response);
+      setErrorMessage(null);
+      setStatusMessage(`Typed ${typed.characterCount} answer characters into the active window`);
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : String(error));
+      setStatusMessage("Could not type latest answer");
+    }
+  }
+
   captureShortcutAction.current = () => {
     void toggleCapture();
   };
   generateShortcutAction.current = () => {
     void generateResponse();
+  };
+  typeLatestShortcutAction.current = () => {
+    void typeLatestAnswer();
   };
 
   return (
@@ -567,6 +595,9 @@ export function Dashboard() {
           </Button>
           <Button variant="primary" icon={<Wand2 size={16} />} onClick={() => generateResponse()} disabled={streaming}>
             {streaming ? "Streaming" : "Generate"}
+          </Button>
+          <Button icon={<Keyboard size={16} />} onClick={typeLatestAnswer} disabled={streaming}>
+            Type Latest
           </Button>
         </div>
 

@@ -8,6 +8,7 @@ use crate::overlay::{OverlayProtectionStatus, OverlayWindowBounds};
 use crate::plugins::PluginManifestFile;
 use crate::secrets::SecretStatus;
 use crate::stt;
+use crate::typing;
 
 #[tauri::command]
 pub fn create_session(database: State<'_, Database>, input: NewSession) -> Result<Session, String> {
@@ -188,6 +189,11 @@ pub fn list_prompt_templates() -> Vec<PromptTemplate> {
 #[tauri::command]
 pub fn load_plugin_manifests(directory: String) -> Result<Vec<PluginManifestFile>, String> {
     crate::plugins::load_plugin_manifest_files(directory).map_err(to_command_error)
+}
+
+#[tauri::command]
+pub fn type_text_into_active_window(text: String) -> Result<typing::TypingResult, String> {
+    typing::type_text_into_active_window(&text).map_err(to_command_error)
 }
 
 fn to_command_error(error: anyhow::Error) -> String {

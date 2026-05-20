@@ -156,7 +156,8 @@ describe("appConfig", () => {
     expect(config.shortcuts).toMatchObject({
       overlayToggle: "CommandOrControl+Shift+H",
       captureToggle: "CommandOrControl+Shift+S",
-      generateAnswer: "CommandOrControl+Shift+G"
+      generateAnswer: "CommandOrControl+Shift+G",
+      typeLatestAnswer: "CommandOrControl+Shift+T"
     });
   });
 
@@ -204,7 +205,8 @@ describe("appConfig", () => {
         shortcuts: {
           overlayToggle: "control + alt + h",
           captureToggle: "control + alt + s",
-          generateAnswer: "control + alt + g"
+          generateAnswer: "control + alt + g",
+          typeLatestAnswer: "control + alt + t"
         }
       })
     );
@@ -250,7 +252,8 @@ describe("appConfig", () => {
     expect(parsed.shortcuts).toMatchObject({
       overlayToggle: "CommandOrControl+Alt+H",
       captureToggle: "CommandOrControl+Alt+S",
-      generateAnswer: "CommandOrControl+Alt+G"
+      generateAnswer: "CommandOrControl+Alt+G",
+      typeLatestAnswer: "CommandOrControl+Alt+T"
     });
   });
 });

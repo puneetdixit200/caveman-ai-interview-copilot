@@ -35,6 +35,11 @@ export interface CaptureSnapshot {
   sampleCount: number;
 }
 
+export interface TypingResult {
+  characterCount: number;
+  inputEventCount: number;
+}
+
 declare global {
   interface Window {
     __TAURI_INTERNALS__?: unknown;
@@ -332,4 +337,11 @@ export async function setOverlayWindowBounds(bounds: OverlayWindowBounds): Promi
 
 export async function loadPluginManifests(directory: string): Promise<PluginManifestFile[]> {
   return invokeStrictOrFallback<PluginManifestFile[]>("load_plugin_manifests", { directory }, () => []);
+}
+
+export async function typeTextIntoActiveWindow(text: string): Promise<TypingResult> {
+  return invokeStrictOrFallback<TypingResult>("type_text_into_active_window", { text }, () => ({
+    characterCount: Array.from(text).length,
+    inputEventCount: text.length * 2
+  }));
 }

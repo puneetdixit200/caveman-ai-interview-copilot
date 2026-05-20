@@ -7,6 +7,7 @@ pub mod overlay;
 pub mod plugins;
 pub mod secrets;
 pub mod stt;
+pub mod typing;
 
 pub fn run() {
     tauri::Builder::default()
@@ -49,7 +50,8 @@ pub fn run() {
             commands::get_overlay_window_bounds,
             commands::set_overlay_window_bounds,
             commands::list_prompt_templates,
-            commands::load_plugin_manifests
+            commands::load_plugin_manifests,
+            commands::type_text_into_active_window
         ])
         .run(tauri::generate_context!())
         .expect("failed to run Caveman");

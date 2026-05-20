@@ -1,6 +1,7 @@
 export const DEFAULT_OVERLAY_SHORTCUT = "CommandOrControl+Shift+H";
 export const DEFAULT_CAPTURE_SHORTCUT = "CommandOrControl+Shift+S";
 export const DEFAULT_GENERATE_SHORTCUT = "CommandOrControl+Shift+G";
+export const DEFAULT_TYPE_LATEST_SHORTCUT = "CommandOrControl+Shift+T";
 
 export function normalizeShortcut(shortcut: string): string {
   return shortcut

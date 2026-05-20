@@ -760,6 +760,14 @@ export function Settings() {
             />
           </label>
           <label className="settings-field">
+            <span>Type latest answer hotkey</span>
+            <input
+              value={config.shortcuts.typeLatestAnswer}
+              placeholder="Ctrl+Shift+T"
+              onChange={(event) => updateShortcuts({ typeLatestAnswer: event.currentTarget.value })}
+            />
+          </label>
+          <label className="settings-field">
             <span>Overlay opacity</span>
             <input
               type="number"

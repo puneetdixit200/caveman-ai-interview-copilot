@@ -19,6 +19,7 @@ import {
   DEFAULT_CAPTURE_SHORTCUT,
   DEFAULT_GENERATE_SHORTCUT,
   DEFAULT_OVERLAY_SHORTCUT,
+  DEFAULT_TYPE_LATEST_SHORTCUT,
   normalizeShortcut
 } from "./hotkeys";
 
@@ -160,7 +161,8 @@ export const DEFAULT_APP_CONFIG: AppConfig = {
   shortcuts: {
     overlayToggle: DEFAULT_OVERLAY_SHORTCUT,
     captureToggle: DEFAULT_CAPTURE_SHORTCUT,
-    generateAnswer: DEFAULT_GENERATE_SHORTCUT
+    generateAnswer: DEFAULT_GENERATE_SHORTCUT,
+    typeLatestAnswer: DEFAULT_TYPE_LATEST_SHORTCUT
   },
   security: {
     localOnlyMode: false,
@@ -427,7 +429,8 @@ function mergeShortcutSettings(raw: unknown, overlayHotkey: string): ShortcutSet
   return {
     overlayToggle: readShortcut(value.overlayToggle, overlayHotkey || DEFAULT_OVERLAY_SHORTCUT),
     captureToggle: readShortcut(value.captureToggle, DEFAULT_CAPTURE_SHORTCUT),
-    generateAnswer: readShortcut(value.generateAnswer, DEFAULT_GENERATE_SHORTCUT)
+    generateAnswer: readShortcut(value.generateAnswer, DEFAULT_GENERATE_SHORTCUT),
+    typeLatestAnswer: readShortcut(value.typeLatestAnswer, DEFAULT_TYPE_LATEST_SHORTCUT)
   };
 }
 
