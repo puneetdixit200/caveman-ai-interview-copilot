@@ -12,6 +12,7 @@ import { buildChatMessages } from "../lib/contextBuilder";
 import { canSendOcrContext } from "../lib/ocr";
 import { registerOverlayToggleShortcut } from "../lib/globalHotkeys";
 import { DEFAULT_OVERLAY_SHORTCUT, overlayShortcutLabel } from "../lib/hotkeys";
+import { shouldAutoHideOverlay } from "../lib/overlaySafety";
 import {
   KNOWLEDGE_BASE_SETTING_KEY,
   createKnowledgeBase,
@@ -113,6 +114,20 @@ export function Dashboard() {
       }
       setVisible(nextVisible);
       const status = await setOverlayWindowVisible(nextVisible);
+      if (
+        nextVisible &&
+        shouldAutoHideOverlay({
+          autoHideOnScreenShare: config.overlay.autoHideOnScreenShare,
+          captureExclusion: status.captureExclusion
+        })
+      ) {
+        const hiddenStatus = await setOverlayWindowVisible(false);
+        setOverlayProtection(hiddenStatus);
+        setOverlayMessage("Overlay hidden because capture exclusion is not enabled.");
+        setVisible(false);
+        return;
+      }
+
       setOverlayProtection(status);
       setOverlayMessage(status.message ?? (nextVisible ? "Overlay shown" : "Overlay hidden"));
 
@@ -120,7 +135,7 @@ export function Dashboard() {
         setVisible(status.visible);
       }
     },
-    [config.overlay.bounds, setVisible]
+    [config.overlay.autoHideOnScreenShare, config.overlay.bounds, setVisible]
   );
 
   const toggleOverlayWindow = useCallback(() => {
@@ -226,8 +241,23 @@ export function Dashboard() {
   useEffect(() => {
     let cancelled = false;
 
-    protectOverlayWindow().then((status) => {
+    protectOverlayWindow().then(async (status) => {
       if (cancelled) {
+        return;
+      }
+
+      if (
+        shouldAutoHideOverlay({
+          autoHideOnScreenShare: config.overlay.autoHideOnScreenShare,
+          captureExclusion: status.captureExclusion
+        })
+      ) {
+        const hiddenStatus = await setOverlayWindowVisible(false);
+        if (!cancelled) {
+          setOverlayProtection(hiddenStatus);
+          setOverlayMessage("Overlay hidden because capture exclusion is not enabled.");
+          setVisible(false);
+        }
         return;
       }
 
@@ -241,7 +271,7 @@ export function Dashboard() {
     return () => {
       cancelled = true;
     };
-  }, [setVisible]);
+  }, [config.overlay.autoHideOnScreenShare, setVisible]);
 
   useEffect(() => {
     let disposed = false;
