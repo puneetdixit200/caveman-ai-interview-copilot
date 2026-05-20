@@ -12,6 +12,8 @@ export interface ModelProviderConfig {
   model: string;
   enabled: boolean;
   apiKeyStored: boolean;
+  apiKey?: string;
+  headers?: Record<string, string>;
 }
 
 export interface AudioDevice {
@@ -46,4 +48,3 @@ export interface AppProfile {
   sttMode: SttMode;
   overlay: OverlaySettings;
 }
-

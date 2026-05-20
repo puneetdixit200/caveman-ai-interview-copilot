@@ -1,0 +1,245 @@
+import type { ChatStreamParams, HealthCheckResult } from "../types/ai";
+import type { ModelProviderConfig } from "../types/settings";
+import type { AIProvider } from "./providerRouter";
+
+type FetchLike = (input: string, init?: RequestInit) => Promise<Response>;
+
+const OPENROUTER_REFERER = "https://github.com/puneetdixit200/caveman-ai-interview-copilot";
+const OPENROUTER_TITLE = "Caveman AI Interview Copilot";
+
+export function createConfiguredProvider(
+  config: ModelProviderConfig,
+  fetchImpl: FetchLike = fetch
+): AIProvider {
+  return {
+    id: config.id,
+    label: config.label,
+    kind: config.kind,
+    healthCheck: () => healthCheck(config, fetchImpl),
+    chatStream: (params) => chatStream(config, params, fetchImpl)
+  };
+}
+
+async function healthCheck(config: ModelProviderConfig, fetchImpl: FetchLike): Promise<HealthCheckResult> {
+  if (!config.enabled) {
+    return { ok: false, latencyMs: 0, error: `${config.label} is disabled` };
+  }
+
+  const secretError = validateSecret(config);
+  if (secretError) {
+    return { ok: false, latencyMs: 0, error: secretError };
+  }
+
+  if (config.kind === "cloud") {
+    return { ok: true, latencyMs: 0 };
+  }
+
+  const startedAt = performance.now();
+  try {
+    const response = await fetchImpl(healthEndpoint(config), {
+      method: "GET",
+      headers: requestHeaders(config)
+    });
+    return {
+      ok: response.ok,
+      latencyMs: Math.round(performance.now() - startedAt),
+      error: response.ok ? undefined : `${config.label} health check returned ${response.status}`
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      latencyMs: Math.round(performance.now() - startedAt),
+      error: error instanceof Error ? error.message : String(error)
+    };
+  }
+}
+
+async function* chatStream(
+  config: ModelProviderConfig,
+  params: ChatStreamParams,
+  fetchImpl: FetchLike
+): AsyncGenerator<string> {
+  const secretError = validateSecret(config);
+  if (secretError) {
+    throw new Error(secretError);
+  }
+
+  const response = await fetchImpl(config.endpoint, {
+    method: "POST",
+    headers: requestHeaders(config),
+    body: JSON.stringify(requestBody(config, params)),
+    signal: params.signal
+  });
+
+  if (!response.ok) {
+    throw new Error(`${config.label} request failed with ${response.status}`);
+  }
+
+  if (!response.body) {
+    throw new Error(`${config.label} returned an empty stream`);
+  }
+
+  if (config.id === "ollama") {
+    yield* parseOllamaStream(response.body);
+    return;
+  }
+
+  yield* parseSseStream(response.body);
+}
+
+function requestHeaders(config: ModelProviderConfig): Record<string, string> {
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+    ...(config.headers ?? {})
+  };
+
+  if (config.apiKey?.trim()) {
+    headers.Authorization = `Bearer ${config.apiKey.trim()}`;
+  }
+
+  if (config.id === "openrouter") {
+    headers["HTTP-Referer"] = OPENROUTER_REFERER;
+    headers["X-Title"] = OPENROUTER_TITLE;
+  }
+
+  return headers;
+}
+
+function requestBody(config: ModelProviderConfig, params: ChatStreamParams): Record<string, unknown> {
+  if (config.id === "ollama") {
+    return {
+      model: params.model ?? config.model,
+      messages: params.messages,
+      stream: true,
+      options: {
+        temperature: params.temperature,
+        num_predict: params.maxTokens
+      }
+    };
+  }
+
+  return {
+    model: params.model ?? config.model,
+    messages: params.messages,
+    stream: true,
+    temperature: params.temperature,
+    max_tokens: params.maxTokens
+  };
+}
+
+function validateSecret(config: ModelProviderConfig): string | undefined {
+  if (config.id === "openrouter" && !config.apiKey?.trim()) {
+    return "OpenRouter API key is required";
+  }
+
+  if (["openai", "anthropic", "groq"].includes(config.id) && !config.apiKey?.trim()) {
+    return `${config.label} API key is required`;
+  }
+
+  return undefined;
+}
+
+function healthEndpoint(config: ModelProviderConfig): string {
+  if (config.id === "ollama") {
+    return config.endpoint.replace(/\/api\/chat\/?$/, "/api/tags");
+  }
+
+  if (config.endpoint.includes("/v1/chat/completions")) {
+    return config.endpoint.replace(/\/v1\/chat\/completions\/?$/, "/v1/models");
+  }
+
+  return config.endpoint;
+}
+
+async function* parseOllamaStream(body: ReadableStream<Uint8Array>): AsyncGenerator<string> {
+  let buffer = "";
+
+  for await (const chunk of decodeBody(body)) {
+    buffer += chunk;
+    const lines = buffer.split(/\r?\n/);
+    buffer = lines.pop() ?? "";
+
+    for (const line of lines) {
+      const content = parseOllamaLine(line);
+      if (content) {
+        yield content;
+      }
+    }
+  }
+
+  const finalContent = parseOllamaLine(buffer);
+  if (finalContent) {
+    yield finalContent;
+  }
+}
+
+function parseOllamaLine(line: string): string {
+  const trimmed = line.trim();
+  if (!trimmed) {
+    return "";
+  }
+
+  const parsed = JSON.parse(trimmed) as { message?: { content?: string }; response?: string };
+  return parsed.message?.content ?? parsed.response ?? "";
+}
+
+async function* parseSseStream(body: ReadableStream<Uint8Array>): AsyncGenerator<string> {
+  let buffer = "";
+
+  for await (const chunk of decodeBody(body)) {
+    buffer += chunk;
+    const events = buffer.split(/\r?\n\r?\n/);
+    buffer = events.pop() ?? "";
+
+    for (const event of events) {
+      const content = parseSseEvent(event);
+      if (content) {
+        yield content;
+      }
+    }
+  }
+
+  const finalContent = parseSseEvent(buffer);
+  if (finalContent) {
+    yield finalContent;
+  }
+}
+
+function parseSseEvent(event: string): string {
+  const lines = event
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter((line) => line.startsWith("data:"));
+
+  let content = "";
+  for (const line of lines) {
+    const payload = line.slice("data:".length).trim();
+    if (!payload || payload === "[DONE]") {
+      continue;
+    }
+
+    const parsed = JSON.parse(payload) as { choices?: Array<{ delta?: { content?: string }; text?: string }> };
+    content += parsed.choices?.map((choice) => choice.delta?.content ?? choice.text ?? "").join("") ?? "";
+  }
+
+  return content;
+}
+
+async function* decodeBody(body: ReadableStream<Uint8Array>): AsyncGenerator<string> {
+  const reader = body.getReader();
+  const decoder = new TextDecoder();
+
+  while (true) {
+    const { value, done } = await reader.read();
+    if (done) {
+      break;
+    }
+
+    yield decoder.decode(value, { stream: true });
+  }
+
+  const tail = decoder.decode();
+  if (tail) {
+    yield tail;
+  }
+}
