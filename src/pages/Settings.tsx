@@ -1,4 +1,4 @@
-import { Bot, KeyRound, Mic, Puzzle, Save, ScanText, ShieldCheck, Volume2, Wifi } from "lucide-react";
+import { Bot, KeyRound, Mic, Play, Puzzle, Save, ScanText, ShieldCheck, Square, Volume2, Wifi } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Button } from "../components/common/Button";
 import {
@@ -11,6 +11,7 @@ import {
 import { createConfiguredProvider } from "../lib/providerClients";
 import { getSetting, saveSetting, transcribeWithLocalWhisper } from "../lib/tauri";
 import { promptTemplates } from "../lib/promptTemplates";
+import { enqueueTtsResponse, playTtsItem, stopTtsPlayback } from "../lib/tts";
 import type {
   AudioSettings,
   AutoTriggerSettings,
@@ -110,6 +111,22 @@ export function Settings() {
 
   function updateTts(patch: Partial<TtsSettings>) {
     setConfig((current) => ({ ...current, tts: { ...current.tts, ...patch } }));
+  }
+
+  function previewTts() {
+    const queue = enqueueTtsResponse(
+      [],
+      "Caveman text to speech preview is ready.",
+      { ...config.tts, enabled: true },
+      false
+    );
+    const played = queue[0] ? playTtsItem(queue[0]) : false;
+    setStatus(played ? "TTS preview playing" : "TTS playback is not available in this environment");
+  }
+
+  function stopTtsPreview() {
+    stopTtsPlayback();
+    setStatus("TTS playback stopped");
   }
 
   function updateSecurity(patch: Partial<SecuritySettings>) {
@@ -504,6 +521,14 @@ export function Settings() {
             />
           </label>
           <label className="toggle-row">
+            <span>Auto-play answers</span>
+            <input
+              type="checkbox"
+              checked={config.tts.autoPlay}
+              onChange={(event) => updateTts({ autoPlay: event.currentTarget.checked })}
+            />
+          </label>
+          <label className="toggle-row">
             <span>Mute in stealth mode</span>
             <input
               type="checkbox"
@@ -544,6 +569,14 @@ export function Settings() {
               onChange={(event) => updateTts({ volume: Number(event.currentTarget.value) })}
             />
           </label>
+        </div>
+        <div className="button-row settings-actions">
+          <Button icon={<Play size={16} />} onClick={previewTts}>
+            Preview Voice
+          </Button>
+          <Button variant="secondary" icon={<Square size={16} />} onClick={stopTtsPreview}>
+            Stop Voice
+          </Button>
         </div>
       </section>
 

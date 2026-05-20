@@ -714,6 +714,10 @@ input[type="checkbox"] {
   gap: 8px;
 }
 
+.settings-actions {
+  margin-top: 14px;
+}
+
 .export-panel pre {
   overflow: auto;
   max-height: 440px;

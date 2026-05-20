@@ -14,6 +14,7 @@ import { createConfiguredProvider } from "../lib/providerClients";
 import { selectRunnableProviders } from "../lib/providerSelection";
 import { promptTemplates } from "../lib/promptTemplates";
 import { estimateTokens, nextTranscriptTimestampMs } from "../lib/sessionRuntime";
+import { enqueueTtsResponse, playTtsItem } from "../lib/tts";
 import {
   addAiResponse,
   addTranscript,
@@ -362,7 +363,9 @@ export function Dashboard() {
       });
 
       setResponses((current) => [saved, ...current.filter((item) => item.id !== TEMP_STREAM_ID)]);
-      setStatusMessage("AI response saved to this session");
+      const ttsQueue = config.tts.autoPlay ? enqueueTtsResponse([], response, config.tts, visible) : [];
+      const played = ttsQueue[0] ? playTtsItem(ttsQueue[0]) : false;
+      setStatusMessage(played ? "AI response saved and spoken" : "AI response saved to this session");
     } catch (error) {
       setResponses((current) => current.filter((item) => item.id !== TEMP_STREAM_ID));
       setErrorMessage(error instanceof Error ? error.message : String(error));
