@@ -1,7 +1,8 @@
-import { Copy, Download, FileJson, Search } from "lucide-react";
+import { BarChart3, Copy, Download, FileJson, Search } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Button } from "../components/common/Button";
 import { ResponseCard } from "../components/overlay/ResponseCard";
+import { calculateSessionAnalytics } from "../lib/analytics";
 import { downloadSessionPdf, exportSessionJson, exportSessionMarkdown } from "../lib/sessionExport";
 import { filterSessionSummaries } from "../lib/sessionSearch";
 import { formatDuration, formatTimestampMs } from "../lib/formatters";
@@ -13,6 +14,8 @@ export function Sessions() {
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
   const [transcripts, setTranscripts] = useState<TranscriptSegment[]>([]);
   const [responses, setResponses] = useState<AIResponseRecord[]>([]);
+  const [analyticsTranscripts, setAnalyticsTranscripts] = useState<TranscriptSegment[]>([]);
+  const [analyticsResponses, setAnalyticsResponses] = useState<AIResponseRecord[]>([]);
   const [transcriptsBySession, setTranscriptsBySession] = useState<Record<string, string[]>>({});
   const [responsesBySession, setResponsesBySession] = useState<Record<string, string[]>>({});
   const [query, setQuery] = useState("");
@@ -23,6 +26,20 @@ export function Sessions() {
     [query, responsesBySession, sessions, transcriptsBySession]
   );
   const selectedSession = sessions.find((session) => session.id === selectedSessionId) ?? filteredSessions[0] ?? sessions[0];
+  const analytics = useMemo(
+    () =>
+      calculateSessionAnalytics({
+        sessions,
+        transcripts: analyticsTranscripts,
+        responses: analyticsResponses
+      }),
+    [analyticsResponses, analyticsTranscripts, sessions]
+  );
+  const topProvider = useMemo(
+    () =>
+      Object.entries(analytics.providerCounts).sort((left, right) => right[1] - left[1])[0]?.[0] ?? "none",
+    [analytics.providerCounts]
+  );
 
   const markdownExport = useMemo(() => {
     if (!selectedSession) {
@@ -71,22 +88,32 @@ export function Sessions() {
     let cancelled = false;
 
     async function buildSearchIndex() {
-      const transcriptEntries = await Promise.all(
-        sessions.map(async (session) => [
-          session.id,
-          (await listTranscripts(session.id)).map((transcript) => transcript.content)
-        ])
+      const transcriptCollections = await Promise.all(
+        sessions.map(async (session) => ({
+          sessionId: session.id,
+          items: await listTranscripts(session.id)
+        }))
       );
-      const responseEntries = await Promise.all(
-        sessions.map(async (session) => [
-          session.id,
-          (await listAiResponses(session.id)).map((response) => response.response)
-        ])
+      const responseCollections = await Promise.all(
+        sessions.map(async (session) => ({
+          sessionId: session.id,
+          items: await listAiResponses(session.id)
+        }))
       );
 
       if (!cancelled) {
-        setTranscriptsBySession(Object.fromEntries(transcriptEntries));
-        setResponsesBySession(Object.fromEntries(responseEntries));
+        setTranscriptsBySession(
+          Object.fromEntries(
+            transcriptCollections.map((entry) => [entry.sessionId, entry.items.map((transcript) => transcript.content)])
+          )
+        );
+        setResponsesBySession(
+          Object.fromEntries(
+            responseCollections.map((entry) => [entry.sessionId, entry.items.map((response) => response.response)])
+          )
+        );
+        setAnalyticsTranscripts(transcriptCollections.flatMap((entry) => entry.items));
+        setAnalyticsResponses(responseCollections.flatMap((entry) => entry.items));
       }
     }
 
@@ -162,6 +189,38 @@ export function Sessions() {
             value={query}
             onChange={(event) => setQuery(event.currentTarget.value)}
           />
+        </div>
+      </section>
+
+      <section className="panel analytics-panel" aria-label="Session analytics">
+        <div className="panel-heading">
+          <div>
+            <p className="eyebrow">Performance</p>
+            <h2>Analytics</h2>
+          </div>
+          <BarChart3 size={18} />
+        </div>
+        <div className="metric-strip">
+          <div>
+            <span>Sessions</span>
+            <strong>
+              {analytics.totalSessions} session{analytics.totalSessions === 1 ? "" : "s"}
+            </strong>
+          </div>
+          <div>
+            <span>Questions</span>
+            <strong>
+              {analytics.totalQuestions} question{analytics.totalQuestions === 1 ? "" : "s"}
+            </strong>
+          </div>
+          <div>
+            <span>Latency</span>
+            <strong>{analytics.averageLatencyMs}ms avg latency</strong>
+          </div>
+          <div>
+            <span>Top provider</span>
+            <strong>{topProvider}</strong>
+          </div>
         </div>
       </section>
 
