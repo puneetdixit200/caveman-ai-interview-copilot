@@ -26,6 +26,7 @@ import { hydrateProviderApiKeys } from "../lib/providerSecrets";
 import {
   deleteProviderApiKey,
   getSetting,
+  listAudioDevices,
   saveProviderApiKey,
   saveSetting,
   transcribeWithLocalWhisper
@@ -34,6 +35,7 @@ import { promptTemplates } from "../lib/promptTemplates";
 import { enqueueTtsResponse, playTtsItem, stopTtsPlayback } from "../lib/tts";
 import type {
   AudioSettings,
+  AudioDevice,
   AutoTriggerSettings,
   ModelProviderConfig,
   OcrSettings,
@@ -51,15 +53,18 @@ export function Settings() {
   const [sttSampleAudioPath, setSttSampleAudioPath] = useState("");
   const [testingStt, setTestingStt] = useState(false);
   const [providerSecretInputs, setProviderSecretInputs] = useState<Partial<Record<ProviderId, string>>>({});
+  const [audioDevices, setAudioDevices] = useState<AudioDevice[]>([]);
 
   useEffect(() => {
     let cancelled = false;
 
     async function load() {
-      const stored = parseAppConfig(await getSetting(APP_CONFIG_SETTING_KEY));
+      const [rawConfig, devices] = await Promise.all([getSetting(APP_CONFIG_SETTING_KEY), listAudioDevices()]);
+      const stored = parseAppConfig(rawConfig);
       const hydrated = await hydrateProviderApiKeys(stored);
       if (!cancelled) {
         setConfig(hydrated);
+        setAudioDevices(devices);
         setProviderSecretInputs(
           hydrated.providers.reduce<Partial<Record<ProviderId, string>>>((values, provider) => {
             if (provider.kind === "cloud") {
@@ -178,6 +183,32 @@ export function Settings() {
 
   function updateAudio(patch: Partial<AudioSettings>) {
     setConfig((current) => ({ ...current, audio: { ...current.audio, ...patch } }));
+  }
+
+  function audioDeviceOptions(
+    source: "microphone" | "system",
+    currentId: string,
+    defaultLabel: string
+  ): AudioDevice[] {
+    const allowedKinds: AudioDevice["kind"][] =
+      source === "microphone" ? ["microphone", "virtual"] : ["system", "virtual"];
+    const options = audioDevices.filter((device) => allowedKinds.includes(device.kind));
+    const currentOption =
+      currentId && !options.some((device) => device.id === currentId)
+        ? [
+            {
+              id: currentId,
+              label: defaultLabel,
+              kind: source,
+              selected: true,
+              level: 0
+            } satisfies AudioDevice
+          ]
+        : [];
+
+    return [...currentOption, ...options].filter(
+      (device, index, devices) => devices.findIndex((candidate) => candidate.id === device.id) === index
+    );
   }
 
   function updateStt(patch: Partial<SttSettings>) {
@@ -420,18 +451,30 @@ export function Settings() {
             </select>
           </label>
           <label className="settings-field">
-            <span>Microphone device id</span>
-            <input
+            <span>Microphone device</span>
+            <select
               value={config.audio.microphoneDeviceId}
               onChange={(event) => updateAudio({ microphoneDeviceId: event.currentTarget.value })}
-            />
+            >
+              {audioDeviceOptions("microphone", config.audio.microphoneDeviceId, "Default microphone").map((device) => (
+                <option key={device.id} value={device.id}>
+                  {device.label}
+                </option>
+              ))}
+            </select>
           </label>
           <label className="settings-field">
-            <span>System audio device id</span>
-            <input
+            <span>System audio device</span>
+            <select
               value={config.audio.systemDeviceId}
               onChange={(event) => updateAudio({ systemDeviceId: event.currentTarget.value })}
-            />
+            >
+              {audioDeviceOptions("system", config.audio.systemDeviceId, "Default system output").map((device) => (
+                <option key={device.id} value={device.id}>
+                  {device.label}
+                </option>
+              ))}
+            </select>
           </label>
           <label className="settings-field">
             <span>Gain dB</span>

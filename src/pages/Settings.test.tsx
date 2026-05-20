@@ -26,4 +26,11 @@ describe("Settings", () => {
     expect(screen.getByRole("button", { name: "Delete Key" })).toBeInTheDocument();
     expect(screen.getByText(/OS keychain/i)).toBeInTheDocument();
   });
+
+  it("uses select controls for microphone and system audio devices", async () => {
+    render(<Settings />);
+
+    expect(await screen.findByRole("combobox", { name: "Microphone device" })).toBeInTheDocument();
+    expect(screen.getByRole("combobox", { name: "System audio device" })).toBeInTheDocument();
+  });
 });

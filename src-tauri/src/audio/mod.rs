@@ -119,7 +119,7 @@ impl AudioCaptureManager {
         let system_device_id = system_device_id.to_string();
         let microphone_device_id = microphone_device_id.to_string();
         let thread = thread::spawn(move || {
-            run_microphone_capture_thread(
+            run_audio_capture_thread(
                 app_handle,
                 system_device_id,
                 microphone_device_id,
@@ -304,7 +304,10 @@ fn stable_device_id(kind: &str, label: &str, index: usize) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::{classify_device_kind, stable_device_id, AudioCaptureManager, AudioLevelEvent};
+    use super::{
+        apply_audio_level_to_state, classify_device_kind, stable_device_id, AudioCaptureManager,
+        AudioCaptureState, AudioLevelEvent,
+    };
 
     #[test]
     fn classifies_virtual_audio_devices_from_name() {
@@ -354,10 +357,38 @@ mod tests {
         assert_eq!(status.microphone_level, 0.0);
         assert!(!status.system_capture_supported);
     }
+
+    #[test]
+    fn applies_dual_stream_audio_events_to_capture_state() {
+        let mut state = AudioCaptureState {
+            running: true,
+            system_device_id: "system-1".to_string(),
+            microphone_device_id: "mic-1".to_string(),
+            sample_rate_hz: 48_000,
+            channels: 2,
+            microphone_level: 0.0,
+            system_level: 0.0,
+            system_capture_supported: true,
+            error: None,
+        };
+
+        let microphone_event =
+            AudioLevelEvent::from_samples("microphone", "mic-1", &[0.1, 0.4], 48_000, 2);
+        let system_event =
+            AudioLevelEvent::from_samples("system", "system-1", &[0.2, -0.8], 48_000, 2);
+
+        apply_audio_level_to_state(&mut state, &microphone_event);
+        apply_audio_level_to_state(&mut state, &system_event);
+
+        assert!((state.microphone_level - 0.4).abs() < 0.001);
+        assert!((state.system_level - 0.8).abs() < 0.001);
+        assert!(state.system_capture_supported);
+    }
 }
 
 fn build_input_stream(
     device: &cpal::Device,
+    source: &'static str,
     sample_format: cpal::SampleFormat,
     config: &cpal::StreamConfig,
     device_id: String,
@@ -369,12 +400,14 @@ fn build_input_stream(
     match sample_format {
         cpal::SampleFormat::F32 => {
             let error_state = shared_state.clone();
+            let callback_device_id = device_id.clone();
             Ok(device.build_input_stream(
                 config,
                 move |data: &[f32], _| {
-                    process_microphone_samples(
+                    process_capture_samples(
+                        source,
                         data.iter().copied(),
-                        &device_id,
+                        &callback_device_id,
                         sample_rate_hz,
                         channels,
                         &shared_state,
@@ -387,12 +420,14 @@ fn build_input_stream(
         }
         cpal::SampleFormat::I16 => {
             let error_state = shared_state.clone();
+            let callback_device_id = device_id.clone();
             Ok(device.build_input_stream(
                 config,
                 move |data: &[i16], _| {
-                    process_microphone_samples(
+                    process_capture_samples(
+                        source,
                         data.iter().map(|sample| *sample as f32 / i16::MAX as f32),
-                        &device_id,
+                        &callback_device_id,
                         sample_rate_hz,
                         channels,
                         &shared_state,
@@ -405,13 +440,15 @@ fn build_input_stream(
         }
         cpal::SampleFormat::U16 => {
             let error_state = shared_state.clone();
+            let callback_device_id = device_id.clone();
             Ok(device.build_input_stream(
                 config,
                 move |data: &[u16], _| {
-                    process_microphone_samples(
+                    process_capture_samples(
+                        source,
                         data.iter()
                             .map(|sample| (*sample as f32 - 32768.0) / 32768.0),
-                        &device_id,
+                        &callback_device_id,
                         sample_rate_hz,
                         channels,
                         &shared_state,
@@ -423,12 +460,12 @@ fn build_input_stream(
             )?)
         }
         unsupported => Err(anyhow::anyhow!(
-            "Unsupported microphone sample format: {unsupported:?}"
+            "Unsupported {source} sample format: {unsupported:?}"
         )),
     }
 }
 
-fn run_microphone_capture_thread(
+fn run_audio_capture_thread(
     app_handle: AppHandle,
     system_device_id: String,
     microphone_device_id: String,
@@ -436,53 +473,83 @@ fn run_microphone_capture_thread(
     stop_rx: mpsc::Receiver<()>,
     ready_tx: mpsc::Sender<Result<AudioCaptureState, String>>,
 ) {
-    let result = (|| -> anyhow::Result<cpal::Stream> {
+    let result = (|| -> anyhow::Result<Vec<cpal::Stream>> {
         let host = cpal::default_host();
-        let device = resolve_input_device(&host, &microphone_device_id)
-            .ok_or_else(|| anyhow::anyhow!("No microphone input device is available"))?;
-        let selected_microphone_id = resolve_device_id(&host, &device, &microphone_device_id);
-        let supported_config = device.default_input_config()?;
-        let sample_rate_hz = supported_config.sample_rate().0;
-        let channels = supported_config.channels();
-        let stream_config = supported_config.clone().into();
+        let mut streams = Vec::new();
+        let mut errors = Vec::new();
+        let mut state = AudioCaptureState {
+            running: true,
+            system_device_id: system_device_id.clone(),
+            microphone_device_id: microphone_device_id.clone(),
+            sample_rate_hz: 16_000,
+            channels: 1,
+            microphone_level: 0.0,
+            system_level: 0.0,
+            system_capture_supported: false,
+            error: None,
+        };
 
-        if let Ok(mut state) = shared_state.lock() {
-            *state = AudioCaptureState {
-                running: true,
-                system_device_id,
-                microphone_device_id: selected_microphone_id.clone(),
-                sample_rate_hz,
-                channels,
-                microphone_level: 0.0,
-                system_level: 0.0,
-                system_capture_supported: false,
-                error: None,
-            };
+        match build_microphone_stream(
+            &host,
+            &microphone_device_id,
+            shared_state.clone(),
+            app_handle.clone(),
+        ) {
+            Ok(spec) => {
+                state.microphone_device_id = spec.device_id;
+                state.sample_rate_hz = spec.sample_rate_hz;
+                state.channels = spec.channels;
+                streams.push(spec.stream);
+            }
+            Err(error) => errors.push(format!("microphone: {error}")),
         }
 
-        let stream = build_input_stream(
-            &device,
-            supported_config.sample_format(),
-            &stream_config,
-            selected_microphone_id,
-            sample_rate_hz,
-            channels,
+        match build_system_loopback_stream(
+            &host,
+            &system_device_id,
             shared_state.clone(),
             app_handle,
-        )?;
-        stream.play()?;
-        Ok(stream)
+        ) {
+            Ok(spec) => {
+                state.system_device_id = spec.device_id;
+                state.system_capture_supported = true;
+                if streams.is_empty() {
+                    state.sample_rate_hz = spec.sample_rate_hz;
+                    state.channels = spec.channels;
+                }
+                streams.push(spec.stream);
+            }
+            Err(error) => errors.push(format!("system audio: {error}")),
+        }
+
+        if streams.is_empty() {
+            return Err(anyhow::anyhow!(errors.join("; ")));
+        }
+
+        if !errors.is_empty() {
+            state.error = Some(errors.join("; "));
+        }
+
+        if let Ok(mut shared) = shared_state.lock() {
+            *shared = state;
+        }
+
+        for stream in &streams {
+            stream.play()?;
+        }
+
+        Ok(streams)
     })();
 
     match result {
-        Ok(stream) => {
+        Ok(streams) => {
             let ready_state = shared_state
                 .lock()
                 .map(|state| state.clone())
                 .unwrap_or_else(|_| stopped_state());
             let _ = ready_tx.send(Ok(ready_state));
             let _ = stop_rx.recv();
-            drop(stream);
+            drop(streams);
         }
         Err(error) => {
             if let Ok(mut state) = shared_state.lock() {
@@ -500,13 +567,88 @@ fn run_microphone_capture_thread(
     }
 }
 
+struct CaptureStreamSpec {
+    stream: cpal::Stream,
+    device_id: String,
+    sample_rate_hz: u32,
+    channels: u16,
+}
+
+fn build_microphone_stream(
+    host: &cpal::Host,
+    microphone_device_id: &str,
+    shared_state: Arc<Mutex<AudioCaptureState>>,
+    app_handle: AppHandle,
+) -> anyhow::Result<CaptureStreamSpec> {
+    let device = resolve_input_device(host, microphone_device_id)
+        .ok_or_else(|| anyhow::anyhow!("No microphone input device is available"))?;
+    let selected_device_id = resolve_input_device_id(host, &device, microphone_device_id);
+    let supported_config = device.default_input_config()?;
+    let sample_rate_hz = supported_config.sample_rate().0;
+    let channels = supported_config.channels();
+    let stream_config = supported_config.clone().into();
+    let stream = build_input_stream(
+        &device,
+        "microphone",
+        supported_config.sample_format(),
+        &stream_config,
+        selected_device_id.clone(),
+        sample_rate_hz,
+        channels,
+        shared_state,
+        app_handle,
+    )?;
+
+    Ok(CaptureStreamSpec {
+        stream,
+        device_id: selected_device_id,
+        sample_rate_hz,
+        channels,
+    })
+}
+
+fn build_system_loopback_stream(
+    host: &cpal::Host,
+    system_device_id: &str,
+    shared_state: Arc<Mutex<AudioCaptureState>>,
+    app_handle: AppHandle,
+) -> anyhow::Result<CaptureStreamSpec> {
+    // CPAL's WASAPI backend enables loopback when an output device is opened as an input stream.
+    let device = resolve_output_device(host, system_device_id)
+        .ok_or_else(|| anyhow::anyhow!("No system output device is available"))?;
+    let selected_device_id = resolve_output_device_id(host, &device, system_device_id);
+    let supported_config = device.default_output_config()?;
+    let sample_rate_hz = supported_config.sample_rate().0;
+    let channels = supported_config.channels();
+    let stream_config = supported_config.clone().into();
+    let stream = build_input_stream(
+        &device,
+        "system",
+        supported_config.sample_format(),
+        &stream_config,
+        selected_device_id.clone(),
+        sample_rate_hz,
+        channels,
+        shared_state,
+        app_handle,
+    )?;
+
+    Ok(CaptureStreamSpec {
+        stream,
+        device_id: selected_device_id,
+        sample_rate_hz,
+        channels,
+    })
+}
+
 fn update_stream_error(shared_state: &Arc<Mutex<AudioCaptureState>>, error: cpal::StreamError) {
     if let Ok(mut state) = shared_state.lock() {
         state.error = Some(error.to_string());
     }
 }
 
-fn process_microphone_samples(
+fn process_capture_samples(
+    source: &'static str,
     samples: impl Iterator<Item = f32>,
     device_id: &str,
     sample_rate_hz: u32,
@@ -518,13 +660,24 @@ fn process_microphone_samples(
         .map(|sample| sample.clamp(-1.0, 1.0))
         .collect::<Vec<_>>();
     let event =
-        AudioLevelEvent::from_samples("microphone", device_id, &samples, sample_rate_hz, channels);
+        AudioLevelEvent::from_samples(source, device_id, &samples, sample_rate_hz, channels);
 
     if let Ok(mut state) = shared_state.lock() {
-        state.microphone_level = event.level;
+        apply_audio_level_to_state(&mut state, &event);
     }
 
     let _ = app_handle.emit("audio-level", event);
+}
+
+fn apply_audio_level_to_state(state: &mut AudioCaptureState, event: &AudioLevelEvent) {
+    match event.source.as_str() {
+        "microphone" => state.microphone_level = event.level,
+        "system" => {
+            state.system_level = event.level;
+            state.system_capture_supported = true;
+        }
+        _ => {}
+    }
 }
 
 fn resolve_input_device(host: &cpal::Host, requested_id: &str) -> Option<cpal::Device> {
@@ -544,7 +697,24 @@ fn resolve_input_device(host: &cpal::Host, requested_id: &str) -> Option<cpal::D
     host.default_input_device()
 }
 
-fn resolve_device_id(host: &cpal::Host, device: &cpal::Device, requested_id: &str) -> String {
+fn resolve_output_device(host: &cpal::Host, requested_id: &str) -> Option<cpal::Device> {
+    if requested_id == "default" || requested_id == "system-default" {
+        return host.default_output_device();
+    }
+
+    let outputs = host.output_devices().ok()?;
+    for (index, device) in outputs.enumerate() {
+        let label = device.name().ok()?;
+        let kind = classify_device_kind(&label, "system");
+        if stable_device_id(&kind, &label, index) == requested_id || label == requested_id {
+            return Some(device);
+        }
+    }
+
+    host.default_output_device()
+}
+
+fn resolve_input_device_id(host: &cpal::Host, device: &cpal::Device, requested_id: &str) -> String {
     if requested_id != "default" && requested_id != "microphone-default" {
         return requested_id.to_string();
     }
@@ -557,6 +727,31 @@ fn resolve_device_id(host: &cpal::Host, device: &cpal::Device, requested_id: &st
         for (index, candidate) in inputs.enumerate() {
             if candidate.name().ok().as_deref() == Some(target_name.as_str()) {
                 let kind = classify_device_kind(&target_name, "microphone");
+                return stable_device_id(&kind, &target_name, index);
+            }
+        }
+    }
+
+    requested_id.to_string()
+}
+
+fn resolve_output_device_id(
+    host: &cpal::Host,
+    device: &cpal::Device,
+    requested_id: &str,
+) -> String {
+    if requested_id != "default" && requested_id != "system-default" {
+        return requested_id.to_string();
+    }
+
+    let Ok(target_name) = device.name() else {
+        return requested_id.to_string();
+    };
+
+    if let Ok(outputs) = host.output_devices() {
+        for (index, candidate) in outputs.enumerate() {
+            if candidate.name().ok().as_deref() == Some(target_name.as_str()) {
+                let kind = classify_device_kind(&target_name, "system");
                 return stable_device_id(&kind, &target_name, index);
             }
         }
