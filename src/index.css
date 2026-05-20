@@ -653,6 +653,63 @@ input[type="checkbox"] {
   grid-template-columns: minmax(0, 1fr) minmax(300px, 0.8fr);
 }
 
+.provider-config-panel {
+  grid-row: span 2;
+}
+
+.provider-editor-list,
+.context-grid {
+  display: grid;
+  gap: 12px;
+}
+
+.provider-editor {
+  display: grid;
+  gap: 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 12px;
+  background: var(--panel-soft);
+}
+
+.provider-editor-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.provider-editor em {
+  display: block;
+  color: var(--muted);
+  font-size: 0.76rem;
+  font-style: normal;
+}
+
+.settings-field {
+  display: grid;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 0.84rem;
+  font-weight: 700;
+}
+
+.settings-field input,
+.settings-field select,
+.settings-field textarea {
+  width: 100%;
+  border: 1px solid #3a4a43;
+  border-radius: 8px;
+  padding: 10px;
+  color: var(--text);
+  background: #0f1412;
+}
+
+.settings-field textarea {
+  min-height: 140px;
+  resize: vertical;
+}
+
 .provider-row {
   grid-template-columns: minmax(0, 1fr) auto auto;
   padding: 12px;
