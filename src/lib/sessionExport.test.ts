@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { exportSessionJson, exportSessionMarkdown } from "./sessionExport";
+import {
+  buildSessionPdfLines,
+  exportSessionJson,
+  exportSessionMarkdown,
+  sessionExportFilename
+} from "./sessionExport";
 import type { AIResponseRecord, SessionRecord, TranscriptSegment } from "../types/session";
 
 describe("exportSessionMarkdown", () => {
@@ -22,6 +27,23 @@ describe("exportSessionMarkdown", () => {
     expect(parsed.transcripts).toHaveLength(1);
     expect(parsed.responses[0].provider).toBe("openrouter");
     expect(json).toContain('\n  "session"');
+  });
+
+  it("builds PDF-safe session lines and filenames", () => {
+    const input = makeExportInput();
+
+    expect(buildSessionPdfLines(input)).toEqual(
+      expect.arrayContaining([
+        "Backend Interview",
+        "Company: Acme",
+        "[00:05.000] INTERVIEWER: Design a URL shortener",
+        "OpenRouter / gpt-4o",
+        "Start with requirements and scale."
+      ])
+    );
+    expect(sessionExportFilename({ ...input.session, title: "Backend / Interview: Acme" }, "pdf")).toBe(
+      "backend-interview-acme.pdf"
+    );
   });
 });
 

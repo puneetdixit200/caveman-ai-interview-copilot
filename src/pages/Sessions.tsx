@@ -1,8 +1,8 @@
-import { Copy, FileJson, Search } from "lucide-react";
+import { Copy, Download, FileJson, Search } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Button } from "../components/common/Button";
 import { ResponseCard } from "../components/overlay/ResponseCard";
-import { exportSessionJson, exportSessionMarkdown } from "../lib/sessionExport";
+import { downloadSessionPdf, exportSessionJson, exportSessionMarkdown } from "../lib/sessionExport";
 import { filterSessionSummaries } from "../lib/sessionSearch";
 import { formatDuration, formatTimestampMs } from "../lib/formatters";
 import { listAiResponses, listSessions, listTranscripts } from "../lib/tauri";
@@ -137,6 +137,15 @@ export function Sessions() {
     setStatus("JSON export copied");
   }
 
+  async function savePdfExport() {
+    if (!selectedSession) {
+      return;
+    }
+
+    await downloadSessionPdf({ session: selectedSession, transcripts, responses });
+    setStatus("PDF export saved");
+  }
+
   return (
     <main className="page-column">
       <section className="panel toolbar-panel">
@@ -242,6 +251,9 @@ export function Sessions() {
             </Button>
             <Button icon={<FileJson size={16} />} onClick={copyJsonExport} disabled={!selectedSession}>
               Copy JSON
+            </Button>
+            <Button icon={<Download size={16} />} onClick={savePdfExport} disabled={!selectedSession}>
+              Save PDF
             </Button>
           </div>
         </div>
