@@ -203,7 +203,7 @@ export function Settings() {
         provider: config.stt.selectedMode,
         apiKey,
         audioPath: sttSampleAudioPath,
-        language: config.stt.language || "en-US",
+        language: normalizeSttLanguage(config.stt.language),
         diarizationEnabled: config.stt.diarizationEnabled,
         endpoint: config.stt.cloudEndpoint || undefined
       });
@@ -1014,7 +1014,11 @@ export function Settings() {
           </label>
           <label className="settings-field">
             <span>Language</span>
-            <input value={config.stt.language} onChange={(event) => updateStt({ language: event.currentTarget.value })} />
+            <input
+              value={config.stt.language}
+              placeholder="auto or en-US"
+              onChange={(event) => updateStt({ language: event.currentTarget.value })}
+            />
           </label>
           <label className="toggle-row">
             <span>Diarization labels</span>
@@ -1383,6 +1387,10 @@ function isCloudSttMode(mode: SttSettings["selectedMode"]): mode is "deepgram" |
 
 function sttSecretProviderId(mode: "deepgram" | "assemblyai" | "google"): string {
   return `stt-${mode}`;
+}
+
+function normalizeSttLanguage(language: string): string {
+  return language.trim() || "auto";
 }
 
 function createKnowledgeDocumentId(title: string): string {

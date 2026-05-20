@@ -142,7 +142,7 @@ async function transcribeSnapshot(input: {
       provider: input.sttMode,
       apiKey,
       audioPath: input.snapshot.audioPath,
-      language: input.config.stt.language || "en-US",
+      language: cloudSttLanguage(input.config.stt.language),
       diarizationEnabled: input.config.stt.diarizationEnabled,
       endpoint: input.config.stt.cloudEndpoint || undefined
     });
@@ -153,6 +153,10 @@ async function transcribeSnapshot(input: {
 
 function isCloudSttMode(mode: SttMode): mode is SttCloudMode {
   return mode === "deepgram" || mode === "assemblyai" || mode === "google";
+}
+
+function cloudSttLanguage(language: string): string {
+  return language.trim() || "auto";
 }
 
 function normalizeSpeakerForSource(speaker: SttTranscriptEvent["speaker"], source: CaptureSnapshot["source"]) {

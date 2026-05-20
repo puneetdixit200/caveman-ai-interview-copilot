@@ -212,4 +212,63 @@ describe("liveTranscription", () => {
       confidence: 0.9
     });
   });
+
+  it("passes auto language to cloud STT when the language setting is blank", async () => {
+    const saveCaptureSnapshot = vi.fn(async () => ({
+      source: "system" as const,
+      audioPath: "C:\\tmp\\system.wav",
+      sampleRateHz: 16000,
+      channels: 1,
+      durationMs: 1600,
+      sampleCount: 25600
+    }));
+    const transcribeWithCloudStt = vi.fn(async () => [
+      {
+        speaker: "interviewer" as const,
+        text: "What trade-offs did you make?",
+        startMs: 0,
+        endMs: 1200,
+        confidence: 0.87,
+        language: "en"
+      }
+    ]);
+    const addTranscript = vi.fn(async (input) => ({
+      id: 4,
+      sessionId: input.sessionId,
+      speaker: input.speaker,
+      content: input.content,
+      timestampMs: input.timestampMs,
+      confidence: input.confidence
+    }));
+
+    await runLiveTranscriptionPass({
+      sessionId: "s1",
+      config: {
+        ...DEFAULT_APP_CONFIG,
+        audio: {
+          ...DEFAULT_APP_CONFIG.audio,
+          captureMode: "system"
+        },
+        stt: {
+          ...DEFAULT_APP_CONFIG.stt,
+          selectedMode: "deepgram",
+          language: "",
+          apiKey: "dg_key"
+        }
+      },
+      seenTranscriptKeys: new Set<string>(),
+      saveCaptureSnapshot,
+      transcribeWithCloudStt,
+      addTranscript
+    });
+
+    expect(transcribeWithCloudStt).toHaveBeenCalledWith({
+      provider: "deepgram",
+      apiKey: "dg_key",
+      audioPath: "C:\\tmp\\system.wav",
+      language: "auto",
+      diarizationEnabled: true,
+      endpoint: undefined
+    });
+  });
 });

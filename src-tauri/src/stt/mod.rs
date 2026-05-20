@@ -85,6 +85,7 @@ struct DeepgramResults {
 #[derive(Debug, Deserialize)]
 struct DeepgramChannel {
     alternatives: Vec<DeepgramAlternative>,
+    detected_language: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -110,6 +111,7 @@ struct AssemblyAiResponse {
     error: Option<String>,
     text: Option<String>,
     confidence: Option<f32>,
+    language_code: Option<String>,
     utterances: Option<Vec<AssemblyAiUtterance>>,
 }
 
@@ -140,6 +142,8 @@ struct GoogleRecognizeResponse {
 #[derive(Debug, Deserialize)]
 struct GoogleResult {
     alternatives: Vec<GoogleAlternative>,
+    #[serde(rename = "languageCode")]
+    language_code: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -165,6 +169,16 @@ struct ParsedWord {
     start_ms: i64,
     end_ms: i64,
     confidence: Option<f32>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+enum LanguageSelection {
+    Auto,
+    Single(String),
+    Multiple {
+        primary: String,
+        alternatives: Vec<String>,
+    },
 }
 
 pub fn list_stt_providers() -> Vec<SttProviderStatus> {
@@ -321,12 +335,8 @@ fn transcribe_with_deepgram(
                 "false"
             },
         );
-        if let Some(language) = request
-            .language
-            .as_deref()
-            .filter(|language| !language.trim().is_empty())
-        {
-            query.append_pair("language", language);
+        for (key, value) in deepgram_language_params(request.language.as_deref()) {
+            query.append_pair(key, &value);
         }
     }
 
@@ -339,7 +349,8 @@ fn transcribe_with_deepgram(
         .error_for_status()?
         .text()?;
 
-    parse_deepgram_json(&json, request.language.as_deref())
+    let language_hint = language_hint(request.language.as_deref());
+    parse_deepgram_json(&json, language_hint.as_deref())
 }
 
 fn transcribe_with_assemblyai(
@@ -365,12 +376,19 @@ fn transcribe_with_assemblyai(
         "audio_url": upload.upload_url,
         "speaker_labels": request.diarization_enabled.unwrap_or(true)
     });
-    if let Some(language) = request
-        .language
-        .as_deref()
-        .filter(|language| !language.trim().is_empty())
-    {
-        payload["language_code"] = json!(language);
+    match parse_language_selection(request.language.as_deref()) {
+        LanguageSelection::Auto => {
+            payload["language_detection"] = json!(true);
+        }
+        LanguageSelection::Single(language) => {
+            payload["language_code"] = json!(language);
+        }
+        LanguageSelection::Multiple {
+            primary,
+            alternatives: _,
+        } => {
+            payload["language_code"] = json!(primary);
+        }
     }
 
     let created: AssemblyAiCreateResponse = client
@@ -392,7 +410,10 @@ fn transcribe_with_assemblyai(
         let status: AssemblyAiResponse = serde_json::from_str(&text)?;
 
         match status.status.as_deref() {
-            Some("completed") => return parse_assemblyai_json(&text, request.language.as_deref()),
+            Some("completed") => {
+                let language_hint = language_hint(request.language.as_deref());
+                return parse_assemblyai_json(&text, language_hint.as_deref());
+            }
             Some("error") => {
                 return Err(anyhow::anyhow!(
                     "AssemblyAI transcription failed: {}",
@@ -422,12 +443,16 @@ fn transcribe_with_google(
     url.query_pairs_mut()
         .append_pair("key", request.api_key.trim());
 
+    let language_config = google_language_config(request.language.as_deref());
     let mut config = json!({
-        "languageCode": request.language.as_deref().filter(|language| !language.trim().is_empty()).unwrap_or("en-US"),
+        "languageCode": language_config.primary,
         "enableAutomaticPunctuation": true,
         "enableWordTimeOffsets": true,
         "maxAlternatives": 1
     });
+    if !language_config.alternatives.is_empty() {
+        config["alternativeLanguageCodes"] = json!(language_config.alternatives);
+    }
     if request.diarization_enabled.unwrap_or(true) {
         config["diarizationConfig"] = json!({
             "enableSpeakerDiarization": true,
@@ -449,7 +474,8 @@ fn transcribe_with_google(
         .error_for_status()?
         .text()?;
 
-    parse_google_json(&json, request.language.as_deref())
+    let language_hint = language_hint(request.language.as_deref());
+    parse_google_json(&json, language_hint.as_deref())
 }
 
 pub fn parse_whisper_json(json: &str) -> anyhow::Result<Vec<TranscriptEvent>> {
@@ -490,6 +516,8 @@ pub fn parse_deepgram_json(
         .map(|results| results.channels)
         .unwrap_or_default()
     {
+        let detected_language = channel.detected_language.clone();
+        let event_language = detected_language.as_deref().or(language);
         let Some(alternative) = channel.alternatives.into_iter().next() else {
             continue;
         };
@@ -505,7 +533,7 @@ pub fn parse_deepgram_json(
                     confidence: word.confidence,
                 })
                 .collect::<Vec<_>>();
-            events.extend(group_words_by_speaker(parsed_words, language));
+            events.extend(group_words_by_speaker(parsed_words, event_language));
         } else if let Some(transcript) = alternative
             .transcript
             .filter(|text| !text.trim().is_empty())
@@ -516,7 +544,7 @@ pub fn parse_deepgram_json(
                 start_ms: 0,
                 end_ms: 0,
                 confidence: alternative.confidence,
-                language: language.map(str::to_string),
+                language: event_language.map(str::to_string),
             });
         }
     }
@@ -529,6 +557,8 @@ pub fn parse_assemblyai_json(
     language: Option<&str>,
 ) -> anyhow::Result<Vec<TranscriptEvent>> {
     let parsed: AssemblyAiResponse = serde_json::from_str(json)?;
+    let detected_language = parsed.language_code.clone();
+    let event_language = detected_language.as_deref().or(language);
 
     if let Some(utterances) = parsed
         .utterances
@@ -548,7 +578,7 @@ pub fn parse_assemblyai_json(
                     start_ms: utterance.start,
                     end_ms: utterance.end,
                     confidence: utterance.confidence,
-                    language: language.map(str::to_string),
+                    language: event_language.map(str::to_string),
                 })
             })
             .collect());
@@ -564,7 +594,7 @@ pub fn parse_assemblyai_json(
                 start_ms: 0,
                 end_ms: 0,
                 confidence: parsed.confidence,
-                language: language.map(str::to_string),
+                language: event_language.map(str::to_string),
             }]
         })
         .unwrap_or_default())
@@ -578,6 +608,8 @@ pub fn parse_google_json(
     let mut events = Vec::new();
 
     for result in parsed.results.unwrap_or_default() {
+        let detected_language = result.language_code.clone();
+        let event_language = detected_language.as_deref().or(language);
         let Some(alternative) = result.alternatives.into_iter().next() else {
             continue;
         };
@@ -593,7 +625,7 @@ pub fn parse_google_json(
                     confidence: alternative.confidence,
                 })
                 .collect::<Vec<_>>();
-            events.extend(group_words_by_speaker(parsed_words, language));
+            events.extend(group_words_by_speaker(parsed_words, event_language));
         } else if let Some(transcript) = alternative
             .transcript
             .filter(|text| !text.trim().is_empty())
@@ -604,7 +636,7 @@ pub fn parse_google_json(
                 start_ms: 0,
                 end_ms: 0,
                 confidence: alternative.confidence,
-                language: language.map(str::to_string),
+                language: event_language.map(str::to_string),
             });
         }
     }
@@ -626,6 +658,107 @@ fn validate_required_file(
     }
 
     Ok(())
+}
+
+fn parse_language_selection(language: Option<&str>) -> LanguageSelection {
+    let Some(language) = language
+        .map(str::trim)
+        .filter(|language| !language.is_empty())
+    else {
+        return LanguageSelection::Auto;
+    };
+
+    if language.eq_ignore_ascii_case("auto") {
+        return LanguageSelection::Auto;
+    }
+
+    let languages = language
+        .split(',')
+        .map(str::trim)
+        .filter(|item| !item.is_empty())
+        .map(str::to_string)
+        .collect::<Vec<_>>();
+
+    match languages.as_slice() {
+        [] => LanguageSelection::Auto,
+        [single] => LanguageSelection::Single(single.clone()),
+        [primary, alternatives @ ..] => LanguageSelection::Multiple {
+            primary: primary.clone(),
+            alternatives: alternatives.iter().take(3).cloned().collect(),
+        },
+    }
+}
+
+fn deepgram_language_params(language: Option<&str>) -> Vec<(&'static str, String)> {
+    match parse_language_selection(language) {
+        LanguageSelection::Auto => vec![("detect_language", "true".to_string())],
+        LanguageSelection::Single(language) => vec![("language", language)],
+        LanguageSelection::Multiple {
+            primary,
+            alternatives,
+        } => {
+            let mut params = vec![("detect_language", primary)];
+            params.extend(
+                alternatives
+                    .into_iter()
+                    .map(|language| ("detect_language", language)),
+            );
+            params
+        }
+    }
+}
+
+fn language_hint(language: Option<&str>) -> Option<String> {
+    match parse_language_selection(language) {
+        LanguageSelection::Auto => None,
+        LanguageSelection::Single(language) => Some(language),
+        LanguageSelection::Multiple {
+            primary,
+            alternatives: _,
+        } => Some(primary),
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+struct GoogleLanguageConfig {
+    primary: String,
+    alternatives: Vec<String>,
+}
+
+fn google_language_config(language: Option<&str>) -> GoogleLanguageConfig {
+    match parse_language_selection(language) {
+        LanguageSelection::Auto => GoogleLanguageConfig {
+            primary: "en-US".to_string(),
+            alternatives: vec![
+                "hi-IN".to_string(),
+                "es-ES".to_string(),
+                "fr-FR".to_string(),
+            ],
+        },
+        LanguageSelection::Single(language) => GoogleLanguageConfig {
+            primary: normalize_google_language(language),
+            alternatives: Vec::new(),
+        },
+        LanguageSelection::Multiple {
+            primary,
+            alternatives,
+        } => GoogleLanguageConfig {
+            primary: normalize_google_language(primary),
+            alternatives: alternatives
+                .into_iter()
+                .map(normalize_google_language)
+                .take(3)
+                .collect(),
+        },
+    }
+}
+
+fn normalize_google_language(language: String) -> String {
+    match language.as_str() {
+        "en" => "en-US".to_string(),
+        "hi" => "hi-IN".to_string(),
+        _ => language,
+    }
 }
 
 fn whisper_output_base(audio_path: &str) -> PathBuf {
@@ -748,8 +881,9 @@ fn duration_to_ms(duration: Option<&str>) -> i64 {
 #[cfg(test)]
 mod tests {
     use super::{
-        parse_assemblyai_json, parse_deepgram_json, parse_google_json, parse_whisper_json,
-        validate_local_whisper_request, LocalWhisperRequest, TranscriptEvent,
+        deepgram_language_params, google_language_config, parse_assemblyai_json,
+        parse_deepgram_json, parse_google_json, parse_whisper_json, validate_local_whisper_request,
+        GoogleLanguageConfig, LocalWhisperRequest, TranscriptEvent,
     };
 
     #[test]
@@ -812,6 +946,43 @@ mod tests {
     }
 
     #[test]
+    fn configures_deepgram_auto_language_detection() {
+        assert_eq!(
+            deepgram_language_params(Some("auto")),
+            vec![("detect_language", "true".to_string())]
+        );
+        assert_eq!(
+            deepgram_language_params(Some("en,hi")),
+            vec![
+                ("detect_language", "en".to_string()),
+                ("detect_language", "hi".to_string())
+            ]
+        );
+    }
+
+    #[test]
+    fn configures_google_auto_language_detection_candidates() {
+        assert_eq!(
+            google_language_config(Some("auto")),
+            GoogleLanguageConfig {
+                primary: "en-US".to_string(),
+                alternatives: vec![
+                    "hi-IN".to_string(),
+                    "es-ES".to_string(),
+                    "fr-FR".to_string()
+                ]
+            }
+        );
+        assert_eq!(
+            google_language_config(Some("en-US,hi-IN")),
+            GoogleLanguageConfig {
+                primary: "en-US".to_string(),
+                alternatives: vec!["hi-IN".to_string()]
+            }
+        );
+    }
+
+    #[test]
     fn parses_deepgram_words_into_speaker_segments() {
         let json = r#"{
             "results": {
@@ -846,10 +1017,36 @@ mod tests {
     }
 
     #[test]
+    fn parses_deepgram_detected_language() {
+        let json = r#"{
+            "results": {
+                "channels": [
+                    {
+                        "detected_language": "hi",
+                        "language_confidence": 0.98,
+                        "alternatives": [
+                            {
+                                "transcript": "Namaste",
+                                "confidence": 0.94
+                            }
+                        ]
+                    }
+                ]
+            }
+        }"#;
+
+        let events = parse_deepgram_json(json, None).unwrap();
+
+        assert_eq!(events.len(), 1);
+        assert_eq!(events[0].language, Some("hi".to_string()));
+    }
+
+    #[test]
     fn parses_assemblyai_utterances() {
         let json = r#"{
             "status": "completed",
             "text": "Tell me about indexes. Indexes speed reads.",
+            "language_code": "en",
             "confidence": 0.91,
             "utterances": [
                 { "speaker": "A", "text": "Tell me about indexes.", "start": 0, "end": 1500, "confidence": 0.93 },
@@ -862,6 +1059,7 @@ mod tests {
         assert_eq!(events.len(), 2);
         assert_eq!(events[0].speaker, "interviewer");
         assert_eq!(events[0].text, "Tell me about indexes.");
+        assert_eq!(events[0].language, Some("en".to_string()));
         assert_eq!(events[1].speaker, "candidate");
     }
 
@@ -870,6 +1068,7 @@ mod tests {
         let json = r#"{
             "results": [
                 {
+                    "languageCode": "en-us",
                     "alternatives": [
                         {
                             "transcript": "Explain caching Redis keeps hot data",
@@ -893,6 +1092,7 @@ mod tests {
         assert_eq!(events.len(), 2);
         assert_eq!(events[0].speaker, "interviewer");
         assert_eq!(events[0].text, "Explain caching");
+        assert_eq!(events[0].language, Some("en-us".to_string()));
         assert_eq!(events[1].speaker, "candidate");
         assert_eq!(events[1].start_ms, 1100);
         assert_eq!(events[1].end_ms, 2200);
