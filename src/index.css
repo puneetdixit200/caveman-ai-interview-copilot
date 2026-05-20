@@ -333,11 +333,65 @@ h2 {
   overflow-wrap: anywhere;
 }
 
+.manual-transcript-form {
+  display: grid;
+  gap: 10px;
+  margin-top: 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 12px;
+  background: #141a18;
+}
+
+.manual-transcript-form label {
+  display: grid;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 0.84rem;
+  font-weight: 700;
+}
+
+.manual-transcript-form select,
+.manual-transcript-form textarea {
+  width: 100%;
+  border: 1px solid #3a4a43;
+  border-radius: 8px;
+  padding: 10px;
+  color: var(--text);
+  background: #0f1412;
+}
+
+.manual-transcript-form textarea {
+  min-height: 96px;
+  resize: vertical;
+}
+
+.runtime-status {
+  display: grid;
+  gap: 6px;
+  margin-top: 12px;
+  color: var(--muted);
+  font-size: 0.84rem;
+}
+
+.runtime-status strong {
+  color: var(--red);
+  overflow-wrap: anywhere;
+}
+
 .device-list,
 .provider-list,
 .vault-list {
   display: grid;
   gap: 10px;
+}
+
+.empty-copy {
+  border: 1px dashed var(--line);
+  border-radius: 8px;
+  padding: 12px;
+  color: var(--muted);
+  background: #121715;
 }
 
 .device-row,

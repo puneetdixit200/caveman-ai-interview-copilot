@@ -52,9 +52,10 @@ export function parseAppConfig(raw: string | null | undefined): AppConfig {
   try {
     const parsed = JSON.parse(raw) as Partial<AppConfig>;
     const providers = mergeProviders(parsed.providers);
-    const selectedProviderId = providers.some((provider) => provider.id === parsed.selectedProviderId)
-      ? parsed.selectedProviderId
-      : DEFAULT_APP_CONFIG.selectedProviderId;
+    const selectedProviderId =
+      isProviderId(parsed.selectedProviderId) && providers.some((provider) => provider.id === parsed.selectedProviderId)
+        ? parsed.selectedProviderId
+        : DEFAULT_APP_CONFIG.selectedProviderId;
 
     return {
       selectedProviderId,
@@ -113,4 +114,8 @@ function isStringRecord(value: unknown): value is Record<string, string> {
     value !== null &&
     Object.values(value).every((entry) => typeof entry === "string")
   );
+}
+
+function isProviderId(value: unknown): value is ProviderId {
+  return DEFAULT_APP_CONFIG.providers.some((provider) => provider.id === value);
 }
