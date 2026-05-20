@@ -15,6 +15,72 @@ export interface KnowledgeChunk {
   createdAtMs?: number;
 }
 
+export interface KnowledgeDocumentRecord {
+  id: string;
+  title: string;
+  sourceType: string;
+  characterCount: number;
+  createdAtMs: number;
+}
+
+export interface KnowledgeBase {
+  documents: KnowledgeDocumentRecord[];
+  chunks: KnowledgeChunk[];
+}
+
+export const KNOWLEDGE_BASE_SETTING_KEY = "knowledge.base";
+
+export function createKnowledgeBase(): KnowledgeBase {
+  return {
+    documents: [],
+    chunks: []
+  };
+}
+
+export function upsertKnowledgeDocument(base: KnowledgeBase, input: KnowledgeDocumentInput): KnowledgeBase {
+  const createdAtMs = input.createdAtMs ?? Date.now();
+  const documentInput = { ...input, createdAtMs };
+  const chunks = chunkKnowledgeDocument(documentInput);
+  const document: KnowledgeDocumentRecord = {
+    id: input.id,
+    title: input.title,
+    sourceType: input.sourceType,
+    characterCount: input.text.length,
+    createdAtMs
+  };
+
+  return {
+    documents: [...base.documents.filter((item) => item.id !== input.id), document],
+    chunks: [...base.chunks.filter((chunk) => chunk.documentId !== input.id), ...chunks]
+  };
+}
+
+export function searchKnowledgeBase(base: KnowledgeBase, query: string, limit = 5): KnowledgeChunk[] {
+  return rankKnowledgeChunks(query, base.chunks, limit);
+}
+
+export function serializeKnowledgeBase(base: KnowledgeBase): string {
+  return JSON.stringify(base, null, 2);
+}
+
+export function parseKnowledgeBase(raw: string | null | undefined): KnowledgeBase {
+  if (!raw?.trim()) {
+    return createKnowledgeBase();
+  }
+
+  try {
+    const parsed = JSON.parse(raw) as Partial<KnowledgeBase>;
+    return {
+      documents: Array.isArray(parsed.documents)
+        ? parsed.documents.filter(isKnowledgeDocumentRecord)
+        : [],
+      chunks: Array.isArray(parsed.chunks) ? parsed.chunks.filter(isKnowledgeChunk) : []
+    };
+  } catch {
+    return createKnowledgeBase();
+  }
+}
+
 export function chunkKnowledgeDocument(input: KnowledgeDocumentInput): KnowledgeChunk[] {
   const maxCharacters = input.maxChunkCharacters ?? 800;
   const sourceLabel = `${input.sourceType}: ${input.title}`;
@@ -81,4 +147,27 @@ function overlapScore(queryTerms: Set<string>, chunkTerms: Set<string>): number 
     }
   }
   return score;
+}
+
+function isKnowledgeDocumentRecord(value: unknown): value is KnowledgeDocumentRecord {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    typeof (value as KnowledgeDocumentRecord).id === "string" &&
+    typeof (value as KnowledgeDocumentRecord).title === "string" &&
+    typeof (value as KnowledgeDocumentRecord).sourceType === "string" &&
+    typeof (value as KnowledgeDocumentRecord).characterCount === "number" &&
+    typeof (value as KnowledgeDocumentRecord).createdAtMs === "number"
+  );
+}
+
+function isKnowledgeChunk(value: unknown): value is KnowledgeChunk {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    typeof (value as KnowledgeChunk).id === "string" &&
+    typeof (value as KnowledgeChunk).documentId === "string" &&
+    typeof (value as KnowledgeChunk).sourceLabel === "string" &&
+    typeof (value as KnowledgeChunk).text === "string"
+  );
 }

@@ -47,4 +47,11 @@ describe("Settings", () => {
     expect(await screen.findByRole("button", { name: "Capture Screen OCR" })).toBeInTheDocument();
     expect(screen.getByRole("textbox", { name: "Reviewed OCR text" })).toBeInTheDocument();
   });
+
+  it("shows knowledge base import controls", async () => {
+    render(<Settings />);
+
+    expect(await screen.findByRole("button", { name: "Add Knowledge Document" })).toBeInTheDocument();
+    expect(screen.getByRole("textbox", { name: "Knowledge text" })).toBeInTheDocument();
+  });
 });

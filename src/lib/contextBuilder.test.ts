@@ -68,4 +68,26 @@ describe("buildChatMessages", () => {
       content: "Reviewed screen OCR context: LeetCode 146 LRU Cache"
     });
   });
+
+  it("includes ranked knowledge base context when provided", () => {
+    const messages = buildChatMessages({
+      template,
+      transcripts: [
+        {
+          id: 1,
+          sessionId: "s1",
+          speaker: "interviewer",
+          content: "How did you implement retries?",
+          timestampMs: 1000,
+          confidence: 0.9
+        }
+      ],
+      knowledgeContext: "project: Payments\nStripe webhook retries used queue backoff."
+    });
+
+    expect(messages).toContainEqual({
+      role: "system",
+      content: "Relevant knowledge base context:\nproject: Payments\nStripe webhook retries used queue backoff."
+    });
+  });
 });

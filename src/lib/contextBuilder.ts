@@ -5,6 +5,7 @@ interface BuildChatMessagesInput {
   transcripts: TranscriptSegment[];
   resumeContext?: string;
   ocrContext?: string;
+  knowledgeContext?: string;
   maxHistoryCharacters?: number;
 }
 
@@ -15,6 +16,7 @@ export function buildChatMessages({
   transcripts,
   resumeContext,
   ocrContext,
+  knowledgeContext,
   maxHistoryCharacters = DEFAULT_MAX_HISTORY_CHARACTERS
 }: BuildChatMessagesInput): ChatMessage[] {
   const ordered = [...transcripts].sort((left, right) => left.timestampMs - right.timestampMs);
@@ -43,6 +45,14 @@ export function buildChatMessages({
     messages.push({
       role: "system",
       content: `Reviewed screen OCR context: ${trimmedOcrContext}`
+    });
+  }
+
+  const trimmedKnowledgeContext = knowledgeContext?.trim();
+  if (trimmedKnowledgeContext) {
+    messages.push({
+      role: "system",
+      content: `Relevant knowledge base context:\n${trimmedKnowledgeContext}`
     });
   }
 

@@ -1,5 +1,7 @@
 import {
+  BookOpen,
   Bot,
+  FilePlus2,
   KeyRound,
   Mic,
   Play,
@@ -21,6 +23,15 @@ import {
   parseAppConfig,
   serializeAppConfig
 } from "../lib/appConfig";
+import {
+  KNOWLEDGE_BASE_SETTING_KEY,
+  createKnowledgeBase,
+  parseKnowledgeBase,
+  searchKnowledgeBase,
+  serializeKnowledgeBase,
+  upsertKnowledgeDocument,
+  type KnowledgeBase
+} from "../lib/knowledge";
 import { runScreenOcr } from "../lib/ocr";
 import { createConfiguredProvider } from "../lib/providerClients";
 import { hydrateProviderApiKeys } from "../lib/providerSecrets";
@@ -60,12 +71,21 @@ export function Settings() {
   const [audioDevices, setAudioDevices] = useState<AudioDevice[]>([]);
   const [ocrReviewText, setOcrReviewText] = useState("");
   const [capturingOcr, setCapturingOcr] = useState(false);
+  const [knowledgeBase, setKnowledgeBase] = useState<KnowledgeBase>(createKnowledgeBase());
+  const [knowledgeTitle, setKnowledgeTitle] = useState("");
+  const [knowledgeSourceType, setKnowledgeSourceType] = useState("project");
+  const [knowledgeText, setKnowledgeText] = useState("");
+  const [knowledgeQuery, setKnowledgeQuery] = useState("");
 
   useEffect(() => {
     let cancelled = false;
 
     async function load() {
-      const [rawConfig, devices] = await Promise.all([getSetting(APP_CONFIG_SETTING_KEY), listAudioDevices()]);
+      const [rawConfig, devices, rawKnowledgeBase] = await Promise.all([
+        getSetting(APP_CONFIG_SETTING_KEY),
+        listAudioDevices(),
+        getSetting(KNOWLEDGE_BASE_SETTING_KEY)
+      ]);
       const stored = parseAppConfig(rawConfig);
       const hydrated = await hydrateProviderApiKeys(stored);
       const sttSecret = isCloudSttMode(hydrated.stt.selectedMode)
@@ -81,6 +101,7 @@ export function Settings() {
       };
       if (!cancelled) {
         setConfig(nextConfig);
+        setKnowledgeBase(parseKnowledgeBase(rawKnowledgeBase));
         setSttSecretInput(sttSecret ?? "");
         setOcrReviewText(nextConfig.ocr.lastText ?? "");
         setAudioDevices(devices);
@@ -354,6 +375,34 @@ export function Settings() {
     }
   }
 
+  async function addKnowledgeDocument() {
+    const text = knowledgeText.trim();
+    if (!text) {
+      setStatus("Paste knowledge text before adding it to the knowledge base.");
+      return;
+    }
+
+    const title = knowledgeTitle.trim() || `Knowledge ${knowledgeBase.documents.length + 1}`;
+    const id = createKnowledgeDocumentId(title);
+    const nextKnowledgeBase = upsertKnowledgeDocument(knowledgeBase, {
+      id,
+      title,
+      sourceType: knowledgeSourceType.trim() || "note",
+      text,
+      createdAtMs: Date.now()
+    });
+
+    setKnowledgeBase(nextKnowledgeBase);
+    setKnowledgeText("");
+    setKnowledgeTitle("");
+    await saveSetting(KNOWLEDGE_BASE_SETTING_KEY, serializeKnowledgeBase(nextKnowledgeBase));
+    setStatus(`Added ${title} to the knowledge base`);
+  }
+
+  const knowledgeResults = knowledgeQuery.trim()
+    ? searchKnowledgeBase(knowledgeBase, knowledgeQuery, 4)
+    : knowledgeBase.chunks.slice(-4).reverse();
+
   function updateTts(patch: Partial<TtsSettings>) {
     setConfig((current) => ({ ...current, tts: { ...current.tts, ...patch } }));
   }
@@ -536,6 +585,72 @@ export function Settings() {
             />
           </label>
         </div>
+      </section>
+
+      <section className="panel prompt-panel">
+        <div className="panel-heading">
+          <div>
+            <p className="eyebrow">RAG</p>
+            <h2>Knowledge Base</h2>
+          </div>
+          <BookOpen size={18} />
+        </div>
+        <div className="settings-two-column">
+          <label className="settings-field">
+            <span>Knowledge title</span>
+            <input
+              value={knowledgeTitle}
+              placeholder="Project, company, framework, or story name"
+              onChange={(event) => setKnowledgeTitle(event.currentTarget.value)}
+            />
+          </label>
+          <label className="settings-field">
+            <span>Knowledge source</span>
+            <select value={knowledgeSourceType} onChange={(event) => setKnowledgeSourceType(event.currentTarget.value)}>
+              <option value="project">Project</option>
+              <option value="resume">Resume</option>
+              <option value="job">Job</option>
+              <option value="note">Note</option>
+              <option value="code">Code</option>
+            </select>
+          </label>
+          <label className="settings-field">
+            <span>Knowledge text</span>
+            <textarea
+              value={knowledgeText}
+              placeholder="Paste project notes, implementation details, metrics, interview stories, or codebase facts."
+              onChange={(event) => setKnowledgeText(event.currentTarget.value)}
+            />
+          </label>
+          <div className="settings-field">
+            <span>Indexed content</span>
+            <strong>
+              {knowledgeBase.documents.length} document{knowledgeBase.documents.length === 1 ? "" : "s"} /{" "}
+              {knowledgeBase.chunks.length} chunk{knowledgeBase.chunks.length === 1 ? "" : "s"}
+            </strong>
+          </div>
+          <Button variant="primary" icon={<FilePlus2 size={16} />} onClick={addKnowledgeDocument}>
+            Add Knowledge Document
+          </Button>
+          <label className="settings-field">
+            <span>Search knowledge</span>
+            <input
+              value={knowledgeQuery}
+              placeholder="Search the context that will be injected into answers"
+              onChange={(event) => setKnowledgeQuery(event.currentTarget.value)}
+            />
+          </label>
+        </div>
+        {knowledgeResults.length > 0 ? (
+          <div className="provider-editor-list">
+            {knowledgeResults.map((chunk) => (
+              <article className="prompt-row" key={chunk.id}>
+                <strong>{chunk.sourceLabel}</strong>
+                <p>{chunk.text}</p>
+              </article>
+            ))}
+          </div>
+        ) : null}
       </section>
 
       <section className="panel prompt-panel">
@@ -1006,4 +1121,17 @@ function isCloudSttMode(mode: SttSettings["selectedMode"]): mode is "deepgram" |
 
 function sttSecretProviderId(mode: "deepgram" | "assemblyai" | "google"): string {
   return `stt-${mode}`;
+}
+
+function createKnowledgeDocumentId(title: string): string {
+  const slug = title
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/(^-|-$)/g, "");
+
+  if (slug) {
+    return slug;
+  }
+
+  return globalThis.crypto?.randomUUID?.() ?? `knowledge-${Date.now()}`;
 }

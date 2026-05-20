@@ -1,5 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { chunkKnowledgeDocument, rankKnowledgeChunks } from "./knowledge";
+import {
+  createKnowledgeBase,
+  parseKnowledgeBase,
+  searchKnowledgeBase,
+  serializeKnowledgeBase,
+  upsertKnowledgeDocument,
+  chunkKnowledgeDocument,
+  rankKnowledgeChunks
+} from "./knowledge";
 
 describe("knowledge", () => {
   it("chunks local knowledge documents with source labels", () => {
@@ -24,5 +32,30 @@ describe("knowledge", () => {
     ];
 
     expect(rankKnowledgeChunks("How did you design webhook retries?", chunks, 1)[0].id).toBe("new");
+  });
+
+  it("persists imported knowledge documents and searches ranked chunks", () => {
+    const base = upsertKnowledgeDocument(createKnowledgeBase(), {
+      id: "payments",
+      title: "Payments Project",
+      sourceType: "project",
+      text: "Built Stripe webhook retries with queue backoff. Added reconciliation dashboards.",
+      createdAtMs: 500
+    });
+
+    const parsed = parseKnowledgeBase(serializeKnowledgeBase(base));
+    const results = searchKnowledgeBase(parsed, "How did webhook retries work?", 1);
+
+    expect(parsed.documents).toEqual([
+      expect.objectContaining({
+        id: "payments",
+        title: "Payments Project",
+        sourceType: "project"
+      })
+    ]);
+    expect(results[0]).toMatchObject({
+      documentId: "payments",
+      sourceLabel: "project: Payments Project"
+    });
   });
 });

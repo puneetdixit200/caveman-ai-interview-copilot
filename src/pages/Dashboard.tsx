@@ -11,6 +11,13 @@ import { buildChatMessages } from "../lib/contextBuilder";
 import { canSendOcrContext } from "../lib/ocr";
 import { registerOverlayToggleShortcut } from "../lib/globalHotkeys";
 import { DEFAULT_OVERLAY_SHORTCUT, overlayShortcutLabel } from "../lib/hotkeys";
+import {
+  KNOWLEDGE_BASE_SETTING_KEY,
+  createKnowledgeBase,
+  parseKnowledgeBase,
+  searchKnowledgeBase,
+  type KnowledgeBase
+} from "../lib/knowledge";
 import { createConfiguredProvider } from "../lib/providerClients";
 import { hydrateProviderApiKeys } from "../lib/providerSecrets";
 import { selectRunnableProviders } from "../lib/providerSelection";
@@ -70,6 +77,7 @@ export function Dashboard() {
   const [lastTriggeredTranscriptId, setLastTriggeredTranscriptId] = useState<number | undefined>();
   const [statusMessage, setStatusMessage] = useState("Loading session...");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [knowledgeBase, setKnowledgeBase] = useState<KnowledgeBase>(createKnowledgeBase());
   const { visible, setVisible, opacity, setOpacity, fontSize, setFontSize, locked, setLocked } = useOverlayStore();
 
   const selectedProvider = useMemo(
@@ -115,7 +123,11 @@ export function Dashboard() {
 
     async function load() {
       try {
-        const storedConfig = parseAppConfig(await getSetting(APP_CONFIG_SETTING_KEY));
+        const [rawConfig, rawKnowledgeBase] = await Promise.all([
+          getSetting(APP_CONFIG_SETTING_KEY),
+          getSetting(KNOWLEDGE_BASE_SETTING_KEY)
+        ]);
+        const storedConfig = parseAppConfig(rawConfig);
         const hydratedConfig = await hydrateProviderApiKeys(storedConfig);
         const [sessions, devices, status] = await Promise.all([listSessions(), listAudioDevices(), getCaptureStatus()]);
         const activeSession =
@@ -134,6 +146,7 @@ export function Dashboard() {
         }
 
         setConfig(hydratedConfig);
+        setKnowledgeBase(parseKnowledgeBase(rawKnowledgeBase));
         setAudioDevices(devices);
         setCaptureStatus(status);
         setRunning(status.running);
@@ -326,7 +339,7 @@ export function Dashboard() {
     setErrorMessage(null);
     setStatusMessage(`Streaming from ${providers[0].label}...`);
 
-    const messages = buildPromptMessages(config, transcriptInput, template);
+    const messages = buildPromptMessages(config, transcriptInput, template, knowledgeBase);
     const activeModel = runnableProviderConfigs[0]?.model ?? selectedProvider.model;
     const router = new ProviderRouter(providers);
     const startedAt = performance.now();
@@ -520,7 +533,8 @@ export function Dashboard() {
 function buildPromptMessages(
   config: AppConfig,
   transcripts: TranscriptSegment[],
-  template: Parameters<typeof buildChatMessages>[0]["template"]
+  template: Parameters<typeof buildChatMessages>[0]["template"],
+  knowledgeBase: KnowledgeBase
 ): ChatMessage[] {
   const selectedProvider = config.providers.find((provider) => provider.id === config.selectedProviderId) ?? config.providers[0];
   const includeOcrContext = canSendOcrContext({
@@ -529,11 +543,26 @@ function buildPromptMessages(
     providerKind: selectedProvider.kind,
     localOnlyMode: config.security.localOnlyMode
   });
+  const latestInterviewerQuestion = [...transcripts]
+    .reverse()
+    .find((segment) => segment.speaker === "interviewer" && segment.content.trim());
+  const knowledgeQuery =
+    latestInterviewerQuestion?.content.trim() ??
+    transcripts
+      .map((segment) => segment.content.trim())
+      .filter(Boolean)
+      .join("\n");
+  const knowledgeContext = knowledgeQuery
+    ? searchKnowledgeBase(knowledgeBase, knowledgeQuery, 4)
+        .map((chunk) => `${chunk.sourceLabel}\n${chunk.text}`)
+        .join("\n\n")
+    : "";
 
   return buildChatMessages({
     template,
     transcripts,
     resumeContext: [config.resumeContext, config.jobDescriptionContext].filter(Boolean).join("\n\n"),
-    ocrContext: includeOcrContext ? config.ocr.lastText : undefined
+    ocrContext: includeOcrContext ? config.ocr.lastText : undefined,
+    knowledgeContext: knowledgeContext || undefined
   });
 }
