@@ -1,8 +1,12 @@
-import { render, screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { cleanup, render, screen } from "@testing-library/react";
+import { afterEach, describe, expect, it } from "vitest";
 import { Settings } from "./Settings";
 
 describe("Settings", () => {
+  afterEach(() => {
+    cleanup();
+  });
+
   it("shows controls for live audio, STT, automation, OCR, TTS, security, and plugins", async () => {
     render(<Settings />);
 
@@ -12,5 +16,14 @@ describe("Settings", () => {
     expect(screen.getByText("Text To Speech")).toBeInTheDocument();
     expect(screen.getByText("Security And Updates")).toBeInTheDocument();
     expect(screen.getByText("Plugin System")).toBeInTheDocument();
+  });
+
+  it("shows OS keychain controls for cloud provider API keys", async () => {
+    render(<Settings />);
+
+    expect(await screen.findByText("API Key Vault")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Save Key" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Delete Key" })).toBeInTheDocument();
+    expect(screen.getByText(/OS keychain/i)).toBeInTheDocument();
   });
 });

@@ -1,4 +1,17 @@
-import { Bot, KeyRound, Mic, Play, Puzzle, Save, ScanText, ShieldCheck, Square, Volume2, Wifi } from "lucide-react";
+import {
+  Bot,
+  KeyRound,
+  Mic,
+  Play,
+  Puzzle,
+  Save,
+  ScanText,
+  ShieldCheck,
+  Square,
+  Trash2,
+  Volume2,
+  Wifi
+} from "lucide-react";
 import { useEffect, useState } from "react";
 import { Button } from "../components/common/Button";
 import {
@@ -9,7 +22,14 @@ import {
   serializeAppConfig
 } from "../lib/appConfig";
 import { createConfiguredProvider } from "../lib/providerClients";
-import { getSetting, saveSetting, transcribeWithLocalWhisper } from "../lib/tauri";
+import { hydrateProviderApiKeys } from "../lib/providerSecrets";
+import {
+  deleteProviderApiKey,
+  getSetting,
+  saveProviderApiKey,
+  saveSetting,
+  transcribeWithLocalWhisper
+} from "../lib/tauri";
 import { promptTemplates } from "../lib/promptTemplates";
 import { enqueueTtsResponse, playTtsItem, stopTtsPlayback } from "../lib/tts";
 import type {
@@ -30,14 +50,24 @@ export function Settings() {
   const [testingProviderId, setTestingProviderId] = useState<ProviderId | null>(null);
   const [sttSampleAudioPath, setSttSampleAudioPath] = useState("");
   const [testingStt, setTestingStt] = useState(false);
+  const [providerSecretInputs, setProviderSecretInputs] = useState<Partial<Record<ProviderId, string>>>({});
 
   useEffect(() => {
     let cancelled = false;
 
     async function load() {
       const stored = parseAppConfig(await getSetting(APP_CONFIG_SETTING_KEY));
+      const hydrated = await hydrateProviderApiKeys(stored);
       if (!cancelled) {
-        setConfig(stored);
+        setConfig(hydrated);
+        setProviderSecretInputs(
+          hydrated.providers.reduce<Partial<Record<ProviderId, string>>>((values, provider) => {
+            if (provider.kind === "cloud") {
+              values[provider.id] = provider.apiKey ?? "";
+            }
+            return values;
+          }, {})
+        );
         setStatus("Settings loaded");
       }
     }
@@ -91,6 +121,59 @@ export function Settings() {
       ...current,
       providers: current.providers.map((provider) => (provider.id === id ? { ...provider, ...patch } : provider))
     }));
+  }
+
+  function patchProviderConfig(
+    current: AppConfig,
+    id: ProviderId,
+    patch: Partial<ModelProviderConfig>
+  ): AppConfig {
+    return {
+      ...current,
+      providers: current.providers.map((provider) => (provider.id === id ? { ...provider, ...patch } : provider))
+    };
+  }
+
+  function updateProviderSecretInput(id: ProviderId, secret: string) {
+    setProviderSecretInputs((current) => ({ ...current, [id]: secret }));
+    setConfig((current) => patchProviderConfig(current, id, { apiKey: secret }));
+  }
+
+  async function saveProviderSecret(provider: ModelProviderConfig) {
+    const secret = (providerSecretInputs[provider.id] ?? provider.apiKey ?? "").trim();
+    if (!secret) {
+      setStatus(`Paste a ${provider.label} API key before saving.`);
+      return;
+    }
+
+    try {
+      const result = await saveProviderApiKey(provider.id, secret);
+      const nextConfig = patchProviderConfig(config, provider.id, {
+        apiKey: secret,
+        apiKeyStored: result.stored
+      });
+      setConfig(nextConfig);
+      await saveSetting(APP_CONFIG_SETTING_KEY, serializeAppConfig(nextConfig));
+      setStatus(`${provider.label} API key stored in OS keychain`);
+    } catch (error) {
+      setStatus(`Could not store ${provider.label} API key: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
+  async function deleteProviderSecret(provider: ModelProviderConfig) {
+    try {
+      await deleteProviderApiKey(provider.id);
+      const nextConfig = patchProviderConfig(config, provider.id, {
+        apiKey: undefined,
+        apiKeyStored: false
+      });
+      setProviderSecretInputs((current) => ({ ...current, [provider.id]: "" }));
+      setConfig(nextConfig);
+      await saveSetting(APP_CONFIG_SETTING_KEY, serializeAppConfig(nextConfig));
+      setStatus(`${provider.label} API key removed from OS keychain`);
+    } catch (error) {
+      setStatus(`Could not delete ${provider.label} API key: ${error instanceof Error ? error.message : String(error)}`);
+    }
   }
 
   function updateAudio(patch: Partial<AudioSettings>) {
@@ -208,20 +291,33 @@ export function Settings() {
                 />
               </label>
               {provider.kind === "cloud" ? (
-                <label className="settings-field">
-                  <span>API key</span>
-                  <input
-                    type="password"
-                    value={provider.apiKey ?? ""}
-                    placeholder="Paste API key"
-                    onChange={(event) =>
-                      updateProvider(provider.id, {
-                        apiKey: event.currentTarget.value,
-                        apiKeyStored: event.currentTarget.value.trim().length > 0
-                      })
-                    }
-                  />
-                </label>
+                <>
+                  <label className="settings-field">
+                    <span>API key</span>
+                    <input
+                      type="password"
+                      value={providerSecretInputs[provider.id] ?? provider.apiKey ?? ""}
+                      placeholder="Paste API key, then save it to the OS keychain"
+                      onChange={(event) => updateProviderSecretInput(provider.id, event.currentTarget.value)}
+                    />
+                  </label>
+                  <div className="button-row settings-actions">
+                    <Button
+                      variant="primary"
+                      icon={<Save size={16} />}
+                      onClick={() => saveProviderSecret(provider)}
+                    >
+                      Save Key
+                    </Button>
+                    <Button
+                      variant="secondary"
+                      icon={<Trash2 size={16} />}
+                      onClick={() => deleteProviderSecret(provider)}
+                    >
+                      Delete Key
+                    </Button>
+                  </div>
+                </>
               ) : null}
             </article>
           ))}
@@ -229,10 +325,7 @@ export function Settings() {
 
         <div className="runtime-status">
           <span>{status}</span>
-          <strong>
-            API keys are stored in local app settings in this build. OS keychain storage is the next security hardening
-            step.
-          </strong>
+          <strong>Cloud provider API keys are stored in the OS keychain, not local app settings.</strong>
         </div>
       </section>
 
@@ -248,7 +341,7 @@ export function Settings() {
           {config.providers.map((provider) => (
             <div className="vault-row" key={provider.id}>
               <span>{provider.label}</span>
-              <strong>{provider.apiKeyStored ? "Configured locally" : "No key configured"}</strong>
+              <strong>{provider.apiKeyStored ? "Stored in OS keychain" : "No key configured"}</strong>
             </div>
           ))}
         </div>

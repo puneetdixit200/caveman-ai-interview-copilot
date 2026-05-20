@@ -153,7 +153,21 @@ export function parseAppConfig(raw: string | null | undefined): AppConfig {
 }
 
 export function serializeAppConfig(config: AppConfig): string {
-  return JSON.stringify(config, null, 2);
+  return JSON.stringify(sanitizeAppConfigForStorage(config), null, 2);
+}
+
+export function sanitizeAppConfigForStorage(config: AppConfig): AppConfig {
+  const sanitized = cloneConfig(config);
+
+  sanitized.providers = sanitized.providers.map((provider) => {
+    const { apiKey: _apiKey, ...providerWithoutSecret } = provider;
+    return providerWithoutSecret;
+  });
+
+  const { apiKey: _sttApiKey, ...sttWithoutSecret } = sanitized.stt;
+  sanitized.stt = sttWithoutSecret;
+
+  return sanitized;
 }
 
 function mergeProviders(rawProviders: unknown): ModelProviderConfig[] {

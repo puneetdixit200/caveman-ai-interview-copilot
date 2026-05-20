@@ -20,6 +20,11 @@ export interface OverlayProtectionStatus {
   message?: string | null;
 }
 
+export interface SecretStatus {
+  providerId: string;
+  stored: boolean;
+}
+
 declare global {
   interface Window {
     __TAURI_INTERNALS__?: unknown;
@@ -68,6 +73,30 @@ export async function getSetting(key: string): Promise<string | undefined> {
 export async function saveSetting(key: string, value: string): Promise<void> {
   return invokeOrFallback<void>("save_setting", { key, value }, () => {
     localStorage.setItem(key, value);
+  });
+}
+
+function providerSecretStorageKey(providerId: string): string {
+  return `caveman.provider-secret.${providerId}`;
+}
+
+export async function saveProviderApiKey(providerId: string, secret: string): Promise<SecretStatus> {
+  return invokeStrictOrFallback<SecretStatus>("save_provider_api_key", { providerId, secret }, () => {
+    sessionStorage.setItem(providerSecretStorageKey(providerId), secret.trim());
+    return { providerId, stored: true };
+  });
+}
+
+export async function getProviderApiKey(providerId: string): Promise<string | undefined> {
+  return invokeStrictOrFallback<string | null>("get_provider_api_key", { providerId }, () =>
+    sessionStorage.getItem(providerSecretStorageKey(providerId))
+  ).then((value) => value ?? undefined);
+}
+
+export async function deleteProviderApiKey(providerId: string): Promise<SecretStatus> {
+  return invokeStrictOrFallback<SecretStatus>("delete_provider_api_key", { providerId }, () => {
+    sessionStorage.removeItem(providerSecretStorageKey(providerId));
+    return { providerId, stored: false };
   });
 }
 

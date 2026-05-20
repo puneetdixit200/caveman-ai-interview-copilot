@@ -5,6 +5,7 @@ use crate::audio::{self, AudioCaptureManager, AudioCaptureState};
 use crate::db::{Database, NewAiResponse, NewSession};
 use crate::models::{AiResponse, PromptTemplate, Session, Transcript};
 use crate::overlay::OverlayProtectionStatus;
+use crate::secrets::SecretStatus;
 use crate::stt;
 
 #[tauri::command]
@@ -73,6 +74,21 @@ pub fn save_setting(
 #[tauri::command]
 pub fn get_setting(database: State<'_, Database>, key: String) -> Result<Option<String>, String> {
     database.get_setting(&key).map_err(to_command_error)
+}
+
+#[tauri::command]
+pub fn save_provider_api_key(provider_id: String, secret: String) -> Result<SecretStatus, String> {
+    crate::secrets::save_provider_api_key(&provider_id, &secret).map_err(to_command_error)
+}
+
+#[tauri::command]
+pub fn get_provider_api_key(provider_id: String) -> Result<Option<String>, String> {
+    crate::secrets::get_provider_api_key(&provider_id).map_err(to_command_error)
+}
+
+#[tauri::command]
+pub fn delete_provider_api_key(provider_id: String) -> Result<SecretStatus, String> {
+    crate::secrets::delete_provider_api_key(&provider_id).map_err(to_command_error)
 }
 
 #[tauri::command]

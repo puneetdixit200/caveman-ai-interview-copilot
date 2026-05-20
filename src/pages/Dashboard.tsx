@@ -11,6 +11,7 @@ import { buildChatMessages } from "../lib/contextBuilder";
 import { registerOverlayToggleShortcut } from "../lib/globalHotkeys";
 import { DEFAULT_OVERLAY_SHORTCUT, overlayShortcutLabel } from "../lib/hotkeys";
 import { createConfiguredProvider } from "../lib/providerClients";
+import { hydrateProviderApiKeys } from "../lib/providerSecrets";
 import { selectRunnableProviders } from "../lib/providerSelection";
 import { promptTemplates } from "../lib/promptTemplates";
 import { estimateTokens, nextTranscriptTimestampMs } from "../lib/sessionRuntime";
@@ -114,6 +115,7 @@ export function Dashboard() {
     async function load() {
       try {
         const storedConfig = parseAppConfig(await getSetting(APP_CONFIG_SETTING_KEY));
+        const hydratedConfig = await hydrateProviderApiKeys(storedConfig);
         const [sessions, devices, status] = await Promise.all([listSessions(), listAudioDevices(), getCaptureStatus()]);
         const activeSession =
           sessions.find((item) => item.status === "active") ??
@@ -130,13 +132,13 @@ export function Dashboard() {
           return;
         }
 
-        setConfig(storedConfig);
+        setConfig(hydratedConfig);
         setAudioDevices(devices);
         setCaptureStatus(status);
         setRunning(status.running);
         setSession(activeSession);
         await refreshSessionData(activeSession.id);
-        setStatusMessage(`Ready with ${storedConfig.selectedProviderId}`);
+        setStatusMessage(`Ready with ${hydratedConfig.selectedProviderId}`);
       } catch (error) {
         if (!cancelled) {
           setErrorMessage(error instanceof Error ? error.message : String(error));

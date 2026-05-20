@@ -27,7 +27,7 @@ describe("appConfig", () => {
     expect(parseAppConfig("{not-json")).toEqual(DEFAULT_APP_CONFIG);
   });
 
-  it("round trips enabled provider and resume context settings", () => {
+  it("round trips enabled provider, stored-key marker, and resume context settings", () => {
     const parsed = parseAppConfig(
       serializeAppConfig({
         ...DEFAULT_APP_CONFIG,
@@ -50,8 +50,43 @@ describe("appConfig", () => {
     expect(parsed.resumeContext).toBe("Backend engineer with React projects.");
     expect(parsed.providers.find((provider) => provider.id === "openrouter")).toMatchObject({
       enabled: true,
-      apiKey: "sk-test",
       apiKeyStored: true
+    });
+    expect(parsed.providers.find((provider) => provider.id === "openrouter")?.apiKey).toBeUndefined();
+  });
+
+  it("does not serialize raw provider or STT API keys into local settings", () => {
+    const serialized = serializeAppConfig({
+      ...DEFAULT_APP_CONFIG,
+      providers: DEFAULT_APP_CONFIG.providers.map((provider) =>
+        provider.id === "openrouter"
+          ? {
+              ...provider,
+              enabled: true,
+              apiKey: "sk-openrouter-secret",
+              apiKeyStored: true
+            }
+          : provider
+      ),
+      stt: {
+        ...DEFAULT_APP_CONFIG.stt,
+        apiKey: "dg-secret",
+        apiKeyStored: true
+      }
+    });
+
+    expect(serialized).not.toContain("sk-openrouter-secret");
+    expect(serialized).not.toContain("dg-secret");
+    expect(JSON.parse(serialized)).toMatchObject({
+      providers: expect.arrayContaining([
+        expect.objectContaining({
+          id: "openrouter",
+          apiKeyStored: true
+        })
+      ]),
+      stt: expect.objectContaining({
+        apiKeyStored: true
+      })
     });
   });
 

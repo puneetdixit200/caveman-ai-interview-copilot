@@ -4,6 +4,7 @@ pub mod commands;
 pub mod db;
 pub mod models;
 pub mod overlay;
+pub mod secrets;
 pub mod stt;
 
 pub fn run() {
@@ -29,6 +30,9 @@ pub fn run() {
             commands::list_ai_responses,
             commands::save_setting,
             commands::get_setting,
+            commands::save_provider_api_key,
+            commands::get_provider_api_key,
+            commands::delete_provider_api_key,
             commands::list_audio_devices,
             commands::start_capture,
             commands::stop_capture,
