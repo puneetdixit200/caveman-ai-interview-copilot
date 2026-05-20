@@ -796,6 +796,42 @@ input[type="checkbox"] {
   resize: vertical;
 }
 
+.practice-type-picker,
+.practice-answer {
+  display: grid;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 0.84rem;
+  font-weight: 700;
+}
+
+.practice-type-picker select,
+.practice-answer textarea {
+  border: 1px solid #3a4a43;
+  border-radius: 8px;
+  padding: 10px;
+  color: var(--text);
+  background: #0f1412;
+}
+
+.practice-answer {
+  margin-top: 14px;
+}
+
+.practice-answer textarea {
+  min-height: 180px;
+  resize: vertical;
+}
+
+.practice-feedback {
+  display: grid;
+  gap: 12px;
+}
+
+.practice-feedback strong {
+  color: var(--accent);
+}
+
 .provider-row {
   grid-template-columns: minmax(0, 1fr) auto auto;
   padding: 12px;

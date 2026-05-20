@@ -1,15 +1,17 @@
-import { Activity, History, Settings as SettingsIcon } from "lucide-react";
+import { Activity, Dumbbell, History, Settings as SettingsIcon } from "lucide-react";
 import type { ReactNode } from "react";
 import { useState } from "react";
 import { Dashboard } from "./pages/Dashboard";
+import { Practice } from "./pages/Practice";
 import { Sessions } from "./pages/Sessions";
 import { Settings } from "./pages/Settings";
 
-type AppTab = "dashboard" | "sessions" | "settings";
+type AppTab = "dashboard" | "sessions" | "practice" | "settings";
 
 const tabs: Array<{ id: AppTab; label: string; icon: ReactNode }> = [
   { id: "dashboard", label: "Dashboard", icon: <Activity size={17} /> },
   { id: "sessions", label: "Sessions", icon: <History size={17} /> },
+  { id: "practice", label: "Practice", icon: <Dumbbell size={17} /> },
   { id: "settings", label: "Settings", icon: <SettingsIcon size={17} /> }
 ];
 
@@ -48,6 +50,7 @@ export function App() {
       <div className="workspace">
         {tab === "dashboard" ? <Dashboard /> : null}
         {tab === "sessions" ? <Sessions /> : null}
+        {tab === "practice" ? <Practice /> : null}
         {tab === "settings" ? <Settings /> : null}
       </div>
     </div>
