@@ -107,6 +107,13 @@ pub fn list_stt_providers() -> Vec<stt::SttProviderStatus> {
 }
 
 #[tauri::command]
+pub fn transcribe_with_local_whisper(
+    input: stt::LocalWhisperRequest,
+) -> Result<Vec<stt::TranscriptEvent>, String> {
+    stt::transcribe_with_local_whisper(input).map_err(to_command_error)
+}
+
+#[tauri::command]
 pub fn list_prompt_templates() -> Vec<PromptTemplate> {
     ai::prompt_templates()
 }

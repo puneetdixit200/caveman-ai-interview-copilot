@@ -9,7 +9,7 @@ import {
   serializeAppConfig
 } from "../lib/appConfig";
 import { createConfiguredProvider } from "../lib/providerClients";
-import { getSetting, saveSetting } from "../lib/tauri";
+import { getSetting, saveSetting, transcribeWithLocalWhisper } from "../lib/tauri";
 import { promptTemplates } from "../lib/promptTemplates";
 import type {
   AudioSettings,
@@ -27,6 +27,8 @@ export function Settings() {
   const [config, setConfig] = useState<AppConfig>(DEFAULT_APP_CONFIG);
   const [status, setStatus] = useState("Loading settings...");
   const [testingProviderId, setTestingProviderId] = useState<ProviderId | null>(null);
+  const [sttSampleAudioPath, setSttSampleAudioPath] = useState("");
+  const [testingStt, setTestingStt] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -61,6 +63,26 @@ export function Settings() {
         ? `${provider.label} is reachable${result.latencyMs ? ` in ${result.latencyMs}ms` : ""}`
         : `${provider.label} failed: ${result.error ?? "unavailable"}`
     );
+  }
+
+  async function testLocalWhisper() {
+    setTestingStt(true);
+    setStatus("Running local Whisper test...");
+
+    try {
+      const events = await transcribeWithLocalWhisper({
+        binaryPath: config.stt.localWhisperBinaryPath,
+        modelPath: config.stt.localWhisperModelPath,
+        audioPath: sttSampleAudioPath,
+        language: config.stt.language || "auto",
+        diarizationEnabled: config.stt.diarizationEnabled
+      });
+      setStatus(`Local Whisper returned ${events.length} transcript segment${events.length === 1 ? "" : "s"}`);
+    } catch (error) {
+      setStatus(`Local Whisper failed: ${error instanceof Error ? error.message : String(error)}`);
+    } finally {
+      setTestingStt(false);
+    }
   }
 
   function updateProvider(id: ProviderId, patch: Partial<ModelProviderConfig>) {
@@ -338,6 +360,14 @@ export function Settings() {
             />
           </label>
           <label className="settings-field">
+            <span>Sample audio file</span>
+            <input
+              value={sttSampleAudioPath}
+              placeholder="C:\\audio\\sample.wav"
+              onChange={(event) => setSttSampleAudioPath(event.currentTarget.value)}
+            />
+          </label>
+          <label className="settings-field">
             <span>Language</span>
             <input value={config.stt.language} onChange={(event) => updateStt({ language: event.currentTarget.value })} />
           </label>
@@ -349,6 +379,9 @@ export function Settings() {
               onChange={(event) => updateStt({ diarizationEnabled: event.currentTarget.checked })}
             />
           </label>
+          <Button icon={<Wifi size={16} />} onClick={testLocalWhisper} disabled={testingStt}>
+            {testingStt ? "Testing STT" : "Test Local Whisper"}
+          </Button>
         </div>
       </section>
 

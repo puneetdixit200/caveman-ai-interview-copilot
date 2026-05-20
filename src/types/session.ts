@@ -39,6 +39,15 @@ export interface TranscriptSegment {
   createdAt?: string;
 }
 
+export interface SttTranscriptEvent {
+  speaker: Speaker;
+  text: string;
+  startMs: number;
+  endMs: number;
+  confidence?: number;
+  language?: string;
+}
+
 export interface AIResponseRecord {
   id: number;
   sessionId: string;

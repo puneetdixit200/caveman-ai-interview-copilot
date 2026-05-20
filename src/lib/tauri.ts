@@ -6,6 +6,7 @@ import type {
   NewAIResponseInput,
   NewSessionInput,
   SessionRecord,
+  SttTranscriptEvent,
   TranscriptSegment
 } from "../types/session";
 import type { AudioDevice } from "../types/settings";
@@ -192,4 +193,14 @@ export async function onAudioLevel(callback: (event: AudioLevelEvent) => void): 
   }
 
   return listen<AudioLevelEvent>("audio-level", (event) => callback(event.payload));
+}
+
+export async function transcribeWithLocalWhisper(input: {
+  binaryPath: string;
+  modelPath: string;
+  audioPath: string;
+  language?: string;
+  diarizationEnabled?: boolean;
+}): Promise<SttTranscriptEvent[]> {
+  return invokeStrictOrFallback<SttTranscriptEvent[]>("transcribe_with_local_whisper", { input }, () => []);
 }
