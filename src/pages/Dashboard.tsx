@@ -1,4 +1,4 @@
-import { Copy, Eye, EyeOff, FilePlus2, Keyboard, Link2, Play, Send, ShieldCheck, Square, Users, Wand2, X } from "lucide-react";
+import { Copy, Eye, EyeOff, FilePlus2, Keyboard, Link2, Play, Send, ShieldCheck, Square, Users, Volume2, Wand2, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AudioControls } from "../components/audio/AudioControls";
 import { CodeAssistantPanel } from "../components/code/CodeAssistantPanel";
@@ -34,7 +34,7 @@ import { selectRunnableProviders } from "../lib/providerSelection";
 import { promptTemplates } from "../lib/promptTemplates";
 import { estimateTokens, nextTranscriptTimestampMs } from "../lib/sessionRuntime";
 import { resolveCalibratedSpeaker } from "../lib/speakerCalibration";
-import { enqueueTtsResponse, playTtsItem } from "../lib/tts";
+import { enqueueTtsResponse, playTtsItem, stopTtsPlayback } from "../lib/tts";
 import { runLiveTranscriptionPass } from "../lib/liveTranscription";
 import {
   addAiResponse,
@@ -1165,6 +1165,41 @@ export function Dashboard() {
     }
   }
 
+  function speakLatestAnswer() {
+    const latestResponse = responses.find((item) => item.id !== TEMP_STREAM_ID && item.response.trim());
+    if (!latestResponse) {
+      setErrorMessage("Generate or save an AI response before speaking it.");
+      setStatusMessage("No AI response available to speak");
+      return;
+    }
+
+    const ttsQueue = enqueueTtsResponse([], latestResponse.response, config.tts, visible);
+    const played = ttsQueue[0] ? playTtsItem(ttsQueue[0]) : false;
+    setErrorMessage(null);
+
+    if (played) {
+      setStatusMessage("Speaking latest answer");
+      return;
+    }
+
+    if (!config.tts.enabled) {
+      setStatusMessage("Enable TTS in Settings before speaking the latest answer");
+      return;
+    }
+
+    if (visible && config.tts.muteInStealth) {
+      setStatusMessage("TTS is muted while the overlay is visible");
+      return;
+    }
+
+    setStatusMessage("TTS playback is not available in this environment");
+  }
+
+  function stopSpeaking() {
+    stopTtsPlayback();
+    setStatusMessage("TTS playback stopped");
+  }
+
   captureShortcutAction.current = () => {
     void toggleCapture();
   };
@@ -1202,6 +1237,12 @@ export function Dashboard() {
           </Button>
           <Button icon={<Keyboard size={16} />} onClick={typeLatestAnswer} disabled={streaming}>
             Type Latest
+          </Button>
+          <Button icon={<Volume2 size={16} />} onClick={speakLatestAnswer} disabled={streaming}>
+            Speak Latest
+          </Button>
+          <Button icon={<Square size={16} />} onClick={stopSpeaking}>
+            Stop Speech
           </Button>
         </div>
 

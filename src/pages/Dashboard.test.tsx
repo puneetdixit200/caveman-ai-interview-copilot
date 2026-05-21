@@ -5,12 +5,33 @@ import { DEFAULT_APP_CONFIG, serializeAppConfig } from "../lib/appConfig";
 import * as tauri from "../lib/tauri";
 import { Dashboard } from "./Dashboard";
 
+const ttsMocks = vi.hoisted(() => ({
+  enqueueTtsResponse: vi.fn(() => [
+    {
+      id: "tts-1",
+      text: "Use idempotency keys.",
+      voice: "default",
+      language: "en-US",
+      rate: 1,
+      volume: 0.8
+    }
+  ]),
+  playTtsItem: vi.fn(() => true),
+  stopTtsPlayback: vi.fn()
+}));
+
 vi.mock("../lib/globalHotkeys", () => ({
   registerGlobalActionShortcuts: vi.fn(async () => ({
     registeredShortcuts: { overlay: "CommandOrControl+Shift+O" },
     errors: {},
     dispose: vi.fn(async () => undefined)
   }))
+}));
+
+vi.mock("../lib/tts", () => ({
+  enqueueTtsResponse: ttsMocks.enqueueTtsResponse,
+  playTtsItem: ttsMocks.playTtsItem,
+  stopTtsPlayback: ttsMocks.stopTtsPlayback
 }));
 
 vi.mock("../lib/providerClients", () => ({
@@ -139,6 +160,9 @@ describe("Dashboard collaboration helper", () => {
   afterEach(() => {
     cleanup();
     vi.clearAllMocks();
+    ttsMocks.enqueueTtsResponse.mockClear();
+    ttsMocks.playTtsItem.mockClear();
+    ttsMocks.stopTtsPlayback.mockClear();
   });
 
   it("starts a trusted helper link and shows incoming helper hints", async () => {
@@ -394,5 +418,45 @@ describe("Dashboard collaboration helper", () => {
 
     await waitFor(() => expect(tauri.typeTextIntoActiveWindow).toHaveBeenCalledWith("Use exponential backoff."));
     expect(await screen.findByText("AI response saved and auto-typed into the active window")).toBeInTheDocument();
+  });
+
+  it("speaks and stops the latest saved answer on demand", async () => {
+    vi.mocked(tauri.getSetting)
+      .mockResolvedValueOnce(
+        serializeAppConfig({
+          ...DEFAULT_APP_CONFIG,
+          tts: {
+            ...DEFAULT_APP_CONFIG.tts,
+            enabled: true,
+            voice: "default",
+            language: "en-US",
+            rate: 1,
+            volume: 0.8
+          }
+        })
+      )
+      .mockResolvedValueOnce(undefined)
+      .mockResolvedValueOnce(undefined);
+    const user = userEvent.setup();
+    render(<Dashboard />);
+
+    expect(await screen.findByText("Live Interview Session")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Speak Latest" }));
+
+    expect(ttsMocks.enqueueTtsResponse).toHaveBeenCalledWith(
+      [],
+      "Use idempotency keys.",
+      expect.objectContaining({ enabled: true, language: "en-US" }),
+      expect.any(Boolean)
+    );
+    expect(ttsMocks.playTtsItem).toHaveBeenCalledWith(
+      expect.objectContaining({ text: "Use idempotency keys." })
+    );
+    expect(await screen.findByText("Speaking latest answer")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Stop Speech" }));
+
+    expect(ttsMocks.stopTtsPlayback).toHaveBeenCalled();
+    expect(await screen.findByText("TTS playback stopped")).toBeInTheDocument();
   });
 });
