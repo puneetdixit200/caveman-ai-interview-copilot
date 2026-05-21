@@ -1,4 +1,5 @@
 import { cleanup, render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it } from "vitest";
 import { Settings } from "./Settings";
 
@@ -59,6 +60,28 @@ describe("Settings", () => {
     expect(await screen.findByRole("button", { name: "Add Knowledge Document" })).toBeInTheDocument();
     expect(screen.getByRole("textbox", { name: "Knowledge text" })).toBeInTheDocument();
     expect(screen.getByLabelText("Knowledge files")).toBeInTheDocument();
+  });
+
+  it("imports resume and job description files into prompt context", async () => {
+    const user = userEvent.setup();
+    render(<Settings />);
+
+    const resumeFile = new File(["Built payments APIs with TypeScript."], "resume.md", {
+      type: "text/markdown"
+    });
+    const jdFile = new File(["Role needs distributed systems and queues."], "jd.txt", {
+      type: "text/plain"
+    });
+
+    await user.upload(await screen.findByLabelText("Resume file"), resumeFile);
+    await user.upload(screen.getByLabelText("Job description file"), jdFile);
+
+    expect((screen.getByRole("textbox", { name: "Resume context" }) as HTMLTextAreaElement).value).toContain(
+      "Built payments APIs with TypeScript."
+    );
+    expect((screen.getByRole("textbox", { name: "Job description context" }) as HTMLTextAreaElement).value).toContain(
+      "Role needs distributed systems and queues."
+    );
   });
 
   it("shows global overlay hotkey controls", async () => {

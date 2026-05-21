@@ -457,6 +457,42 @@ export function Settings() {
     setStatus(`Imported ${importedCount} knowledge file${importedCount === 1 ? "" : "s"}`);
   }
 
+  async function importPromptContextFiles(
+    files: FileList | null,
+    field: "resumeContext" | "jobDescriptionContext",
+    label: string
+  ) {
+    const selectedFiles = Array.from(files ?? []);
+    if (selectedFiles.length === 0) {
+      return;
+    }
+
+    const importedBlocks: string[] = [];
+    for (const file of selectedFiles) {
+      const text = (await file.text()).trim();
+      if (!text) {
+        continue;
+      }
+
+      importedBlocks.push(`Imported from ${file.name}:\n${text}`);
+    }
+
+    if (importedBlocks.length === 0) {
+      setStatus(`Selected ${label.toLowerCase()} files were empty.`);
+      return;
+    }
+
+    setConfig((current) => ({
+      ...current,
+      [field]: appendPromptContext(current[field], importedBlocks.join("\n\n"))
+    }));
+    setStatus(
+      `Imported ${importedBlocks.length} ${label.toLowerCase()} file${
+        importedBlocks.length === 1 ? "" : "s"
+      }; save settings to keep it`
+    );
+  }
+
   const knowledgeResults = knowledgeQuery.trim()
     ? searchKnowledgeBase(knowledgeBase, knowledgeQuery, 4)
     : knowledgeBase.chunks.slice(-4).reverse();
@@ -866,6 +902,18 @@ export function Settings() {
             />
           </label>
           <label className="settings-field">
+            <span>Resume file</span>
+            <input
+              type="file"
+              multiple
+              accept=".txt,.md,.markdown,.json,.csv"
+              onChange={(event) => {
+                void importPromptContextFiles(event.currentTarget.files, "resumeContext", "Resume");
+                event.currentTarget.value = "";
+              }}
+            />
+          </label>
+          <label className="settings-field">
             <span>Job description context</span>
             <textarea
               value={config.jobDescriptionContext}
@@ -873,6 +921,18 @@ export function Settings() {
                 setConfig((current) => ({ ...current, jobDescriptionContext: event.currentTarget.value }))
               }
               placeholder="Paste the target role or interview context..."
+            />
+          </label>
+          <label className="settings-field">
+            <span>Job description file</span>
+            <input
+              type="file"
+              multiple
+              accept=".txt,.md,.markdown,.json,.csv"
+              onChange={(event) => {
+                void importPromptContextFiles(event.currentTarget.files, "jobDescriptionContext", "Job description");
+                event.currentTarget.value = "";
+              }}
             />
           </label>
         </div>
@@ -1474,6 +1534,10 @@ function sttSecretProviderId(mode: "deepgram" | "assemblyai" | "google"): string
 
 function normalizeSttLanguage(language: string): string {
   return language.trim() || "auto";
+}
+
+function appendPromptContext(existing: string, imported: string): string {
+  return [existing.trim(), imported.trim()].filter(Boolean).join("\n\n");
 }
 
 function createKnowledgeDocumentId(title: string): string {
