@@ -533,6 +533,23 @@ h2 {
   gap: 10px;
 }
 
+.audio-runtime {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.audio-runtime span {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 5px 9px;
+  color: var(--muted);
+  background: #101614;
+  font-size: 0.75rem;
+  font-weight: 800;
+}
+
 .empty-copy {
   border: 1px dashed var(--line);
   border-radius: 8px;

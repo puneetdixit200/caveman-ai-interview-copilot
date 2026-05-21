@@ -1299,6 +1299,7 @@ export function Dashboard() {
 
       <AudioControls
         devices={audioDevices}
+        captureStatus={captureStatus}
         status={captureStatus.running ? "Live" : config.audio.captureMode === "manual" ? "Manual" : config.audio.captureMode}
       />
       <TranscriptFeed transcripts={transcripts} interimPreviews={interimPreviews} />
