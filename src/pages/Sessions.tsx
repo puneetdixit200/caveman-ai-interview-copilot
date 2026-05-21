@@ -1,4 +1,4 @@
-import { BarChart3, Copy, Download, FileJson, Search } from "lucide-react";
+import { BarChart3, Check, Copy, Download, FileJson, Pencil, Search, Trash2, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Button } from "../components/common/Button";
 import { ResponseCard } from "../components/overlay/ResponseCard";
@@ -6,8 +6,15 @@ import { calculateSessionAnalytics } from "../lib/analytics";
 import { downloadSessionPdf, exportSessionJson, exportSessionMarkdown } from "../lib/sessionExport";
 import { filterSessionSummaries } from "../lib/sessionSearch";
 import { formatDuration, formatTimestampMs } from "../lib/formatters";
-import { listAiResponses, listSessions, listTranscripts } from "../lib/tauri";
-import type { AIResponseRecord, SessionRecord, TranscriptSegment } from "../types/session";
+import { deleteTranscript, listAiResponses, listSessions, listTranscripts, updateTranscript } from "../lib/tauri";
+import type { AIResponseRecord, SessionRecord, Speaker, TranscriptSegment } from "../types/session";
+
+interface TranscriptCorrectionDraft {
+  speaker: Speaker;
+  content: string;
+  timestampMs: string;
+  confidence: string;
+}
 
 export function Sessions() {
   const [sessions, setSessions] = useState<SessionRecord[]>([]);
@@ -20,6 +27,8 @@ export function Sessions() {
   const [responsesBySession, setResponsesBySession] = useState<Record<string, string[]>>({});
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState("Loading sessions...");
+  const [editingTranscriptId, setEditingTranscriptId] = useState<number | null>(null);
+  const [transcriptDraft, setTranscriptDraft] = useState<TranscriptCorrectionDraft | null>(null);
 
   const filteredSessions = useMemo(
     () => filterSessionSummaries({ query, sessions, transcriptsBySession, responsesBySession }),
@@ -144,6 +153,8 @@ export function Sessions() {
       if (!cancelled) {
         setTranscripts(sessionTranscripts);
         setResponses(sessionResponses);
+        setEditingTranscriptId(null);
+        setTranscriptDraft(null);
       }
     }
 
@@ -171,6 +182,85 @@ export function Sessions() {
 
     await downloadSessionPdf({ session: selectedSession, transcripts, responses });
     setStatus("PDF export saved");
+  }
+
+  function startTranscriptCorrection(segment: TranscriptSegment) {
+    setEditingTranscriptId(segment.id);
+    setTranscriptDraft({
+      speaker: segment.speaker,
+      content: segment.content,
+      timestampMs: String(segment.timestampMs),
+      confidence: segment.confidence === undefined ? "" : String(segment.confidence)
+    });
+  }
+
+  function patchTranscriptDraft(patch: Partial<TranscriptCorrectionDraft>) {
+    setTranscriptDraft((current) => (current ? { ...current, ...patch } : current));
+  }
+
+  async function saveTranscriptCorrection(segment: TranscriptSegment) {
+    if (!transcriptDraft) {
+      return;
+    }
+
+    const content = transcriptDraft.content.trim();
+    if (!content) {
+      setStatus("Transcript text cannot be empty");
+      return;
+    }
+
+    const timestampMs = Math.max(0, Math.round(Number(transcriptDraft.timestampMs)));
+    if (!Number.isFinite(timestampMs)) {
+      setStatus("Transcript timestamp must be a number");
+      return;
+    }
+
+    const confidence = readOptionalConfidence(transcriptDraft.confidence);
+    if (confidence === null) {
+      setStatus("Transcript confidence must be between 0 and 1");
+      return;
+    }
+
+    const updated = await updateTranscript({
+      id: segment.id,
+      speaker: transcriptDraft.speaker,
+      content,
+      timestampMs,
+      confidence
+    });
+    const corrected = { ...updated, sessionId: updated.sessionId || segment.sessionId };
+
+    const nextTranscripts = sortTranscriptSegments(
+      transcripts.map((item) => (item.id === corrected.id ? corrected : item))
+    );
+    setTranscripts(nextTranscripts);
+    syncTranscriptCaches(corrected.sessionId, nextTranscripts);
+    setEditingTranscriptId(null);
+    setTranscriptDraft(null);
+    setStatus("Transcript correction saved");
+  }
+
+  async function deleteSavedTranscript(segment: TranscriptSegment) {
+    await deleteTranscript(segment.id);
+    const nextTranscripts = transcripts.filter((item) => item.id !== segment.id);
+    setTranscripts(nextTranscripts);
+    syncTranscriptCaches(segment.sessionId, nextTranscripts);
+    if (editingTranscriptId === segment.id) {
+      setEditingTranscriptId(null);
+      setTranscriptDraft(null);
+    }
+    setStatus("Transcript line deleted");
+  }
+
+  function syncTranscriptCaches(sessionId: string, nextTranscripts: TranscriptSegment[]) {
+    setTranscriptsBySession((current) => ({
+      ...current,
+      [sessionId]: nextTranscripts.map((segment) => segment.content)
+    }));
+    setAnalyticsTranscripts((current) => [
+      ...current.filter((segment) => segment.sessionId !== sessionId),
+      ...nextTranscripts
+    ]);
   }
 
   return (
@@ -273,11 +363,97 @@ export function Sessions() {
               {transcripts.length > 0 ? (
                 transcripts.map((segment) => (
                   <article className={`transcript-row speaker-${segment.speaker}`} key={segment.id}>
-                    <div className="transcript-meta">
-                      <span>{segment.speaker}</span>
-                      <span>{formatTimestampMs(segment.timestampMs)}</span>
-                    </div>
-                    <p>{segment.content}</p>
+                    {editingTranscriptId === segment.id && transcriptDraft ? (
+                      <div className="transcript-editor">
+                        <div className="transcript-editor-grid">
+                          <label className="settings-field">
+                            <span>Speaker for transcript line {segment.id}</span>
+                            <select
+                              value={transcriptDraft.speaker}
+                              onChange={(event) =>
+                                patchTranscriptDraft({ speaker: event.currentTarget.value as Speaker })
+                              }
+                            >
+                              <option value="interviewer">Interviewer</option>
+                              <option value="candidate">Candidate</option>
+                              <option value="unknown">Unknown</option>
+                            </select>
+                          </label>
+                          <label className="settings-field">
+                            <span>Timestamp ms for transcript line {segment.id}</span>
+                            <input
+                              type="number"
+                              min="0"
+                              value={transcriptDraft.timestampMs}
+                              onChange={(event) => patchTranscriptDraft({ timestampMs: event.currentTarget.value })}
+                            />
+                          </label>
+                          <label className="settings-field">
+                            <span>Confidence for transcript line {segment.id}</span>
+                            <input
+                              type="number"
+                              min="0"
+                              max="1"
+                              step="0.01"
+                              value={transcriptDraft.confidence}
+                              onChange={(event) => patchTranscriptDraft({ confidence: event.currentTarget.value })}
+                            />
+                          </label>
+                        </div>
+                        <label className="settings-field">
+                          <span>Transcript text for line {segment.id}</span>
+                          <textarea
+                            value={transcriptDraft.content}
+                            onChange={(event) => patchTranscriptDraft({ content: event.currentTarget.value })}
+                          />
+                        </label>
+                        <div className="button-row transcript-row-actions">
+                          <Button
+                            aria-label={`Save transcript line ${segment.id}`}
+                            icon={<Check size={16} />}
+                            variant="primary"
+                            onClick={() => void saveTranscriptCorrection(segment)}
+                          >
+                            Save
+                          </Button>
+                          <Button
+                            aria-label={`Cancel transcript line ${segment.id}`}
+                            icon={<X size={16} />}
+                            onClick={() => {
+                              setEditingTranscriptId(null);
+                              setTranscriptDraft(null);
+                            }}
+                          >
+                            Cancel
+                          </Button>
+                        </div>
+                      </div>
+                    ) : (
+                      <>
+                        <div className="transcript-meta">
+                          <span>{segment.speaker}</span>
+                          <span>{formatTimestampMs(segment.timestampMs)}</span>
+                        </div>
+                        <p>{segment.content}</p>
+                        <div className="button-row transcript-row-actions">
+                          <Button
+                            aria-label={`Edit transcript line ${segment.id}`}
+                            icon={<Pencil size={16} />}
+                            onClick={() => startTranscriptCorrection(segment)}
+                          >
+                            Edit
+                          </Button>
+                          <Button
+                            aria-label={`Delete transcript line ${segment.id}`}
+                            icon={<Trash2 size={16} />}
+                            variant="danger"
+                            onClick={() => void deleteSavedTranscript(segment)}
+                          >
+                            Delete
+                          </Button>
+                        </div>
+                      </>
+                    )}
                   </article>
                 ))
               ) : (
@@ -320,4 +496,21 @@ export function Sessions() {
       </section>
     </main>
   );
+}
+
+function sortTranscriptSegments(transcripts: TranscriptSegment[]): TranscriptSegment[] {
+  return [...transcripts].sort((left, right) => left.timestampMs - right.timestampMs || left.id - right.id);
+}
+
+function readOptionalConfidence(value: string): number | undefined | null {
+  if (!value.trim()) {
+    return undefined;
+  }
+
+  const confidence = Number(value);
+  if (!Number.isFinite(confidence) || confidence < 0 || confidence > 1) {
+    return null;
+  }
+
+  return confidence;
 }

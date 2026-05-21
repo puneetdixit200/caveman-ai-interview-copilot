@@ -47,6 +47,25 @@ pub fn list_transcripts(
 }
 
 #[tauri::command]
+pub fn update_transcript(
+    database: State<'_, Database>,
+    id: i64,
+    speaker: String,
+    content: String,
+    timestamp_ms: i64,
+    confidence: Option<f64>,
+) -> Result<Transcript, String> {
+    database
+        .update_transcript(id, &speaker, &content, timestamp_ms, confidence)
+        .map_err(to_command_error)
+}
+
+#[tauri::command]
+pub fn delete_transcript(database: State<'_, Database>, id: i64) -> Result<(), String> {
+    database.delete_transcript(id).map_err(to_command_error)
+}
+
+#[tauri::command]
 pub fn add_ai_response(
     database: State<'_, Database>,
     input: NewAiResponse,

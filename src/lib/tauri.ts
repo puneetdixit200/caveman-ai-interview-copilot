@@ -191,6 +191,38 @@ export async function listTranscripts(sessionId: string): Promise<TranscriptSegm
   return invokeOrFallback<TranscriptSegment[]>("list_transcripts", { sessionId }, () => []);
 }
 
+export async function updateTranscript(input: {
+  id: number;
+  speaker: TranscriptSegment["speaker"];
+  content: string;
+  timestampMs: number;
+  confidence?: number;
+}): Promise<TranscriptSegment> {
+  return invokeOrFallback<TranscriptSegment>(
+    "update_transcript",
+    {
+      id: input.id,
+      speaker: input.speaker,
+      content: input.content,
+      timestampMs: input.timestampMs,
+      confidence: input.confidence
+    },
+    () => ({
+      id: input.id,
+      sessionId: "",
+      speaker: input.speaker,
+      content: input.content,
+      timestampMs: input.timestampMs,
+      confidence: input.confidence,
+      createdAt: new Date().toISOString()
+    })
+  );
+}
+
+export async function deleteTranscript(id: number): Promise<void> {
+  return invokeOrFallback<void>("delete_transcript", { id }, () => undefined);
+}
+
 export async function addAiResponse(input: NewAIResponseInput): Promise<AIResponseRecord> {
   return invokeOrFallback<AIResponseRecord>("add_ai_response", { input }, () => ({
     id: Date.now(),

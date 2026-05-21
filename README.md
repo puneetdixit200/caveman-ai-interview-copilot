@@ -27,7 +27,7 @@ Implemented now:
 - Automatic interviewer question detection and answer triggering from live transcript updates
 - Ollama, LM Studio, OpenRouter, OpenAI, Anthropic, and Groq provider routing with streaming fallback
 - Stealth overlay window with opacity, font controls, global hotkeys, click-through mode, position persistence, and Windows capture exclusion
-- Session archive with search, replay, Markdown, JSON, and PDF export
+- Session archive with search, replay, transcript correction, Markdown, JSON, and PDF export
 - Resume, job description, OCR, and local knowledge-base context injection
 - Code answer extraction and active-window typing for code/editor/chat handoff
 - Practice interview mode with local scoring and AI follow-up question generation
@@ -37,7 +37,7 @@ Implemented now:
 
 Planned full build:
 
-- Long-session transcript cursoring and correction workflow
+- Long-session transcript cursoring for very large histories
 - Collaborative helper mode for trusted remote observers
 - Production release signing, hosted update manifest publishing, and broader platform packaging
 

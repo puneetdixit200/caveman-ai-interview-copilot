@@ -485,6 +485,22 @@ h2 {
   text-transform: uppercase;
 }
 
+.transcript-row-actions {
+  justify-content: flex-start;
+  margin-top: 10px;
+}
+
+.transcript-editor {
+  display: grid;
+  gap: 10px;
+}
+
+.transcript-editor-grid {
+  display: grid;
+  grid-template-columns: minmax(120px, 0.8fr) minmax(120px, 0.7fr) minmax(120px, 0.7fr);
+  gap: 10px;
+}
+
 .overlay-control-panel {
   grid-row: span 2;
 }
@@ -986,7 +1002,8 @@ code {
 
   .metric-strip,
   .profile-grid,
-  .settings-two-column {
+  .settings-two-column,
+  .transcript-editor-grid {
     grid-template-columns: 1fr;
   }
 

@@ -131,6 +131,44 @@ impl Database {
             .map_err(Into::into)
     }
 
+    pub fn update_transcript(
+        &self,
+        id: i64,
+        speaker: &str,
+        content: &str,
+        timestamp_ms: i64,
+        confidence: Option<f64>,
+    ) -> Result<Transcript> {
+        let normalized_content = content.trim();
+        if normalized_content.is_empty() {
+            anyhow::bail!("transcript content cannot be empty");
+        }
+
+        let connection = self.lock()?;
+        let updated_rows = connection.execute(
+            "UPDATE transcripts
+             SET speaker = ?1, content = ?2, confidence = ?3, timestamp_ms = ?4
+             WHERE id = ?5",
+            params![speaker, normalized_content, confidence, timestamp_ms, id],
+        )?;
+        if updated_rows == 0 {
+            anyhow::bail!("transcript {id} was not found");
+        }
+        drop(connection);
+
+        self.get_transcript(id)
+    }
+
+    pub fn delete_transcript(&self, id: i64) -> Result<()> {
+        let connection = self.lock()?;
+        let deleted_rows =
+            connection.execute("DELETE FROM transcripts WHERE id = ?1", params![id])?;
+        if deleted_rows == 0 {
+            anyhow::bail!("transcript {id} was not found");
+        }
+        Ok(())
+    }
+
     pub fn add_ai_response(&self, input: NewAiResponse) -> Result<AiResponse> {
         let now = Utc::now().to_rfc3339();
         let connection = self.lock()?;

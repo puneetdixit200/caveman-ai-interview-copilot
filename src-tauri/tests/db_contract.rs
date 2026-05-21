@@ -35,6 +35,53 @@ fn session_and_transcript_records_round_trip_through_sqlite() {
 }
 
 #[test]
+fn transcript_records_can_be_corrected_and_deleted() {
+    let db = Database::in_memory().expect("in-memory database");
+    let session = db
+        .create_session(NewSession {
+            title: "Correction Round".to_string(),
+            company: None,
+            role: None,
+            interview_type: "mixed".to_string(),
+            tags: vec![],
+            notes: None,
+        })
+        .expect("create session");
+    let transcript = db
+        .add_transcript(
+            &session.id,
+            "interviewer",
+            "How do retrys work?",
+            900,
+            Some(0.72),
+        )
+        .expect("add transcript");
+
+    let updated = db
+        .update_transcript(
+            transcript.id,
+            "candidate",
+            "How do retries work?",
+            1200,
+            Some(0.94),
+        )
+        .expect("update transcript");
+
+    assert_eq!(updated.speaker, "candidate");
+    assert_eq!(updated.content, "How do retries work?");
+    assert_eq!(updated.timestamp_ms, 1200);
+    assert_eq!(updated.confidence, Some(0.94));
+
+    db.delete_transcript(transcript.id)
+        .expect("delete transcript");
+
+    assert!(db
+        .list_transcripts(&session.id)
+        .expect("list transcripts")
+        .is_empty());
+}
+
+#[test]
 fn settings_round_trip_by_key() {
     let db = Database::in_memory().expect("in-memory database");
 
