@@ -125,6 +125,8 @@ pub struct CloudSttRequest {
     pub language: Option<String>,
     pub diarization_enabled: Option<bool>,
     pub endpoint: Option<String>,
+    pub local_only_mode: Option<bool>,
+    pub block_cloud_when_local_only: Option<bool>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -598,6 +600,12 @@ pub fn validate_local_whisper_request(request: &LocalWhisperRequest) -> anyhow::
 }
 
 pub fn validate_cloud_stt_request(request: &CloudSttRequest) -> anyhow::Result<()> {
+    if request.local_only_mode.unwrap_or(false)
+        && request.block_cloud_when_local_only.unwrap_or(true)
+    {
+        return Err(anyhow::anyhow!("Cloud STT is blocked by local-only mode"));
+    }
+
     if request.api_key.trim().is_empty() {
         return Err(anyhow::anyhow!("Cloud STT API key is required"));
     }
@@ -1390,8 +1398,9 @@ mod tests {
         decode_local_whisper_pcm_audio, deepgram_language_params,
         detect_local_whisper_setup_in_roots, download_whisper_model_to_dir, google_language_config,
         parse_assemblyai_json, parse_deepgram_json, parse_google_json, parse_whisper_json,
-        validate_local_whisper_request, whisper_model_catalog, GoogleLanguageConfig,
-        LocalWhisperPcmRequest, LocalWhisperRequest, TranscriptEvent, WhisperModelDownloadRequest,
+        validate_cloud_stt_request, validate_local_whisper_request, whisper_model_catalog,
+        CloudSttRequest, GoogleLanguageConfig, LocalWhisperPcmRequest, LocalWhisperRequest,
+        TranscriptEvent, WhisperModelDownloadRequest,
     };
 
     #[test]
@@ -1602,6 +1611,24 @@ mod tests {
                 alternatives: vec!["hi-IN".to_string()]
             }
         );
+    }
+
+    #[test]
+    fn blocks_cloud_stt_when_local_only_mode_is_enabled() {
+        let request = CloudSttRequest {
+            provider: "assemblyai".to_string(),
+            api_key: "stt-key".to_string(),
+            audio_path: "missing.wav".to_string(),
+            language: Some("auto".to_string()),
+            diarization_enabled: Some(true),
+            endpoint: None,
+            local_only_mode: Some(true),
+            block_cloud_when_local_only: Some(true),
+        };
+
+        let error = validate_cloud_stt_request(&request).expect_err("cloud STT should be blocked");
+
+        assert!(error.to_string().contains("local-only mode"));
     }
 
     #[test]

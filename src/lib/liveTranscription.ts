@@ -37,6 +37,9 @@ export async function runLiveTranscriptionPass(input: {
   if (sttMode === "manual" || sttMode === "deepgram") {
     return [];
   }
+  if (isCloudSttMode(sttMode) && isCloudBlocked(input.config)) {
+    return [];
+  }
 
   const deps = {
     saveCaptureSnapshot: input.saveCaptureSnapshot ?? input.deps?.saveCaptureSnapshot ?? saveCaptureSnapshot,
@@ -150,7 +153,9 @@ async function transcribeSnapshot(input: {
       audioPath: input.snapshot.audioPath,
       language: cloudSttLanguage(input.config.stt.language),
       diarizationEnabled: input.config.stt.diarizationEnabled,
-      endpoint: input.config.stt.cloudEndpoint || undefined
+      endpoint: input.config.stt.cloudEndpoint || undefined,
+      localOnlyMode: input.config.security.localOnlyMode,
+      blockCloudWhenLocalOnly: input.config.security.blockCloudWhenLocalOnly
     });
   }
 
@@ -159,6 +164,10 @@ async function transcribeSnapshot(input: {
 
 function isCloudSttMode(mode: SttMode): mode is SttCloudMode {
   return mode === "assemblyai" || mode === "google";
+}
+
+function isCloudBlocked(config: AppConfig): boolean {
+  return config.security.localOnlyMode && config.security.blockCloudWhenLocalOnly;
 }
 
 function cloudSttLanguage(language: string): string {

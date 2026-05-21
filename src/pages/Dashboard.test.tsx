@@ -266,7 +266,36 @@ describe("Dashboard collaboration helper", () => {
     render(<Dashboard />);
 
     expect(await screen.findByText("Live Interview Session")).toBeInTheDocument();
-    expect(tauri.protectOverlayWindow).toHaveBeenCalledWith(false);
+    await waitFor(() => expect(tauri.protectOverlayWindow).toHaveBeenCalledWith(false));
     expect(await screen.findByText("Capture disabled")).toBeInTheDocument();
+  });
+
+  it("does not arm Deepgram streaming while local-only mode blocks cloud calls", async () => {
+    vi.mocked(tauri.getSetting)
+      .mockResolvedValueOnce(
+        serializeAppConfig({
+          ...DEFAULT_APP_CONFIG,
+          security: {
+            ...DEFAULT_APP_CONFIG.security,
+            localOnlyMode: true,
+            blockCloudWhenLocalOnly: true
+          },
+          stt: {
+            ...DEFAULT_APP_CONFIG.stt,
+            selectedMode: "deepgram",
+            apiKey: "dg_key"
+          }
+        })
+      )
+      .mockResolvedValueOnce(undefined)
+      .mockResolvedValueOnce(undefined);
+    const user = userEvent.setup();
+    render(<Dashboard />);
+
+    expect(await screen.findByText("Live Interview Session")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Start" }));
+
+    expect(await screen.findByText("Cloud STT is blocked by local-only mode.")).toBeInTheDocument();
+    expect(tauri.onAudioChunk).not.toHaveBeenCalled();
   });
 });

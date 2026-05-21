@@ -228,6 +228,10 @@ export function Settings() {
       setStatus("Choose Deepgram, AssemblyAI, or Google STT before testing cloud transcription.");
       return;
     }
+    if (isCloudBlocked(config)) {
+      setStatus("Cloud STT is blocked by local-only mode.");
+      return;
+    }
 
     const apiKey = (sttSecretInput || config.stt.apiKey || "").trim();
     if (!apiKey) {
@@ -245,7 +249,9 @@ export function Settings() {
         audioPath: sttSampleAudioPath,
         language: normalizeSttLanguage(config.stt.language),
         diarizationEnabled: config.stt.diarizationEnabled,
-        endpoint: config.stt.cloudEndpoint || undefined
+        endpoint: config.stt.cloudEndpoint || undefined,
+        localOnlyMode: config.security.localOnlyMode,
+        blockCloudWhenLocalOnly: config.security.blockCloudWhenLocalOnly
       });
       setStatus(`${config.stt.selectedMode} returned ${events.length} transcript segment${events.length === 1 ? "" : "s"}`);
     } catch (error) {
@@ -1922,6 +1928,10 @@ function sttSecretProviderId(mode: "deepgram" | "assemblyai" | "google"): string
 
 function normalizeSttLanguage(language: string): string {
   return language.trim() || "auto";
+}
+
+function isCloudBlocked(config: AppConfig): boolean {
+  return config.security.localOnlyMode && config.security.blockCloudWhenLocalOnly;
 }
 
 function formatModelOption(model: ModelInfo): string {

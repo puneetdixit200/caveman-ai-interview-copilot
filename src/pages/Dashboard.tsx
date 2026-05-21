@@ -650,6 +650,11 @@ export function Dashboard() {
       return;
     }
 
+    if (isCloudBlocked(config)) {
+      setStatusMessage("Cloud STT is blocked by local-only mode.");
+      return;
+    }
+
     const apiKey = config.stt.apiKey?.trim() ?? "";
     if (!apiKey) {
       setStatusMessage("Save a Deepgram STT API key before starting streaming transcription.");
@@ -1418,6 +1423,10 @@ function buildPromptMessages(
     maxStaticContextTokens: config.contextWindow.maxStaticContextTokens,
     maxHistoryTurns: config.contextWindow.maxHistoryTurns
   });
+}
+
+function isCloudBlocked(config: AppConfig): boolean {
+  return config.security.localOnlyMode && config.security.blockCloudWhenLocalOnly;
 }
 
 function buildCollaborationSnapshot(

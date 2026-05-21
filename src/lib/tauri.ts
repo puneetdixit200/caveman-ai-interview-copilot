@@ -468,6 +468,8 @@ export async function transcribeWithCloudStt(input: {
   language?: string;
   diarizationEnabled?: boolean;
   endpoint?: string;
+  localOnlyMode?: boolean;
+  blockCloudWhenLocalOnly?: boolean;
 }): Promise<SttTranscriptEvent[]> {
   return invokeStrictOrFallback<SttTranscriptEvent[]>("transcribe_with_cloud_stt", { input }, () => []);
 }

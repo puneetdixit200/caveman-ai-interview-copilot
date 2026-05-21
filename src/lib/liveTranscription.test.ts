@@ -268,8 +268,43 @@ describe("liveTranscription", () => {
       audioPath: "C:\\tmp\\system.wav",
       language: "auto",
       diarizationEnabled: true,
-      endpoint: undefined
+      endpoint: undefined,
+      localOnlyMode: false,
+      blockCloudWhenLocalOnly: true
     });
+  });
+
+  it("blocks snapshot cloud STT while local-only mode is enabled", async () => {
+    const saveCaptureSnapshot = vi.fn();
+    const transcribeWithCloudStt = vi.fn();
+
+    const saved = await runLiveTranscriptionPass({
+      sessionId: "s1",
+      config: {
+        ...DEFAULT_APP_CONFIG,
+        security: {
+          ...DEFAULT_APP_CONFIG.security,
+          localOnlyMode: true,
+          blockCloudWhenLocalOnly: true
+        },
+        audio: {
+          ...DEFAULT_APP_CONFIG.audio,
+          captureMode: "system"
+        },
+        stt: {
+          ...DEFAULT_APP_CONFIG.stt,
+          selectedMode: "assemblyai",
+          apiKey: "stt_key"
+        }
+      },
+      seenTranscriptKeys: new Set<string>(),
+      saveCaptureSnapshot,
+      transcribeWithCloudStt
+    });
+
+    expect(saved).toEqual([]);
+    expect(saveCaptureSnapshot).not.toHaveBeenCalled();
+    expect(transcribeWithCloudStt).not.toHaveBeenCalled();
   });
 
   it("applies speaker calibration before saving snapshot transcript events", async () => {
