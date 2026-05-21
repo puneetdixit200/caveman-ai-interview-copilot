@@ -31,6 +31,7 @@ pub fn run() {
             commands::list_sessions,
             commands::add_transcript,
             commands::list_transcripts,
+            commands::list_transcripts_page,
             commands::update_transcript,
             commands::delete_transcript,
             commands::add_ai_response,

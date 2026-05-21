@@ -4,6 +4,42 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import * as tauri from "../lib/tauri";
 import { Sessions } from "./Sessions";
 
+const firstTranscriptPage = {
+  items: [
+    {
+      id: 1,
+      sessionId: "s1",
+      speaker: "interviewer",
+      content: "How would you design retries?",
+      timestampMs: 1000,
+      confidence: 0.9
+    }
+  ],
+  totalCount: 2,
+  hasMoreBefore: false,
+  hasMoreAfter: true,
+  previousCursor: { timestampMs: 1000, id: 1 },
+  nextCursor: { timestampMs: 1000, id: 1 }
+};
+
+const secondTranscriptPage = {
+  items: [
+    {
+      id: 2,
+      sessionId: "s1",
+      speaker: "candidate",
+      content: "I would use idempotency keys.",
+      timestampMs: 2500,
+      confidence: 0.88
+    }
+  ],
+  totalCount: 2,
+  hasMoreBefore: true,
+  hasMoreAfter: false,
+  previousCursor: { timestampMs: 2500, id: 2 },
+  nextCursor: { timestampMs: 2500, id: 2 }
+};
+
 vi.mock("../lib/tauri", () => ({
   listSessions: vi.fn(async () => [
     {
@@ -29,6 +65,9 @@ vi.mock("../lib/tauri", () => ({
       confidence: 0.9
     }
   ]),
+  listTranscriptPage: vi.fn(async (sessionId, options = {}) =>
+    sessionId === "s1" && options.direction === "after" ? secondTranscriptPage : firstTranscriptPage
+  ),
   listAiResponses: vi.fn(async () => [
     {
       id: 1,
@@ -101,5 +140,33 @@ describe("Sessions", () => {
     expect(tauri.deleteTranscript).toHaveBeenCalledWith(1);
     expect(screen.queryByText("I would design retry budgets.")).not.toBeInTheDocument();
     expect(screen.getByText("Transcript line deleted")).toBeInTheDocument();
+  });
+
+  it("pages through long transcript replays with cursor navigation", async () => {
+    const user = userEvent.setup();
+    render(<Sessions />);
+
+    expect(await screen.findByText("How would you design retries?")).toBeInTheDocument();
+    expect(screen.getByText("Showing 1 transcript line of 2")).toBeInTheDocument();
+    expect(tauri.listTranscriptPage).toHaveBeenCalledWith("s1", { limit: 100 });
+
+    await user.click(screen.getByRole("button", { name: "Next transcript page" }));
+
+    expect(await screen.findByText("I would use idempotency keys.")).toBeInTheDocument();
+    expect(screen.queryByText("How would you design retries?")).not.toBeInTheDocument();
+    expect(tauri.listTranscriptPage).toHaveBeenCalledWith("s1", {
+      cursor: { timestampMs: 1000, id: 1 },
+      direction: "after",
+      limit: 100
+    });
+
+    await user.click(screen.getByRole("button", { name: "Previous transcript page" }));
+
+    expect(await screen.findByText("How would you design retries?")).toBeInTheDocument();
+    expect(tauri.listTranscriptPage).toHaveBeenCalledWith("s1", {
+      cursor: { timestampMs: 2500, id: 2 },
+      direction: "before",
+      limit: 100
+    });
   });
 });

@@ -2,7 +2,7 @@ use tauri::{AppHandle, Manager, State};
 
 use crate::ai;
 use crate::audio::{self, AudioCaptureManager, AudioCaptureState, AudioProcessingSettings};
-use crate::db::{Database, NewAiResponse, NewSession};
+use crate::db::{Database, NewAiResponse, NewSession, TranscriptCursor, TranscriptPage};
 use crate::models::{AiResponse, PromptTemplate, Session, Transcript};
 use crate::ocr;
 use crate::ocr::ScreenFrame;
@@ -43,6 +43,24 @@ pub fn list_transcripts(
 ) -> Result<Vec<Transcript>, String> {
     database
         .list_transcripts(&session_id)
+        .map_err(to_command_error)
+}
+
+#[tauri::command]
+pub fn list_transcripts_page(
+    database: State<'_, Database>,
+    session_id: String,
+    cursor: Option<TranscriptCursor>,
+    direction: Option<String>,
+    limit: Option<i64>,
+) -> Result<TranscriptPage, String> {
+    database
+        .list_transcripts_page(
+            &session_id,
+            cursor,
+            direction.as_deref().unwrap_or("after"),
+            limit.unwrap_or(100),
+        )
         .map_err(to_command_error)
 }
 

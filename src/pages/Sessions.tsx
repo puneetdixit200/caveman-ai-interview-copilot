@@ -6,8 +6,17 @@ import { calculateSessionAnalytics } from "../lib/analytics";
 import { downloadSessionPdf, exportSessionJson, exportSessionMarkdown } from "../lib/sessionExport";
 import { filterSessionSummaries } from "../lib/sessionSearch";
 import { formatDuration, formatTimestampMs } from "../lib/formatters";
-import { deleteTranscript, listAiResponses, listSessions, listTranscripts, updateTranscript } from "../lib/tauri";
-import type { AIResponseRecord, SessionRecord, Speaker, TranscriptSegment } from "../types/session";
+import {
+  deleteTranscript,
+  listAiResponses,
+  listSessions,
+  listTranscriptPage,
+  listTranscripts,
+  updateTranscript
+} from "../lib/tauri";
+import type { AIResponseRecord, SessionRecord, Speaker, TranscriptCursor, TranscriptPage, TranscriptSegment } from "../types/session";
+
+const TRANSCRIPT_PAGE_LIMIT = 100;
 
 interface TranscriptCorrectionDraft {
   speaker: Speaker;
@@ -29,6 +38,7 @@ export function Sessions() {
   const [status, setStatus] = useState("Loading sessions...");
   const [editingTranscriptId, setEditingTranscriptId] = useState<number | null>(null);
   const [transcriptDraft, setTranscriptDraft] = useState<TranscriptCorrectionDraft | null>(null);
+  const [transcriptPage, setTranscriptPage] = useState<TranscriptPage | null>(null);
 
   const filteredSessions = useMemo(
     () => filterSessionSummaries({ query, sessions, transcriptsBySession, responsesBySession }),
@@ -142,16 +152,18 @@ export function Sessions() {
       if (!selectedSession) {
         setTranscripts([]);
         setResponses([]);
+        setTranscriptPage(null);
         return;
       }
 
-      const [sessionTranscripts, sessionResponses] = await Promise.all([
-        listTranscripts(selectedSession.id),
+      const [sessionTranscriptPage, sessionResponses] = await Promise.all([
+        listTranscriptPage(selectedSession.id, { limit: TRANSCRIPT_PAGE_LIMIT }),
         listAiResponses(selectedSession.id)
       ]);
 
       if (!cancelled) {
-        setTranscripts(sessionTranscripts);
+        setTranscripts(sessionTranscriptPage.items);
+        setTranscriptPage(sessionTranscriptPage);
         setResponses(sessionResponses);
         setEditingTranscriptId(null);
         setTranscriptDraft(null);
@@ -166,12 +178,20 @@ export function Sessions() {
   }, [selectedSession?.id]);
 
   async function copyMarkdownExport() {
-    await navigator.clipboard?.writeText(markdownExport);
+    const fullTranscripts = await loadFullSelectedTranscripts();
+    const exportText = selectedSession
+      ? exportSessionMarkdown({ session: selectedSession, transcripts: fullTranscripts, responses })
+      : markdownExport;
+    await navigator.clipboard?.writeText(exportText);
     setStatus("Markdown export copied");
   }
 
   async function copyJsonExport() {
-    await navigator.clipboard?.writeText(jsonExport);
+    const fullTranscripts = await loadFullSelectedTranscripts();
+    const exportText = selectedSession
+      ? exportSessionJson({ session: selectedSession, transcripts: fullTranscripts, responses })
+      : jsonExport;
+    await navigator.clipboard?.writeText(exportText);
     setStatus("JSON export copied");
   }
 
@@ -180,8 +200,36 @@ export function Sessions() {
       return;
     }
 
-    await downloadSessionPdf({ session: selectedSession, transcripts, responses });
+    await downloadSessionPdf({ session: selectedSession, transcripts: await loadFullSelectedTranscripts(), responses });
     setStatus("PDF export saved");
+  }
+
+  async function loadFullSelectedTranscripts(): Promise<TranscriptSegment[]> {
+    if (!selectedSession) {
+      return [];
+    }
+
+    return listTranscripts(selectedSession.id);
+  }
+
+  async function loadTranscriptReplayPage(input: {
+    cursor?: TranscriptCursor;
+    direction?: "before" | "after";
+  }) {
+    if (!selectedSession) {
+      return;
+    }
+
+    const page = await listTranscriptPage(selectedSession.id, {
+      limit: TRANSCRIPT_PAGE_LIMIT,
+      cursor: input.cursor,
+      direction: input.direction
+    });
+    setTranscripts(page.items);
+    setTranscriptPage(page);
+    setEditingTranscriptId(null);
+    setTranscriptDraft(null);
+    setStatus(`Loaded transcript page with ${page.items.length} line${page.items.length === 1 ? "" : "s"}`);
   }
 
   function startTranscriptCorrection(segment: TranscriptSegment) {
@@ -234,6 +282,7 @@ export function Sessions() {
       transcripts.map((item) => (item.id === corrected.id ? corrected : item))
     );
     setTranscripts(nextTranscripts);
+    setTranscriptPage((current) => (current ? buildTranscriptPageFromCurrentItems(current, nextTranscripts) : current));
     syncTranscriptCaches(corrected.sessionId, nextTranscripts);
     setEditingTranscriptId(null);
     setTranscriptDraft(null);
@@ -244,6 +293,11 @@ export function Sessions() {
     await deleteTranscript(segment.id);
     const nextTranscripts = transcripts.filter((item) => item.id !== segment.id);
     setTranscripts(nextTranscripts);
+    setTranscriptPage((current) =>
+      current
+        ? buildTranscriptPageFromCurrentItems(current, nextTranscripts, Math.max(0, current.totalCount - 1))
+        : current
+    );
     syncTranscriptCaches(segment.sessionId, nextTranscripts);
     if (editingTranscriptId === segment.id) {
       setEditingTranscriptId(null);
@@ -359,6 +413,35 @@ export function Sessions() {
         <div className="replay-grid">
           <div className="replay-column">
             <h3>Transcript</h3>
+            <div className="transcript-pagination">
+              <p>{transcriptPageSummary(transcriptPage, transcripts.length)}</p>
+              <div className="button-row">
+                <Button
+                  aria-label="Previous transcript page"
+                  disabled={!transcriptPage?.hasMoreBefore || !transcriptPage.previousCursor}
+                  onClick={() =>
+                    void loadTranscriptReplayPage({
+                      cursor: transcriptPage?.previousCursor,
+                      direction: "before"
+                    })
+                  }
+                >
+                  Previous
+                </Button>
+                <Button
+                  aria-label="Next transcript page"
+                  disabled={!transcriptPage?.hasMoreAfter || !transcriptPage.nextCursor}
+                  onClick={() =>
+                    void loadTranscriptReplayPage({
+                      cursor: transcriptPage?.nextCursor,
+                      direction: "after"
+                    })
+                  }
+                >
+                  Next
+                </Button>
+              </div>
+            </div>
             <div className="transcript-feed">
               {transcripts.length > 0 ? (
                 transcripts.map((segment) => (
@@ -500,6 +583,33 @@ export function Sessions() {
 
 function sortTranscriptSegments(transcripts: TranscriptSegment[]): TranscriptSegment[] {
   return [...transcripts].sort((left, right) => left.timestampMs - right.timestampMs || left.id - right.id);
+}
+
+function buildTranscriptPageFromCurrentItems(
+  current: TranscriptPage,
+  items: TranscriptSegment[],
+  totalCount = current.totalCount
+): TranscriptPage {
+  return {
+    ...current,
+    items,
+    totalCount,
+    previousCursor: transcriptCursorFor(items[0]),
+    nextCursor: transcriptCursorFor(items[items.length - 1])
+  };
+}
+
+function transcriptCursorFor(segment: TranscriptSegment | undefined): TranscriptCursor | undefined {
+  return segment ? { timestampMs: segment.timestampMs, id: segment.id } : undefined;
+}
+
+function transcriptPageSummary(page: TranscriptPage | null, visibleCount: number): string {
+  if (!page) {
+    return "No transcript page loaded";
+  }
+
+  const lineLabel = visibleCount === 1 ? "transcript line" : "transcript lines";
+  return `Showing ${visibleCount} ${lineLabel} of ${page.totalCount}`;
 }
 
 function readOptionalConfidence(value: string): number | undefined | null {

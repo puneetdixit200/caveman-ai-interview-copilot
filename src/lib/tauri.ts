@@ -7,6 +7,8 @@ import type {
   NewSessionInput,
   SessionRecord,
   SttTranscriptEvent,
+  TranscriptCursor,
+  TranscriptPage,
   TranscriptSegment
 } from "../types/session";
 import type { AudioDevice, OverlayWindowBounds } from "../types/settings";
@@ -191,6 +193,41 @@ export async function listTranscripts(sessionId: string): Promise<TranscriptSegm
   return invokeOrFallback<TranscriptSegment[]>("list_transcripts", { sessionId }, () => []);
 }
 
+export async function listTranscriptPage(
+  sessionId: string,
+  options: {
+    limit?: number;
+    cursor?: TranscriptCursor;
+    direction?: "before" | "after";
+  } = {}
+): Promise<TranscriptPage> {
+  return invokeOrFallback<TranscriptPage>(
+    "list_transcripts_page",
+    {
+      sessionId,
+      limit: options.limit,
+      cursor: options.cursor,
+      direction: options.direction
+    },
+    async () => {
+      const allTranscripts = await listTranscripts(sessionId);
+      const limit = Math.max(1, Math.min(500, options.limit ?? 100));
+      const cursorIndex = options.cursor
+        ? allTranscripts.findIndex(
+            (segment) => segment.timestampMs === options.cursor?.timestampMs && segment.id === options.cursor?.id
+          )
+        : -1;
+      const start =
+        options.direction === "before"
+          ? Math.max(0, (cursorIndex >= 0 ? cursorIndex : allTranscripts.length) - limit)
+          : Math.max(0, cursorIndex + 1);
+      const items = allTranscripts.slice(start, start + limit);
+
+      return buildFallbackTranscriptPage(items, allTranscripts.length, start, limit);
+    }
+  );
+}
+
 export async function updateTranscript(input: {
   id: number;
   speaker: TranscriptSegment["speaker"];
@@ -221,6 +258,26 @@ export async function updateTranscript(input: {
 
 export async function deleteTranscript(id: number): Promise<void> {
   return invokeOrFallback<void>("delete_transcript", { id }, () => undefined);
+}
+
+function buildFallbackTranscriptPage(
+  items: TranscriptSegment[],
+  totalCount: number,
+  start: number,
+  limit: number
+): TranscriptPage {
+  return {
+    items,
+    totalCount,
+    hasMoreBefore: start > 0,
+    hasMoreAfter: start + limit < totalCount,
+    previousCursor: transcriptCursorFor(items[0]),
+    nextCursor: transcriptCursorFor(items[items.length - 1])
+  };
+}
+
+function transcriptCursorFor(segment: TranscriptSegment | undefined): TranscriptCursor | undefined {
+  return segment ? { timestampMs: segment.timestampMs, id: segment.id } : undefined;
 }
 
 export async function addAiResponse(input: NewAIResponseInput): Promise<AIResponseRecord> {

@@ -39,6 +39,20 @@ export interface TranscriptSegment {
   createdAt?: string;
 }
 
+export interface TranscriptCursor {
+  timestampMs: number;
+  id: number;
+}
+
+export interface TranscriptPage {
+  items: TranscriptSegment[];
+  totalCount: number;
+  hasMoreBefore: boolean;
+  hasMoreAfter: boolean;
+  previousCursor?: TranscriptCursor;
+  nextCursor?: TranscriptCursor;
+}
+
 export interface SttTranscriptEvent {
   speaker: Speaker;
   providerSpeaker?: string;

@@ -34,6 +34,24 @@ pub struct NewAiResponse {
     pub latency_ms: Option<i64>,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct TranscriptCursor {
+    pub timestamp_ms: i64,
+    pub id: i64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct TranscriptPage {
+    pub items: Vec<Transcript>,
+    pub total_count: i64,
+    pub has_more_before: bool,
+    pub has_more_after: bool,
+    pub previous_cursor: Option<TranscriptCursor>,
+    pub next_cursor: Option<TranscriptCursor>,
+}
+
 pub struct Database {
     connection: Mutex<Connection>,
 }
@@ -129,6 +147,101 @@ impl Database {
         let rows = statement.query_map(params![session_id], map_transcript)?;
         rows.collect::<rusqlite::Result<Vec<_>>>()
             .map_err(Into::into)
+    }
+
+    pub fn list_transcripts_page(
+        &self,
+        session_id: &str,
+        cursor: Option<TranscriptCursor>,
+        direction: &str,
+        limit: i64,
+    ) -> Result<TranscriptPage> {
+        let limit = limit.clamp(1, 500);
+        let fetch_limit = limit + 1;
+        let direction = if direction == "before" {
+            "before"
+        } else {
+            "after"
+        };
+        let connection = self.lock()?;
+        let total_count = connection.query_row(
+            "SELECT COUNT(*) FROM transcripts WHERE session_id = ?1",
+            params![session_id],
+            |row| row.get::<_, i64>(0),
+        )?;
+
+        let mut items = match (direction, cursor.as_ref()) {
+            ("before", Some(cursor)) => {
+                let mut statement = connection.prepare(
+                    "SELECT id, session_id, speaker, content, confidence, timestamp_ms, created_at
+                     FROM transcripts
+                     WHERE session_id = ?1
+                       AND (timestamp_ms < ?2 OR (timestamp_ms = ?2 AND id < ?3))
+                     ORDER BY timestamp_ms DESC, id DESC
+                     LIMIT ?4",
+                )?;
+                let rows = statement.query_map(
+                    params![session_id, cursor.timestamp_ms, cursor.id, fetch_limit],
+                    map_transcript,
+                )?;
+                let mut rows = rows.collect::<rusqlite::Result<Vec<_>>>()?;
+                rows.reverse();
+                rows
+            }
+            ("after", Some(cursor)) => {
+                let mut statement = connection.prepare(
+                    "SELECT id, session_id, speaker, content, confidence, timestamp_ms, created_at
+                     FROM transcripts
+                     WHERE session_id = ?1
+                       AND (timestamp_ms > ?2 OR (timestamp_ms = ?2 AND id > ?3))
+                     ORDER BY timestamp_ms ASC, id ASC
+                     LIMIT ?4",
+                )?;
+                let rows = statement.query_map(
+                    params![session_id, cursor.timestamp_ms, cursor.id, fetch_limit],
+                    map_transcript,
+                )?;
+                rows.collect::<rusqlite::Result<Vec<_>>>()?
+            }
+            _ => {
+                let mut statement = connection.prepare(
+                    "SELECT id, session_id, speaker, content, confidence, timestamp_ms, created_at
+                     FROM transcripts
+                     WHERE session_id = ?1
+                     ORDER BY timestamp_ms ASC, id ASC
+                     LIMIT ?2",
+                )?;
+                let rows = statement.query_map(params![session_id, fetch_limit], map_transcript)?;
+                rows.collect::<rusqlite::Result<Vec<_>>>()?
+            }
+        };
+
+        let fetched_extra = items.len() > limit as usize;
+        if direction == "before" && fetched_extra {
+            items.remove(0);
+        } else if fetched_extra {
+            items.truncate(limit as usize);
+        }
+
+        let previous_cursor = items.first().map(transcript_cursor);
+        let next_cursor = items.last().map(transcript_cursor);
+        let has_more_before = match previous_cursor.as_ref() {
+            Some(cursor) => has_transcript_before(&connection, session_id, cursor)?,
+            None => false,
+        };
+        let has_more_after = match next_cursor.as_ref() {
+            Some(cursor) => has_transcript_after(&connection, session_id, cursor)?,
+            None => false,
+        };
+
+        Ok(TranscriptPage {
+            items,
+            total_count,
+            has_more_before,
+            has_more_after,
+            previous_cursor,
+            next_cursor,
+        })
     }
 
     pub fn update_transcript(
@@ -389,6 +502,47 @@ fn map_transcript(row: &rusqlite::Row<'_>) -> rusqlite::Result<Transcript> {
         timestamp_ms: row.get(5)?,
         created_at: row.get(6)?,
     })
+}
+
+fn transcript_cursor(transcript: &Transcript) -> TranscriptCursor {
+    TranscriptCursor {
+        timestamp_ms: transcript.timestamp_ms,
+        id: transcript.id,
+    }
+}
+
+fn has_transcript_before(
+    connection: &Connection,
+    session_id: &str,
+    cursor: &TranscriptCursor,
+) -> rusqlite::Result<bool> {
+    connection.query_row(
+        "SELECT EXISTS(
+            SELECT 1 FROM transcripts
+            WHERE session_id = ?1
+              AND (timestamp_ms < ?2 OR (timestamp_ms = ?2 AND id < ?3))
+            LIMIT 1
+        )",
+        params![session_id, cursor.timestamp_ms, cursor.id],
+        |row| row.get::<_, bool>(0),
+    )
+}
+
+fn has_transcript_after(
+    connection: &Connection,
+    session_id: &str,
+    cursor: &TranscriptCursor,
+) -> rusqlite::Result<bool> {
+    connection.query_row(
+        "SELECT EXISTS(
+            SELECT 1 FROM transcripts
+            WHERE session_id = ?1
+              AND (timestamp_ms > ?2 OR (timestamp_ms = ?2 AND id > ?3))
+            LIMIT 1
+        )",
+        params![session_id, cursor.timestamp_ms, cursor.id],
+        |row| row.get::<_, bool>(0),
+    )
 }
 
 fn map_ai_response(row: &rusqlite::Row<'_>) -> rusqlite::Result<AiResponse> {

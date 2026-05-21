@@ -457,6 +457,21 @@ h2 {
   overflow: auto;
 }
 
+.transcript-pagination {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.transcript-pagination p {
+  color: var(--muted);
+  font-size: 0.84rem;
+  font-weight: 700;
+}
+
 .transcript-row {
   border-left: 3px solid var(--blue);
   padding: 10px 10px 10px 12px;

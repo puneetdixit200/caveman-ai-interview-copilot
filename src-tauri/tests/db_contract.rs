@@ -1,4 +1,4 @@
-use caveman_lib::db::{Database, NewAiResponse, NewSession};
+use caveman_lib::db::{Database, NewAiResponse, NewSession, TranscriptCursor};
 
 #[test]
 fn session_and_transcript_records_round_trip_through_sqlite() {
@@ -79,6 +79,67 @@ fn transcript_records_can_be_corrected_and_deleted() {
         .list_transcripts(&session.id)
         .expect("list transcripts")
         .is_empty());
+}
+
+#[test]
+fn transcript_records_page_by_timestamp_cursor() {
+    let db = Database::in_memory().expect("in-memory database");
+    let session = db
+        .create_session(NewSession {
+            title: "Long Replay".to_string(),
+            company: None,
+            role: None,
+            interview_type: "mixed".to_string(),
+            tags: vec![],
+            notes: None,
+        })
+        .expect("create session");
+
+    let first = db
+        .add_transcript(&session.id, "interviewer", "Question one?", 1000, None)
+        .expect("add first transcript");
+    let second = db
+        .add_transcript(&session.id, "candidate", "Answer one.", 2000, None)
+        .expect("add second transcript");
+    let third = db
+        .add_transcript(&session.id, "interviewer", "Question two?", 3000, None)
+        .expect("add third transcript");
+
+    let first_page = db
+        .list_transcripts_page(&session.id, None, "after", 2)
+        .expect("first page");
+
+    assert_eq!(first_page.items.len(), 2);
+    assert_eq!(first_page.total_count, 3);
+    assert_eq!(first_page.items[0].id, first.id);
+    assert_eq!(first_page.items[1].id, second.id);
+    assert!(!first_page.has_more_before);
+    assert!(first_page.has_more_after);
+
+    let next_page = db
+        .list_transcripts_page(
+            &session.id,
+            Some(TranscriptCursor {
+                timestamp_ms: second.timestamp_ms,
+                id: second.id,
+            }),
+            "after",
+            2,
+        )
+        .expect("next page");
+
+    assert_eq!(next_page.items.len(), 1);
+    assert_eq!(next_page.items[0].id, third.id);
+    assert!(next_page.has_more_before);
+    assert!(!next_page.has_more_after);
+
+    let previous_page = db
+        .list_transcripts_page(&session.id, next_page.previous_cursor.clone(), "before", 2)
+        .expect("previous page");
+
+    assert_eq!(previous_page.items.len(), 2);
+    assert_eq!(previous_page.items[0].id, first.id);
+    assert_eq!(previous_page.items[1].id, second.id);
 }
 
 #[test]
