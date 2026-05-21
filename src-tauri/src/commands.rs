@@ -11,6 +11,7 @@ use crate::ocr;
 use crate::ocr::ScreenFrame;
 use crate::overlay::{OverlayProtectionStatus, OverlayWindowBounds};
 use crate::plugins::PluginManifestFile;
+use crate::screen_share::ScreenShareStatus;
 use crate::secrets::SecretStatus;
 use crate::stt;
 use crate::typing;
@@ -316,6 +317,11 @@ pub fn set_overlay_window_bounds(
         capture_exclusion_enabled.unwrap_or(true),
     )
     .map_err(to_command_error)
+}
+
+#[tauri::command]
+pub fn detect_screen_share_status() -> Result<ScreenShareStatus, String> {
+    crate::screen_share::detect_screen_share_status().map_err(to_command_error)
 }
 
 #[tauri::command]

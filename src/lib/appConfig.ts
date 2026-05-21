@@ -157,7 +157,7 @@ export const DEFAULT_APP_CONFIG: AppConfig = {
   },
   stt: {
     selectedMode: "manual",
-    language: "en",
+    language: "auto",
     diarizationEnabled: true,
     speakerCalibration: DEFAULT_SPEAKER_CALIBRATION,
     localWhisperBinaryPath: "",

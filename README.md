@@ -21,14 +21,14 @@ Implemented now:
 - Tauri v2 desktop app with Rust backend and React frontend
 - Dashboard for active interview sessions
 - Native CPAL microphone, system audio, and dual-stream capture with device selection, gain, noise gate, meters, STT-ready 16 kHz mono snapshots, and 250 ms PCM chunk events for streaming STT clients
-- Local Whisper chunk-driven streaming from 250 ms PCM audio, Deepgram live WebSocket streaming with interim word preview, plus AssemblyAI and Google STT fallback commands
+- Local Whisper chunk-driven streaming from 250 ms PCM audio, Deepgram live WebSocket streaming with interim word preview, AssemblyAI and Google STT fallback commands, and first-class STT auto language detection
 - Speaker diarization calibration for microphone, system audio, and provider speaker slots from Whisper, Deepgram, AssemblyAI, and Google STT
 - Local Whisper setup helpers that scan for `whisper-cli`/`main` binaries, detect local `ggml` models, and download the official `base.en` model with SHA-1 verification
 - Automatic interviewer question detection and answer triggering from live transcript updates
 - Token-budgeted context window management with history turn limits, supplemental context trimming, and reserved answer tokens
 - Prompt templates for DSA/coding, system design, frontend, backend, DevOps/cloud, behavioral, and HR/culture-fit interviews
 - Ollama, LM Studio, OpenRouter, OpenAI, Anthropic, Groq, Google Gemini, Mistral, Together AI, and Fireworks AI provider routing with streaming fallback and Settings model discovery
-- Stealth overlay window with opacity, font controls, global hotkeys, click-through mode, position persistence, and Windows capture exclusion
+- Stealth overlay window with opacity, font controls, global hotkeys, click-through mode, position persistence, Windows capture exclusion, and a screen-sharing process auto-hide guard
 - Dashboard session setup for company, role, interview type, tags, and notes, plus archive search, cursor-paged replay, transcript correction, Markdown, JSON, and PDF export
 - Trusted collaborative helper link with token-gated live transcript/answer snapshot sharing and inbound helper hints
 - Resume, job description, OCR, and local knowledge-base context injection
@@ -50,7 +50,7 @@ Caveman is designed to capture conversation audio, transcribe it, detect intervi
 
 ### Stealth Overlay
 
-The overlay is designed for interview use: always on top, adjustable opacity, adjustable font size, fast hide/show, markdown rendering, and Windows screen-capture exclusion when supported by the operating system.
+The overlay is designed for interview use: always on top, adjustable opacity, adjustable font size, fast hide/show, markdown rendering, Windows screen-capture exclusion when supported by the operating system, and optional auto-hide while known conferencing or recording processes are running.
 
 ### Local-First AI Workflow
 

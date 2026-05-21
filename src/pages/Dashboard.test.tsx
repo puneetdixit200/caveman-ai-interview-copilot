@@ -36,6 +36,10 @@ vi.mock("../lib/tauri", () => ({
   getProviderApiKey: vi.fn(async () => undefined),
   getSetting: vi.fn(async () => undefined),
   isRunningInTauri: vi.fn(() => false),
+  detectScreenShareStatus: vi.fn(async () => ({
+    active: false,
+    matchedProcesses: []
+  })),
   listAudioDevices: vi.fn(async () => []),
   listAiResponses: vi.fn(async () => [
     {
@@ -268,6 +272,39 @@ describe("Dashboard collaboration helper", () => {
     expect(await screen.findByText("Live Interview Session")).toBeInTheDocument();
     await waitFor(() => expect(tauri.protectOverlayWindow).toHaveBeenCalledWith(false));
     expect(await screen.findByText("Capture disabled")).toBeInTheDocument();
+  });
+
+  it("auto-hides the overlay when a screen sharing process is detected", async () => {
+    vi.mocked(tauri.getSetting)
+      .mockResolvedValueOnce(
+        serializeAppConfig({
+          ...DEFAULT_APP_CONFIG,
+          overlay: {
+            ...DEFAULT_APP_CONFIG.overlay,
+            autoHideOnScreenShare: true
+          }
+        })
+      )
+      .mockResolvedValueOnce(undefined)
+      .mockResolvedValueOnce(undefined);
+    vi.mocked(tauri.protectOverlayWindow).mockResolvedValueOnce({
+      alwaysOnTop: true,
+      skipTaskbar: true,
+      captureExclusion: "enabled",
+      clickThrough: true,
+      visible: true
+    });
+    vi.mocked(tauri.detectScreenShareStatus).mockResolvedValueOnce({
+      active: true,
+      matchedProcesses: [{ name: "zoom.exe", pid: 4242 }]
+    });
+
+    render(<Dashboard />);
+
+    expect(await screen.findByText("Live Interview Session")).toBeInTheDocument();
+    await waitFor(() => expect(tauri.detectScreenShareStatus).toHaveBeenCalled());
+    expect(await screen.findByText("Overlay hidden because screen sharing process is running: zoom.exe.")).toBeInTheDocument();
+    expect(tauri.setOverlayWindowVisible).toHaveBeenCalledWith(false, true);
   });
 
   it("does not arm Deepgram streaming while local-only mode blocks cloud calls", async () => {

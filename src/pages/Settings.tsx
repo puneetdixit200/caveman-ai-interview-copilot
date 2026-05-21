@@ -90,6 +90,20 @@ const SPEAKER_ROLE_OPTIONS: Array<{ value: Speaker; label: string }> = [
   { value: "unknown", label: "Unknown" }
 ];
 
+const STT_LANGUAGE_OPTIONS = [
+  { value: "auto", label: "Auto detect" },
+  { value: "en-US", label: "English (US)" },
+  { value: "en", label: "English" },
+  { value: "hi-IN", label: "Hindi (India)" },
+  { value: "es-ES", label: "Spanish (Spain)" },
+  { value: "fr-FR", label: "French (France)" },
+  { value: "de-DE", label: "German (Germany)" },
+  { value: "pt-BR", label: "Portuguese (Brazil)" },
+  { value: "ja-JP", label: "Japanese" },
+  { value: "ko-KR", label: "Korean" },
+  { value: "zh-CN", label: "Chinese (Simplified)" }
+];
+
 export function Settings() {
   const [config, setConfig] = useState<AppConfig>(DEFAULT_APP_CONFIG);
   const [status, setStatus] = useState("Loading settings...");
@@ -1519,12 +1533,17 @@ export function Settings() {
             />
           </label>
           <label className="settings-field">
-            <span>Language</span>
-            <input
-              value={config.stt.language}
-              placeholder="auto or en-US"
+            <span>STT language</span>
+            <select
+              value={normalizeSttLanguage(config.stt.language)}
               onChange={(event) => updateStt({ language: event.currentTarget.value })}
-            />
+            >
+              {sttLanguageOptions(config.stt.language).map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
           </label>
           <label className="toggle-row">
             <span>Diarization labels</span>
@@ -1959,6 +1978,15 @@ function sttSecretProviderId(mode: "deepgram" | "assemblyai" | "google"): string
 
 function normalizeSttLanguage(language: string): string {
   return language.trim() || "auto";
+}
+
+function sttLanguageOptions(language: string): Array<{ value: string; label: string }> {
+  const current = normalizeSttLanguage(language);
+  if (STT_LANGUAGE_OPTIONS.some((option) => option.value === current)) {
+    return STT_LANGUAGE_OPTIONS;
+  }
+
+  return [...STT_LANGUAGE_OPTIONS, { value: current, label: current }];
 }
 
 function isCloudBlocked(config: AppConfig): boolean {

@@ -7,6 +7,7 @@ pub mod models;
 pub mod ocr;
 pub mod overlay;
 pub mod plugins;
+pub mod screen_share;
 pub mod secrets;
 pub mod stt;
 pub mod typing;
@@ -59,6 +60,7 @@ pub fn run() {
             commands::set_overlay_window_visible,
             commands::get_overlay_window_bounds,
             commands::set_overlay_window_bounds,
+            commands::detect_screen_share_status,
             commands::list_prompt_templates,
             commands::load_plugin_manifests,
             commands::capture_screen_frame,

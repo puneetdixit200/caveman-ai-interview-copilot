@@ -206,7 +206,7 @@ describe("appConfig", () => {
     expect(config.stt).toMatchObject({
       selectedMode: "manual",
       diarizationEnabled: true,
-      language: "en",
+      language: "auto",
       speakerCalibration: {
         systemAudioSpeaker: "interviewer",
         microphoneSpeaker: "candidate",

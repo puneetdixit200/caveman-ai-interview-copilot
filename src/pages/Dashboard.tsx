@@ -41,6 +41,7 @@ import {
   addTranscript,
   clearCollaborationHint,
   createSession,
+  detectScreenShareStatus,
   getCaptureStatus,
   getCollaborationStatus,
   getSetting,
@@ -76,7 +77,7 @@ import type {
 import type { AudioDevice } from "../types/settings";
 import type { CollaborationHint, CollaborationServerStatus, CollaborationSnapshot } from "../types/collaboration";
 import type { AppConfig } from "../lib/appConfig";
-import type { OverlayProtectionStatus } from "../lib/tauri";
+import type { OverlayProtectionStatus, ScreenShareStatus } from "../lib/tauri";
 
 const TEMP_STREAM_ID = -1;
 const DEFAULT_CAPTURE_STATUS: AudioCaptureState = {
@@ -117,6 +118,7 @@ export function Dashboard() {
   const [audioDevices, setAudioDevices] = useState<AudioDevice[]>([]);
   const [captureStatus, setCaptureStatus] = useState<AudioCaptureState>(DEFAULT_CAPTURE_STATUS);
   const [overlayProtection, setOverlayProtection] = useState<OverlayProtectionStatus | null>(null);
+  const [screenShareStatus, setScreenShareStatus] = useState<ScreenShareStatus | null>(null);
   const [overlayShortcut, setOverlayShortcut] = useState(DEFAULT_OVERLAY_SHORTCUT);
   const [overlayMessage, setOverlayMessage] = useState<string | null>(null);
   const [config, setConfig] = useState<AppConfig>(DEFAULT_APP_CONFIG);
@@ -168,16 +170,22 @@ export function Dashboard() {
       }
       setVisible(nextVisible);
       const status = await setOverlayWindowVisible(nextVisible, config.security.captureExclusionEnabled);
+      const guardStatus =
+        nextVisible && config.overlay.autoHideOnScreenShare ? await detectScreenShareStatus() : null;
+      if (guardStatus) {
+        setScreenShareStatus(guardStatus);
+      }
       if (
         nextVisible &&
         shouldAutoHideOverlay({
           autoHideOnScreenShare: config.overlay.autoHideOnScreenShare,
-          captureExclusion: status.captureExclusion
+          captureExclusion: status.captureExclusion,
+          screenShareDetected: guardStatus?.active ?? false
         })
       ) {
         const hiddenStatus = await setOverlayWindowVisible(false, config.security.captureExclusionEnabled);
         setOverlayProtection(hiddenStatus);
-        setOverlayMessage("Overlay hidden because capture exclusion is not enabled.");
+        setOverlayMessage(overlayAutoHideMessage(guardStatus));
         setVisible(false);
         return;
       }
@@ -316,22 +324,32 @@ export function Dashboard() {
     }
 
     let cancelled = false;
+    let intervalId: number | undefined;
 
-    protectOverlayWindow(config.security.captureExclusionEnabled).then(async (status) => {
+    async function applyOverlayProtection() {
+      const status = await protectOverlayWindow(config.security.captureExclusionEnabled);
       if (cancelled) {
         return;
+      }
+      const guardStatus = config.overlay.autoHideOnScreenShare ? await detectScreenShareStatus() : null;
+      if (cancelled) {
+        return;
+      }
+      if (guardStatus) {
+        setScreenShareStatus(guardStatus);
       }
 
       if (
         shouldAutoHideOverlay({
           autoHideOnScreenShare: config.overlay.autoHideOnScreenShare,
-          captureExclusion: status.captureExclusion
+          captureExclusion: status.captureExclusion,
+          screenShareDetected: guardStatus?.active ?? false
         })
       ) {
         const hiddenStatus = await setOverlayWindowVisible(false, config.security.captureExclusionEnabled);
         if (!cancelled) {
           setOverlayProtection(hiddenStatus);
-          setOverlayMessage("Overlay hidden because capture exclusion is not enabled.");
+          setOverlayMessage(overlayAutoHideMessage(guardStatus));
           setVisible(false);
         }
         return;
@@ -342,10 +360,20 @@ export function Dashboard() {
       if (isRunningInTauri()) {
         setVisible(status.visible);
       }
-    });
+    }
+
+    void applyOverlayProtection();
+    if (config.overlay.autoHideOnScreenShare) {
+      intervalId = window.setInterval(() => {
+        void applyOverlayProtection();
+      }, 5000);
+    }
 
     return () => {
       cancelled = true;
+      if (intervalId !== undefined) {
+        window.clearInterval(intervalId);
+      }
     };
   }, [config.overlay.autoHideOnScreenShare, config.security.captureExclusionEnabled, settingsLoaded, setVisible]);
 
@@ -1347,6 +1375,7 @@ export function Dashboard() {
             Capture {overlayProtection?.captureExclusion ?? "checking"}
           </span>
           <span>Click-through {overlayProtection?.clickThrough ? "on" : "off"}</span>
+          <span>Share guard {screenShareStatus?.active ? "detected" : "clear"}</span>
         </div>
         {overlayMessage ? <p className="overlay-runtime-message">{overlayMessage}</p> : null}
         <OverlayWindow responses={responses} transcripts={transcripts} />
@@ -1427,6 +1456,18 @@ function buildPromptMessages(
 
 function isCloudBlocked(config: AppConfig): boolean {
   return config.security.localOnlyMode && config.security.blockCloudWhenLocalOnly;
+}
+
+function overlayAutoHideMessage(screenShareStatus: ScreenShareStatus | null): string {
+  if (screenShareStatus?.active) {
+    return `Overlay hidden because screen sharing process is running: ${screenShareProcessNames(screenShareStatus)}.`;
+  }
+
+  return "Overlay hidden because capture exclusion is not enabled.";
+}
+
+function screenShareProcessNames(screenShareStatus: ScreenShareStatus): string {
+  return screenShareStatus.matchedProcesses.map((process) => process.name).join(", ") || "unknown";
 }
 
 function buildCollaborationSnapshot(

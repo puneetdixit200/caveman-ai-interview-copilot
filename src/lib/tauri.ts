@@ -24,6 +24,17 @@ export interface OverlayProtectionStatus {
   message?: string | null;
 }
 
+export interface ScreenShareProcess {
+  name: string;
+  pid?: number | null;
+}
+
+export interface ScreenShareStatus {
+  active: boolean;
+  matchedProcesses: ScreenShareProcess[];
+  message?: string | null;
+}
+
 export interface SecretStatus {
   providerId: string;
   stored: boolean;
@@ -529,6 +540,14 @@ export async function setOverlayWindowBounds(
     { bounds, captureExclusionEnabled },
     () => bounds
   );
+}
+
+export async function detectScreenShareStatus(): Promise<ScreenShareStatus> {
+  return invokeOrFallback<ScreenShareStatus>("detect_screen_share_status", {}, () => ({
+    active: false,
+    matchedProcesses: [],
+    message: "Native screen-share process detection is available only inside the Caveman desktop app."
+  }));
 }
 
 export async function loadPluginManifests(directory: string): Promise<PluginManifestFile[]> {

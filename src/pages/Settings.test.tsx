@@ -79,6 +79,14 @@ describe("Settings", () => {
     expect(screen.getByRole("button", { name: "Delete STT Key" })).toBeInTheDocument();
   });
 
+  it("makes automatic STT language detection a first-class setting", async () => {
+    render(<Settings />);
+
+    const languageSelect = await screen.findByRole("combobox", { name: "STT language" });
+    expect(languageSelect).toHaveValue("auto");
+    expect(screen.getByRole("option", { name: "Auto detect" })).toBeInTheDocument();
+  });
+
   it("shows local Whisper setup helper controls", async () => {
     render(<Settings />);
 
