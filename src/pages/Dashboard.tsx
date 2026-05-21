@@ -10,6 +10,7 @@ import { applyAudioLevelEvent, type AudioCaptureState } from "../lib/audioEvents
 import { shouldTriggerAnswer } from "../lib/autoTrigger";
 import { buildChatMessages } from "../lib/contextBuilder";
 import { DeepgramLiveTranscriber } from "../lib/deepgramStreaming";
+import { LocalWhisperChunkTranscriber } from "../lib/localWhisperStreaming";
 import { canSendOcrContext } from "../lib/ocr";
 import { registerGlobalActionShortcuts } from "../lib/globalHotkeys";
 import { DEFAULT_OVERLAY_SHORTCUT, overlayShortcutLabel } from "../lib/hotkeys";
@@ -334,7 +335,7 @@ export function Dashboard() {
   }, [session?.id]);
 
   useEffect(() => {
-    if (!running || !session || config.stt.selectedMode === "manual" || config.stt.selectedMode === "deepgram") {
+    if (!running || !session || !isSnapshotSttMode(config.stt.selectedMode)) {
       return;
     }
 
@@ -395,6 +396,148 @@ export function Dashboard() {
       window.clearInterval(interval);
     };
   }, [config, lastTriggeredTranscriptId, running, session?.id]);
+
+  useEffect(() => {
+    if (!running || !session || config.stt.selectedMode !== "local_whisper") {
+      return;
+    }
+
+    const binaryPath = config.stt.localWhisperBinaryPath.trim();
+    const modelPath = config.stt.localWhisperModelPath.trim();
+    if (!binaryPath || !modelPath) {
+      setStatusMessage("Set the local Whisper binary and model paths before starting streaming STT.");
+      return;
+    }
+
+    let disposed = false;
+    let cleanup: (() => void) | undefined;
+    const streamStartedAtMs = Date.now();
+    const sessionStartedAtMs = Date.parse(session.createdAt);
+    const sessionOffsetMs = Number.isFinite(sessionStartedAtMs)
+      ? Math.max(0, streamStartedAtMs - sessionStartedAtMs)
+      : 0;
+    const transcribers = new Map<"microphone" | "system", LocalWhisperChunkTranscriber>();
+
+    async function saveStreamingTranscript(event: SttTranscriptEvent, source: "microphone" | "system") {
+      if (!session || disposed) {
+        return;
+      }
+
+      const text = event.text.trim();
+      if (!text) {
+        return;
+      }
+
+      const speaker = normalizeStreamingSpeakerForSource(event.speaker, source);
+      const key = `${speaker}:${text.toLowerCase().replace(/\s+/g, " ")}`;
+      if (seenLiveTranscriptKeys.current.has(key)) {
+        return;
+      }
+      seenLiveTranscriptKeys.current.add(key);
+
+      try {
+        const saved = await addTranscript({
+          sessionId: session.id,
+          speaker,
+          content: text,
+          timestampMs: sessionOffsetMs + event.startMs,
+          confidence: event.confidence
+        });
+
+        if (disposed) {
+          return;
+        }
+
+        setTranscripts((current) => {
+          const nextTranscripts = [...current, saved];
+          const trigger = shouldTriggerAnswer({
+            segments: nextTranscripts,
+            settings: config.autoTrigger,
+            lastTriggeredTranscriptId,
+            nowMs: saved.timestampMs + config.autoTrigger.silenceTimeoutMs
+          });
+
+          if (trigger.shouldTrigger && trigger.transcriptId) {
+            setLastTriggeredTranscriptId(trigger.transcriptId);
+            setStatusMessage(`Local Whisper detected ${trigger.reason}; generating answer...`);
+            void generateResponse(nextTranscripts, trigger.transcriptId);
+          }
+
+          return nextTranscripts;
+        });
+        setStatusMessage("Local Whisper streaming STT saved a transcript segment");
+      } catch (error) {
+        if (!disposed) {
+          setErrorMessage(error instanceof Error ? error.message : String(error));
+          setStatusMessage("Local Whisper streaming STT failed");
+        }
+      }
+    }
+
+    function getTranscriber(source: "microphone" | "system") {
+      const existing = transcribers.get(source);
+      if (existing) {
+        return existing;
+      }
+
+      const transcriber = new LocalWhisperChunkTranscriber({
+        source,
+        binaryPath,
+        modelPath,
+        language: config.stt.language || "auto",
+        diarizationEnabled: config.stt.diarizationEnabled,
+        onTranscript: (event) => void saveStreamingTranscript(event, source),
+        onStatus: (message) => {
+          if (!disposed) {
+            setStatusMessage(message);
+          }
+        },
+        onError: (error) => {
+          if (!disposed) {
+            setErrorMessage(error.message);
+            setStatusMessage("Local Whisper streaming STT failed");
+          }
+        }
+      });
+      transcribers.set(source, transcriber);
+      return transcriber;
+    }
+
+    onAudioChunk((chunk) => {
+      if (chunk.source !== "microphone" && chunk.source !== "system") {
+        return;
+      }
+
+      getTranscriber(chunk.source).sendChunk(chunk);
+    }).then((unlisten) => {
+      if (disposed) {
+        unlisten();
+        return;
+      }
+
+      cleanup = unlisten;
+    });
+    setStatusMessage("Local Whisper streaming STT armed");
+
+    return () => {
+      disposed = true;
+      cleanup?.();
+      for (const transcriber of transcribers.values()) {
+        void transcriber.close();
+      }
+    };
+  }, [
+    config.autoTrigger,
+    config.stt.diarizationEnabled,
+    config.stt.language,
+    config.stt.localWhisperBinaryPath,
+    config.stt.localWhisperModelPath,
+    config.stt.selectedMode,
+    lastTriggeredTranscriptId,
+    running,
+    session?.createdAt,
+    session?.id
+  ]);
 
   useEffect(() => {
     if (!running || !session || config.stt.selectedMode !== "deepgram") {
@@ -897,4 +1040,16 @@ function buildPromptMessages(
 function websocketSttEndpoint(endpoint: string): string | undefined {
   const trimmed = endpoint.trim();
   return trimmed.startsWith("ws://") || trimmed.startsWith("wss://") ? trimmed : undefined;
+}
+
+function isSnapshotSttMode(mode: AppConfig["stt"]["selectedMode"]): mode is "assemblyai" | "google" {
+  return mode === "assemblyai" || mode === "google";
+}
+
+function normalizeStreamingSpeakerForSource(speaker: Speaker, source: "microphone" | "system"): Speaker {
+  if (speaker !== "unknown") {
+    return speaker;
+  }
+
+  return source === "system" ? "interviewer" : "candidate";
 }

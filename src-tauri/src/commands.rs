@@ -1,4 +1,4 @@
-use tauri::{AppHandle, State};
+use tauri::{AppHandle, Manager, State};
 
 use crate::ai;
 use crate::audio::{self, AudioCaptureManager, AudioCaptureState, AudioProcessingSettings};
@@ -151,6 +151,19 @@ pub fn transcribe_with_local_whisper(
     input: stt::LocalWhisperRequest,
 ) -> Result<Vec<stt::TranscriptEvent>, String> {
     stt::transcribe_with_local_whisper(input).map_err(to_command_error)
+}
+
+#[tauri::command]
+pub fn transcribe_local_whisper_pcm(
+    app_handle: AppHandle,
+    input: stt::LocalWhisperPcmRequest,
+) -> Result<Vec<stt::TranscriptEvent>, String> {
+    let output_dir = app_handle
+        .path()
+        .app_cache_dir()
+        .map_err(|error| error.to_string())?
+        .join("local-whisper");
+    stt::transcribe_local_whisper_pcm(input, output_dir).map_err(to_command_error)
 }
 
 #[tauri::command]

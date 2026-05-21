@@ -2,6 +2,7 @@ use base64::Engine;
 use reqwest::blocking::Client;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
+use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::time::{Duration, Instant};
@@ -22,6 +23,18 @@ pub struct LocalWhisperRequest {
     pub binary_path: String,
     pub model_path: String,
     pub audio_path: String,
+    pub language: Option<String>,
+    pub diarization_enabled: Option<bool>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LocalWhisperPcmRequest {
+    pub binary_path: String,
+    pub model_path: String,
+    pub pcm16_base64: String,
+    pub sample_rate_hz: u32,
+    pub channels: u16,
     pub language: Option<String>,
     pub diarization_enabled: Option<bool>,
 }
@@ -181,6 +194,13 @@ enum LanguageSelection {
     },
 }
 
+#[derive(Debug, Clone, PartialEq)]
+struct PcmAudioSnapshot {
+    samples: Vec<f32>,
+    sample_rate_hz: u32,
+    channels: u16,
+}
+
 pub fn list_stt_providers() -> Vec<SttProviderStatus> {
     vec![
         SttProviderStatus {
@@ -265,6 +285,38 @@ pub fn transcribe_with_local_whisper(
     parse_whisper_json(&json)
 }
 
+pub fn transcribe_local_whisper_pcm(
+    request: LocalWhisperPcmRequest,
+    output_dir: PathBuf,
+) -> anyhow::Result<Vec<TranscriptEvent>> {
+    validate_required_file(
+        &request.binary_path,
+        "Whisper binary path is required",
+        "Whisper binary path does not exist",
+    )?;
+    validate_required_file(
+        &request.model_path,
+        "Whisper model path is required",
+        "Whisper model path does not exist",
+    )?;
+
+    let snapshot = decode_local_whisper_pcm_audio(&request)?;
+    std::fs::create_dir_all(&output_dir)?;
+    let audio_path = output_dir.join(format!("chunk-{}.wav", uuid::Uuid::new_v4()));
+    write_pcm16_wav_file(&audio_path, &snapshot)?;
+
+    let whisper_request = LocalWhisperRequest {
+        binary_path: request.binary_path,
+        model_path: request.model_path,
+        audio_path: audio_path.display().to_string(),
+        language: request.language,
+        diarization_enabled: request.diarization_enabled,
+    };
+    let result = transcribe_with_local_whisper(whisper_request);
+    cleanup_local_whisper_files(&audio_path);
+    result
+}
+
 pub fn transcribe_with_cloud_stt(request: CloudSttRequest) -> anyhow::Result<Vec<TranscriptEvent>> {
     validate_cloud_stt_request(&request)?;
     let client = Client::builder()
@@ -309,6 +361,82 @@ pub fn validate_cloud_stt_request(request: &CloudSttRequest) -> anyhow::Result<(
         "Audio file path is required",
         "Audio file path does not exist",
     )
+}
+
+fn decode_local_whisper_pcm_audio(
+    request: &LocalWhisperPcmRequest,
+) -> anyhow::Result<PcmAudioSnapshot> {
+    if request.sample_rate_hz < 8_000 || request.sample_rate_hz > 48_000 {
+        return Err(anyhow::anyhow!(
+            "PCM sample rate must be between 8000 and 48000 Hz"
+        ));
+    }
+
+    if request.channels == 0 || request.channels > 2 {
+        return Err(anyhow::anyhow!("PCM audio channels must be 1 or 2"));
+    }
+
+    let bytes = base64::engine::general_purpose::STANDARD
+        .decode(request.pcm16_base64.trim().as_bytes())
+        .map_err(|_| anyhow::anyhow!("PCM16 audio is not valid base64"))?;
+
+    if bytes.is_empty() {
+        return Err(anyhow::anyhow!("PCM16 audio is empty"));
+    }
+
+    let frame_bytes = 2 * request.channels as usize;
+    if bytes.len() % frame_bytes != 0 {
+        return Err(anyhow::anyhow!("PCM16 audio must contain whole samples"));
+    }
+
+    let samples = bytes
+        .chunks_exact(2)
+        .map(|chunk| {
+            let pcm = i16::from_le_bytes([chunk[0], chunk[1]]);
+            (pcm as f32 / i16::MAX as f32).clamp(-1.0, 1.0)
+        })
+        .collect::<Vec<_>>();
+
+    Ok(PcmAudioSnapshot {
+        samples,
+        sample_rate_hz: request.sample_rate_hz,
+        channels: request.channels,
+    })
+}
+
+fn write_pcm16_wav_file(path: &Path, snapshot: &PcmAudioSnapshot) -> anyhow::Result<()> {
+    let mut file = std::fs::File::create(path)?;
+    let bytes_per_sample = 2_u16;
+    let data_bytes = snapshot.samples.len() as u32 * bytes_per_sample as u32;
+    let byte_rate = snapshot.sample_rate_hz * snapshot.channels as u32 * bytes_per_sample as u32;
+    let block_align = snapshot.channels * bytes_per_sample;
+
+    file.write_all(b"RIFF")?;
+    file.write_all(&(36_u32 + data_bytes).to_le_bytes())?;
+    file.write_all(b"WAVE")?;
+    file.write_all(b"fmt ")?;
+    file.write_all(&16_u32.to_le_bytes())?;
+    file.write_all(&1_u16.to_le_bytes())?;
+    file.write_all(&snapshot.channels.to_le_bytes())?;
+    file.write_all(&snapshot.sample_rate_hz.to_le_bytes())?;
+    file.write_all(&byte_rate.to_le_bytes())?;
+    file.write_all(&block_align.to_le_bytes())?;
+    file.write_all(&(bytes_per_sample * 8).to_le_bytes())?;
+    file.write_all(b"data")?;
+    file.write_all(&data_bytes.to_le_bytes())?;
+
+    for sample in &snapshot.samples {
+        let pcm = (sample.clamp(-1.0, 1.0) * i16::MAX as f32) as i16;
+        file.write_all(&pcm.to_le_bytes())?;
+    }
+
+    Ok(())
+}
+
+fn cleanup_local_whisper_files(audio_path: &Path) {
+    let _ = std::fs::remove_file(audio_path);
+    let output_json = whisper_output_base(&audio_path.display().to_string()).with_extension("json");
+    let _ = std::fs::remove_file(output_json);
 }
 
 fn transcribe_with_deepgram(
@@ -880,10 +1008,13 @@ fn duration_to_ms(duration: Option<&str>) -> i64 {
 
 #[cfg(test)]
 mod tests {
+    use base64::Engine;
+
     use super::{
-        deepgram_language_params, google_language_config, parse_assemblyai_json,
-        parse_deepgram_json, parse_google_json, parse_whisper_json, validate_local_whisper_request,
-        GoogleLanguageConfig, LocalWhisperRequest, TranscriptEvent,
+        decode_local_whisper_pcm_audio, deepgram_language_params, google_language_config,
+        parse_assemblyai_json, parse_deepgram_json, parse_google_json, parse_whisper_json,
+        validate_local_whisper_request, GoogleLanguageConfig, LocalWhisperPcmRequest,
+        LocalWhisperRequest, TranscriptEvent,
     };
 
     #[test]
@@ -942,6 +1073,49 @@ mod tests {
                 .unwrap_err()
                 .to_string(),
             "Whisper binary path is required"
+        );
+    }
+
+    #[test]
+    fn decodes_local_whisper_pcm_request_to_normalized_audio() {
+        let request = LocalWhisperPcmRequest {
+            binary_path: "whisper-cli.exe".to_string(),
+            model_path: "ggml-base.en.bin".to_string(),
+            pcm16_base64: base64::engine::general_purpose::STANDARD
+                .encode([0x00, 0x00, 0xff, 0x7f, 0x00, 0x80]),
+            sample_rate_hz: 16_000,
+            channels: 1,
+            language: Some("auto".to_string()),
+            diarization_enabled: Some(true),
+        };
+
+        let decoded = decode_local_whisper_pcm_audio(&request).unwrap();
+
+        assert_eq!(decoded.sample_rate_hz, 16_000);
+        assert_eq!(decoded.channels, 1);
+        assert_eq!(decoded.samples.len(), 3);
+        assert!(decoded.samples[0].abs() < 0.001);
+        assert!((decoded.samples[1] - 1.0).abs() < 0.001);
+        assert!((decoded.samples[2] + 1.0).abs() < 0.001);
+    }
+
+    #[test]
+    fn rejects_malformed_local_whisper_pcm_payloads() {
+        let request = LocalWhisperPcmRequest {
+            binary_path: "whisper-cli.exe".to_string(),
+            model_path: "ggml-base.en.bin".to_string(),
+            pcm16_base64: base64::engine::general_purpose::STANDARD.encode([1, 2, 3]),
+            sample_rate_hz: 16_000,
+            channels: 1,
+            language: Some("en".to_string()),
+            diarization_enabled: Some(false),
+        };
+
+        assert_eq!(
+            decode_local_whisper_pcm_audio(&request)
+                .unwrap_err()
+                .to_string(),
+            "PCM16 audio must contain whole samples"
         );
     }
 

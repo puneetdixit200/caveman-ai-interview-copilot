@@ -305,6 +305,18 @@ export async function transcribeWithLocalWhisper(input: {
   return invokeStrictOrFallback<SttTranscriptEvent[]>("transcribe_with_local_whisper", { input }, () => []);
 }
 
+export async function transcribeLocalWhisperPcm(input: {
+  binaryPath: string;
+  modelPath: string;
+  pcm16Base64: string;
+  sampleRateHz: number;
+  channels: number;
+  language?: string;
+  diarizationEnabled?: boolean;
+}): Promise<SttTranscriptEvent[]> {
+  return invokeStrictOrFallback<SttTranscriptEvent[]>("transcribe_local_whisper_pcm", { input }, () => []);
+}
+
 export async function transcribeWithCloudStt(input: {
   provider: "deepgram" | "assemblyai" | "google";
   apiKey: string;
