@@ -2,7 +2,7 @@ import { Clipboard, Code2, Copy, Keyboard } from "lucide-react";
 import { useMemo, useState } from "react";
 import { extractCodeSuggestions } from "../../lib/codeBlocks";
 import { displayLanguageLabel, highlightCode, normalizeLanguage } from "../../lib/codeHighlight";
-import { typeTextIntoActiveWindow } from "../../lib/tauri";
+import { getActiveWindowInfo, type ActiveWindowInfo, typeTextIntoActiveWindow } from "../../lib/tauri";
 import type { AIResponseRecord } from "../../types/session";
 import { Button } from "../common/Button";
 
@@ -27,8 +27,14 @@ export function CodeAssistantPanel({ responses }: CodeAssistantPanelProps) {
 
   async function typeIntoActiveEditor(text: string, label: string) {
     try {
+      const activeWindow = await getActiveWindowInfo();
+      if (!activeWindow.isCodeEditor) {
+        setStatus(`Focus a code editor before typing code. Active window: ${activeWindowLabel(activeWindow)}`);
+        return;
+      }
+
       const typed = await typeTextIntoActiveWindow(text);
-      setStatus(`Typed ${typed.characterCount} ${label.toLowerCase()} characters into the active editor`);
+      setStatus(`Typed ${typed.characterCount} ${label.toLowerCase()} characters into ${editorLabel(activeWindow)}`);
     } catch (error) {
       setStatus(`Could not type ${label.toLowerCase()}: ${error instanceof Error ? error.message : String(error)}`);
     }
@@ -86,4 +92,18 @@ export function CodeAssistantPanel({ responses }: CodeAssistantPanelProps) {
       <p className="page-status">{status}</p>
     </section>
   );
+}
+
+function editorLabel(activeWindow: ActiveWindowInfo): string {
+  return activeWindow.editorKind?.trim() || activeWindow.title.trim() || activeWindow.processName.trim() || "active editor";
+}
+
+function activeWindowLabel(activeWindow: ActiveWindowInfo): string {
+  const title = activeWindow.title.trim();
+  const processName = activeWindow.processName.trim();
+  if (title && processName) {
+    return `${title} (${processName})`;
+  }
+
+  return title || processName || "unknown window";
 }

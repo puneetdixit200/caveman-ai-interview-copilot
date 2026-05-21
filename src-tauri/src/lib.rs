@@ -77,6 +77,7 @@ pub fn run() {
             commands::list_prompt_templates,
             commands::load_plugin_manifests,
             commands::capture_screen_frame,
+            commands::get_active_window_info,
             commands::type_text_into_active_window,
             commands::start_collaboration_server,
             commands::stop_collaboration_server,

@@ -1,18 +1,31 @@
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { CodeAssistantPanel } from "./CodeAssistantPanel";
 
 const tauriMocks = vi.hoisted(() => ({
+  getActiveWindowInfo: vi.fn(),
   typeTextIntoActiveWindow: vi.fn()
 }));
 
 vi.mock("../../lib/tauri", () => ({
+  getActiveWindowInfo: tauriMocks.getActiveWindowInfo,
   typeTextIntoActiveWindow: tauriMocks.typeTextIntoActiveWindow
 }));
 
 describe("CodeAssistantPanel", () => {
+  beforeEach(() => {
+    tauriMocks.getActiveWindowInfo.mockResolvedValue({
+      title: "main.ts - Visual Studio Code",
+      processName: "Code.exe",
+      executablePath: "C:\\Users\\mrpun\\AppData\\Local\\Programs\\Microsoft VS Code\\Code.exe",
+      editorKind: "VS Code",
+      isCodeEditor: true
+    });
+  });
+
   afterEach(() => {
+    tauriMocks.getActiveWindowInfo.mockReset();
     tauriMocks.typeTextIntoActiveWindow.mockReset();
     vi.restoreAllMocks();
     vi.unstubAllGlobals();
@@ -88,7 +101,41 @@ describe("CodeAssistantPanel", () => {
 
     await user.click(screen.getByRole("button", { name: "Type Code" }));
 
+    expect(tauriMocks.getActiveWindowInfo).toHaveBeenCalled();
     expect(tauriMocks.typeTextIntoActiveWindow).toHaveBeenCalledWith("const answer = 42;");
-    expect(await screen.findByText("Typed 18 code characters into the active editor")).toBeInTheDocument();
+    expect(await screen.findByText("Typed 18 code characters into VS Code")).toBeInTheDocument();
+  });
+
+  it("does not type code when the active window is not a recognized editor", async () => {
+    tauriMocks.getActiveWindowInfo.mockResolvedValue({
+      title: "Interview - Google Meet",
+      processName: "chrome.exe",
+      executablePath: "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
+      editorKind: null,
+      isCodeEditor: false
+    });
+    const user = userEvent.setup();
+
+    render(
+      <CodeAssistantPanel
+        responses={[
+          {
+            id: 1,
+            sessionId: "s1",
+            provider: "ollama",
+            model: "llama3.1:8b",
+            response: "```ts\nconst answer = 42;\n```",
+            createdAt: "2026-05-20T00:00:00.000Z"
+          }
+        ]}
+      />
+    );
+
+    await user.click(screen.getByRole("button", { name: "Type Code" }));
+
+    expect(tauriMocks.typeTextIntoActiveWindow).not.toHaveBeenCalled();
+    expect(
+      await screen.findByText("Focus a code editor before typing code. Active window: Interview - Google Meet (chrome.exe)")
+    ).toBeInTheDocument();
   });
 });

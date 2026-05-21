@@ -4,6 +4,7 @@ import {
   clearKnowledgeBaseNative,
   deleteProviderApiKey,
   deleteKnowledgeDocumentNative,
+  getActiveWindowInfo,
   getRuntimeBudgetStatus,
   listPracticeScores,
   listKnowledgeBase,
@@ -37,6 +38,16 @@ describe("tauri fallback security events", () => {
       target: "openai"
     });
     expect(serialized).not.toContain("sk-live-secret");
+  });
+});
+
+describe("tauri fallback active window detection", () => {
+  it("returns an editor-compatible browser fallback outside the desktop app", async () => {
+    await expect(getActiveWindowInfo()).resolves.toMatchObject({
+      processName: "browser",
+      editorKind: "Browser fallback",
+      isCodeEditor: true
+    });
   });
 });
 

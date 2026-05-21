@@ -7,6 +7,20 @@ pub struct TypingResult {
     pub input_event_count: usize,
 }
 
+#[derive(Debug, Clone, Serialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct ActiveWindowInfo {
+    pub title: String,
+    pub process_name: String,
+    pub executable_path: Option<String>,
+    pub editor_kind: Option<String>,
+    pub is_code_editor: bool,
+}
+
+pub fn get_active_window_info() -> anyhow::Result<ActiveWindowInfo> {
+    platform_active_window_info()
+}
+
 pub fn type_text_into_active_window(text: &str) -> anyhow::Result<TypingResult> {
     let units = unicode_key_units(text);
     if units.is_empty() {
@@ -33,6 +47,193 @@ pub fn unicode_key_units(text: &str) -> Vec<u16> {
     }
 
     units
+}
+
+pub fn active_window_info_from_parts(
+    title: impl Into<String>,
+    process_name: impl Into<String>,
+    executable_path: Option<String>,
+) -> ActiveWindowInfo {
+    let title = title.into();
+    let process_name = process_name.into();
+    let editor_kind = detect_code_editor(&process_name, &title, executable_path.as_deref());
+    ActiveWindowInfo {
+        title,
+        process_name,
+        executable_path,
+        is_code_editor: editor_kind.is_some(),
+        editor_kind,
+    }
+}
+
+fn detect_code_editor(
+    process_name: &str,
+    title: &str,
+    executable_path: Option<&str>,
+) -> Option<String> {
+    let process = normalized_process_name(process_name, executable_path);
+    let title = title.to_ascii_lowercase();
+    let editor = match process.as_str() {
+        "code.exe" => Some("VS Code"),
+        "code - insiders.exe" => Some("VS Code Insiders"),
+        "vscodium.exe" | "codium.exe" => Some("VSCodium"),
+        "cursor.exe" => Some("Cursor"),
+        "windsurf.exe" => Some("Windsurf"),
+        "devenv.exe" => Some("Visual Studio"),
+        "webstorm64.exe" | "webstorm.exe" => Some("WebStorm"),
+        "idea64.exe" | "idea.exe" => Some("IntelliJ IDEA"),
+        "pycharm64.exe" | "pycharm.exe" => Some("PyCharm"),
+        "rider64.exe" | "rider.exe" => Some("Rider"),
+        "clion64.exe" | "clion.exe" => Some("CLion"),
+        "datagrip64.exe" | "datagrip.exe" => Some("DataGrip"),
+        "sublime_text.exe" => Some("Sublime Text"),
+        "notepad++.exe" => Some("Notepad++"),
+        "zed.exe" => Some("Zed"),
+        "atom.exe" => Some("Atom"),
+        "emacs.exe" | "runemacs.exe" => Some("Emacs"),
+        "gvim.exe" | "vim.exe" | "nvim.exe" | "nvim-qt.exe" | "neovide.exe" => Some("Neovim"),
+        "windows terminal.exe"
+        | "windowsterminal.exe"
+        | "wt.exe"
+        | "alacritty.exe"
+        | "wezterm-gui.exe"
+        | "wezterm.exe"
+        | "conhost.exe"
+        | "cmd.exe"
+        | "powershell.exe"
+        | "pwsh.exe" => terminal_editor_kind(&title),
+        _ => None,
+    };
+
+    editor.map(str::to_string)
+}
+
+fn normalized_process_name(process_name: &str, executable_path: Option<&str>) -> String {
+    let raw = if process_name.trim().is_empty() {
+        executable_path
+            .and_then(|path| std::path::Path::new(path).file_name())
+            .and_then(|name| name.to_str())
+            .unwrap_or("")
+    } else {
+        process_name
+    };
+
+    raw.trim().to_ascii_lowercase()
+}
+
+fn terminal_editor_kind(title: &str) -> Option<&'static str> {
+    if title.contains("nvim") || title.contains("neovim") {
+        return Some("Neovim terminal");
+    }
+
+    if title.contains("vim") {
+        return Some("Vim terminal");
+    }
+
+    if title.contains("helix") || title.contains(" hx ") || title.ends_with(" hx") {
+        return Some("Helix terminal");
+    }
+
+    if title.contains("emacs") {
+        return Some("Emacs terminal");
+    }
+
+    None
+}
+
+#[cfg(windows)]
+fn platform_active_window_info() -> anyhow::Result<ActiveWindowInfo> {
+    use windows::Win32::UI::WindowsAndMessaging::{GetForegroundWindow, GetWindowThreadProcessId};
+
+    let hwnd = unsafe { GetForegroundWindow() };
+    if hwnd.0 == std::ptr::null_mut() {
+        return Err(anyhow::anyhow!("No active foreground window was found"));
+    }
+
+    let title = read_window_title(hwnd);
+    let mut process_id = 0_u32;
+    unsafe {
+        GetWindowThreadProcessId(hwnd, Some(&mut process_id));
+    }
+    if process_id == 0 {
+        return Err(anyhow::anyhow!(
+            "Could not resolve the active window process id"
+        ));
+    }
+
+    let executable_path = read_process_executable_path(process_id).ok();
+    let process_name = executable_path
+        .as_deref()
+        .and_then(|path| std::path::Path::new(path).file_name())
+        .and_then(|name| name.to_str())
+        .map(str::to_string)
+        .unwrap_or_else(|| process_id.to_string());
+
+    Ok(active_window_info_from_parts(
+        title,
+        process_name,
+        executable_path,
+    ))
+}
+
+#[cfg(windows)]
+fn read_window_title(hwnd: windows::Win32::Foundation::HWND) -> String {
+    use windows::Win32::UI::WindowsAndMessaging::GetWindowTextW;
+
+    let mut buffer = vec![0_u16; 512];
+    let length = unsafe { GetWindowTextW(hwnd, &mut buffer) };
+    if length <= 0 {
+        return String::new();
+    }
+
+    String::from_utf16_lossy(&buffer[..length as usize])
+        .trim()
+        .to_string()
+}
+
+#[cfg(windows)]
+fn read_process_executable_path(process_id: u32) -> anyhow::Result<String> {
+    use windows::core::PWSTR;
+    use windows::Win32::System::Threading::{
+        OpenProcess, QueryFullProcessImageNameW, PROCESS_NAME_WIN32,
+        PROCESS_QUERY_LIMITED_INFORMATION,
+    };
+
+    let handle = unsafe {
+        OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, false, process_id)
+            .map_err(|error| anyhow::anyhow!("Could not open active process: {error}"))?
+    };
+    let _handle_guard = HandleGuard(handle);
+    let mut buffer = vec![0_u16; 32_768];
+    let mut length = buffer.len() as u32;
+    unsafe {
+        QueryFullProcessImageNameW(
+            handle,
+            PROCESS_NAME_WIN32,
+            PWSTR(buffer.as_mut_ptr()),
+            &mut length,
+        )
+        .map_err(|error| anyhow::anyhow!("Could not read active process path: {error}"))?;
+    }
+
+    Ok(String::from_utf16_lossy(&buffer[..length as usize]))
+}
+
+#[cfg(windows)]
+struct HandleGuard(windows::Win32::Foundation::HANDLE);
+
+#[cfg(windows)]
+impl Drop for HandleGuard {
+    fn drop(&mut self) {
+        let _ = unsafe { windows::Win32::Foundation::CloseHandle(self.0) };
+    }
+}
+
+#[cfg(not(windows))]
+fn platform_active_window_info() -> anyhow::Result<ActiveWindowInfo> {
+    Err(anyhow::anyhow!(
+        "Active editor detection is currently implemented for Windows only"
+    ))
 }
 
 #[cfg(windows)]
@@ -92,7 +293,7 @@ fn send_unicode_key_units(_units: &[u16]) -> anyhow::Result<()> {
 
 #[cfg(test)]
 mod tests {
-    use super::unicode_key_units;
+    use super::{active_window_info_from_parts, detect_code_editor, unicode_key_units};
 
     #[test]
     fn unicode_key_units_normalize_newlines_for_windows_text_injection() {
@@ -117,6 +318,62 @@ mod tests {
                 'w' as u16,
                 'o' as u16
             ]
+        );
+    }
+
+    #[test]
+    fn detects_known_code_editor_processes() {
+        assert_eq!(
+            detect_code_editor("Code.exe", "main.ts - Visual Studio Code", None),
+            Some("VS Code".to_string())
+        );
+        assert_eq!(
+            detect_code_editor("Cursor.exe", "route.ts - Cursor", None),
+            Some("Cursor".to_string())
+        );
+        assert_eq!(
+            detect_code_editor("pycharm64.exe", "api.py - PyCharm", None),
+            Some("PyCharm".to_string())
+        );
+        assert_eq!(
+            detect_code_editor(
+                "",
+                "Program.cs - Microsoft Visual Studio",
+                Some("C:\\VS\\devenv.exe")
+            ),
+            Some("Visual Studio".to_string())
+        );
+    }
+
+    #[test]
+    fn only_treats_terminal_windows_as_editors_when_editor_title_is_present() {
+        assert_eq!(
+            detect_code_editor("WindowsTerminal.exe", "nvim C:\\repo\\main.rs", None),
+            Some("Neovim terminal".to_string())
+        );
+        assert_eq!(
+            detect_code_editor("powershell.exe", "PowerShell", None),
+            None
+        );
+    }
+
+    #[test]
+    fn builds_active_window_info_with_editor_flags() {
+        assert_eq!(
+            active_window_info_from_parts(
+                "Interview - Google Meet",
+                "chrome.exe",
+                Some("C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe".to_string())
+            ),
+            super::ActiveWindowInfo {
+                title: "Interview - Google Meet".to_string(),
+                process_name: "chrome.exe".to_string(),
+                executable_path: Some(
+                    "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe".to_string()
+                ),
+                editor_kind: None,
+                is_code_editor: false
+            }
         );
     }
 }

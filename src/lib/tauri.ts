@@ -96,6 +96,14 @@ export interface TypingResult {
   inputEventCount: number;
 }
 
+export interface ActiveWindowInfo {
+  title: string;
+  processName: string;
+  executablePath?: string | null;
+  editorKind?: string | null;
+  isCodeEditor: boolean;
+}
+
 export interface NativeScreenFrame {
   imageDataUrl: string;
   width: number;
@@ -790,6 +798,16 @@ export async function captureNativeScreenFrame(): Promise<NativeScreenFrame> {
   return invokeStrictOrFallback<NativeScreenFrame>("capture_screen_frame", {}, async () => {
     throw new Error("Native screen capture is available only inside the Caveman desktop app.");
   });
+}
+
+export async function getActiveWindowInfo(): Promise<ActiveWindowInfo> {
+  return invokeStrictOrFallback<ActiveWindowInfo>("get_active_window_info", {}, () => ({
+    title: "Browser fallback",
+    processName: "browser",
+    executablePath: null,
+    editorKind: "Browser fallback",
+    isCodeEditor: true
+  }));
 }
 
 export async function typeTextIntoActiveWindow(text: string): Promise<TypingResult> {

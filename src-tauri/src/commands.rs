@@ -474,6 +474,11 @@ pub fn capture_screen_frame() -> Result<ScreenFrame, String> {
 }
 
 #[tauri::command]
+pub fn get_active_window_info() -> Result<typing::ActiveWindowInfo, String> {
+    typing::get_active_window_info().map_err(to_command_error)
+}
+
+#[tauri::command]
 pub fn type_text_into_active_window(
     database: State<'_, Database>,
     text: String,
