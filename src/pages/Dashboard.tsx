@@ -4,7 +4,7 @@ import { AudioControls } from "../components/audio/AudioControls";
 import { CodeAssistantPanel } from "../components/code/CodeAssistantPanel";
 import { Button } from "../components/common/Button";
 import { OverlayWindow } from "../components/overlay/OverlayWindow";
-import { TranscriptFeed } from "../components/overlay/TranscriptFeed";
+import { TranscriptFeed, type InterimTranscriptPreview } from "../components/overlay/TranscriptFeed";
 import { APP_CONFIG_SETTING_KEY, DEFAULT_APP_CONFIG, parseAppConfig } from "../lib/appConfig";
 import { applyAudioLevelEvent, type AudioCaptureState } from "../lib/audioEvents";
 import { shouldTriggerAnswer } from "../lib/autoTrigger";
@@ -80,6 +80,7 @@ export function Dashboard() {
   const [running, setRunning] = useState(false);
   const [session, setSession] = useState<SessionRecord | null>(null);
   const [transcripts, setTranscripts] = useState<TranscriptSegment[]>([]);
+  const [interimPreviews, setInterimPreviews] = useState<InterimTranscriptPreview[]>([]);
   const [responses, setResponses] = useState<AIResponseRecord[]>([]);
   const [audioDevices, setAudioDevices] = useState<AudioDevice[]>([]);
   const [captureStatus, setCaptureStatus] = useState<AudioCaptureState>(DEFAULT_CAPTURE_STATUS);
@@ -332,6 +333,7 @@ export function Dashboard() {
 
   useEffect(() => {
     seenLiveTranscriptKeys.current.clear();
+    setInterimPreviews([]);
   }, [session?.id]);
 
   useEffect(() => {
@@ -588,6 +590,8 @@ export function Dashboard() {
           return;
         }
 
+        setInterimPreviews((current) => current.filter((preview) => preview.source !== eventSourceForSpeaker(saved.speaker)));
+
         setTranscripts((current) => {
           const nextTranscripts = [...current, saved];
           const trigger = shouldTriggerAnswer({
@@ -614,6 +618,26 @@ export function Dashboard() {
       }
     }
 
+    function previewStreamingTranscript(event: SttTranscriptEvent, source: "microphone" | "system") {
+      const text = event.text.trim();
+      if (!text || disposed) {
+        return;
+      }
+
+      setInterimPreviews((current) => {
+        const nextPreview: InterimTranscriptPreview = {
+          id: `deepgram-${source}`,
+          speaker: event.speaker,
+          content: text,
+          timestampMs: sessionOffsetMs + event.startMs,
+          confidence: event.confidence,
+          source
+        };
+
+        return [nextPreview, ...current.filter((preview) => preview.id !== nextPreview.id)].slice(0, 2);
+      });
+    }
+
     function getTranscriber(source: "microphone" | "system") {
       const existing = transcribers.get(source);
       if (existing) {
@@ -627,6 +651,7 @@ export function Dashboard() {
         diarizationEnabled: config.stt.diarizationEnabled,
         endpoint: websocketSttEndpoint(config.stt.cloudEndpoint),
         onTranscript: (event) => void saveStreamingTranscript(event),
+        onInterimTranscript: (event) => previewStreamingTranscript(event, source),
         onStatus: (message) => {
           if (!disposed) {
             setStatusMessage(message);
@@ -685,6 +710,7 @@ export function Dashboard() {
       setCaptureStatus(stopped);
       setRunning(false);
       setAudioDevices((current) => current.map((device) => ({ ...device, level: 0 })));
+      setInterimPreviews([]);
       setStatusMessage("Audio capture stopped");
       return;
     }
@@ -943,7 +969,7 @@ export function Dashboard() {
         devices={audioDevices}
         status={captureStatus.running ? "Live" : config.audio.captureMode === "manual" ? "Manual" : config.audio.captureMode}
       />
-      <TranscriptFeed transcripts={transcripts} />
+      <TranscriptFeed transcripts={transcripts} interimPreviews={interimPreviews} />
 
       <section className="panel overlay-control-panel">
         <div className="panel-heading">
@@ -1052,4 +1078,8 @@ function normalizeStreamingSpeakerForSource(speaker: Speaker, source: "microphon
   }
 
   return source === "system" ? "interviewer" : "candidate";
+}
+
+function eventSourceForSpeaker(speaker: Speaker): "microphone" | "system" {
+  return speaker === "candidate" ? "microphone" : "system";
 }

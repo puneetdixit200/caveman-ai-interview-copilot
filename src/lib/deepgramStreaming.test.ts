@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   DeepgramLiveTranscriber,
   buildDeepgramLiveUrl,
+  parseDeepgramLiveMessage,
   parseDeepgramLiveResult
 } from "./deepgramStreaming";
 import type { AudioChunkEvent } from "./audioEvents";
@@ -94,6 +95,42 @@ describe("deepgramStreaming", () => {
     ]);
   });
 
+  it("parses interim Deepgram result messages for live word streaming previews", () => {
+    expect(
+      parseDeepgramLiveMessage(
+        JSON.stringify({
+          type: "Results",
+          is_final: false,
+          speech_final: false,
+          start: 2.4,
+          duration: 0.7,
+          channel: {
+            alternatives: [
+              {
+                transcript: "Walk me through",
+                confidence: 0.72,
+                languages: ["en-US"],
+                words: [{ speaker: 0 }]
+              }
+            ]
+          }
+        }),
+        "system"
+      )
+    ).toEqual([
+      {
+        speaker: "interviewer",
+        text: "Walk me through",
+        startMs: 2400,
+        endMs: 3100,
+        confidence: 0.72,
+        language: "en-US",
+        isFinal: false,
+        speechFinal: false
+      }
+    ]);
+  });
+
   it("opens a browser WebSocket with token subprotocol auth and sends PCM chunks as binary", () => {
     FakeWebSocket.instances = [];
     const onTranscript = vi.fn();
@@ -136,6 +173,46 @@ describe("deepgramStreaming", () => {
         endMs: 250
       })
     );
+  });
+
+  it("routes interim messages to live preview callbacks without saving final transcripts", () => {
+    FakeWebSocket.instances = [];
+    const onTranscript = vi.fn();
+    const onInterimTranscript = vi.fn();
+    const transcriber = new DeepgramLiveTranscriber({
+      apiKey: "dg_key",
+      language: "auto",
+      diarizationEnabled: true,
+      source: "system",
+      WebSocketCtor: FakeWebSocket as unknown as typeof WebSocket,
+      onTranscript,
+      onInterimTranscript
+    });
+
+    transcriber.sendChunk({ ...makeChunk("AQIDBA=="), source: "system" });
+    const socket = FakeWebSocket.instances[0];
+    socket.open();
+    socket.emitMessage(
+      JSON.stringify({
+        type: "Results",
+        is_final: false,
+        speech_final: false,
+        start: 0,
+        duration: 0.25,
+        channel: {
+          alternatives: [{ transcript: "Explain", confidence: 0.5 }]
+        }
+      })
+    );
+
+    expect(onInterimTranscript).toHaveBeenCalledWith(
+      expect.objectContaining({
+        speaker: "interviewer",
+        text: "Explain",
+        isFinal: false
+      })
+    );
+    expect(onTranscript).not.toHaveBeenCalled();
   });
 });
 

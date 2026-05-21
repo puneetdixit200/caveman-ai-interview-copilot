@@ -467,6 +467,16 @@ h2 {
   border-left-color: var(--gold);
 }
 
+.transcript-row-interim {
+  border-left-style: dashed;
+  color: #dbe7e1;
+  background: #101713;
+}
+
+.transcript-row-interim p {
+  color: #c9d8d1;
+}
+
 .transcript-meta {
   display: flex;
   flex-wrap: wrap;

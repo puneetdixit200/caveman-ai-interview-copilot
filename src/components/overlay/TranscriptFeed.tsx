@@ -1,11 +1,21 @@
 import type { TranscriptSegment } from "../../types/session";
 import { formatConfidence, formatTimestampMs } from "../../lib/formatters";
 
-interface TranscriptFeedProps {
-  transcripts: TranscriptSegment[];
+export interface InterimTranscriptPreview {
+  id: string;
+  speaker: TranscriptSegment["speaker"];
+  content: string;
+  timestampMs: number;
+  confidence?: number;
+  source: "microphone" | "system";
 }
 
-export function TranscriptFeed({ transcripts }: TranscriptFeedProps) {
+interface TranscriptFeedProps {
+  transcripts: TranscriptSegment[];
+  interimPreviews?: InterimTranscriptPreview[];
+}
+
+export function TranscriptFeed({ transcripts, interimPreviews = [] }: TranscriptFeedProps) {
   return (
     <section className="panel transcript-panel" aria-label="Live transcript">
       <div className="panel-heading">
@@ -15,6 +25,18 @@ export function TranscriptFeed({ transcripts }: TranscriptFeedProps) {
         </div>
       </div>
       <div className="transcript-feed">
+        {interimPreviews.map((preview) => (
+          <article className={`transcript-row transcript-row-interim speaker-${preview.speaker}`} key={preview.id}>
+            <div className="transcript-meta">
+              <span>{formatTimestampMs(preview.timestampMs)}</span>
+              <strong>{preview.speaker}</strong>
+              <span>{formatConfidence(preview.confidence)}</span>
+              <span>live</span>
+              <span>{preview.source}</span>
+            </div>
+            <p>{preview.content}</p>
+          </article>
+        ))}
         {transcripts.map((segment) => (
           <article className={`transcript-row speaker-${segment.speaker}`} key={segment.id}>
             <div className="transcript-meta">
@@ -29,4 +51,3 @@ export function TranscriptFeed({ transcripts }: TranscriptFeedProps) {
     </section>
   );
 }
-

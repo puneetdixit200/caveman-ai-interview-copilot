@@ -3,6 +3,11 @@ import type { AudioChunkEvent } from "./audioEvents";
 
 type TranscriptSource = "microphone" | "system";
 
+export interface DeepgramLiveTranscriptEvent extends SttTranscriptEvent {
+  isFinal: boolean;
+  speechFinal: boolean;
+}
+
 interface DeepgramLiveUrlInput {
   language: string;
   diarizationEnabled: boolean;
@@ -14,6 +19,7 @@ interface DeepgramLiveTranscriberInput extends DeepgramLiveUrlInput {
   source: TranscriptSource;
   WebSocketCtor?: typeof WebSocket;
   onTranscript: (event: SttTranscriptEvent) => void;
+  onInterimTranscript?: (event: DeepgramLiveTranscriptEvent) => void;
   onStatus?: (message: string) => void;
   onError?: (error: Error) => void;
 }
@@ -41,6 +47,12 @@ export function buildDeepgramLiveUrl(input: DeepgramLiveUrlInput): URL {
 }
 
 export function parseDeepgramLiveResult(raw: string, source: TranscriptSource): SttTranscriptEvent[] {
+  return parseDeepgramLiveMessage(raw, source)
+    .filter((event) => event.isFinal)
+    .map(({ isFinal: _isFinal, speechFinal: _speechFinal, ...event }) => event);
+}
+
+export function parseDeepgramLiveMessage(raw: string, source: TranscriptSource): DeepgramLiveTranscriptEvent[] {
   const parsed = parseJsonObject(raw);
   if (parsed?.type !== "Results") {
     return [];
@@ -49,7 +61,7 @@ export function parseDeepgramLiveResult(raw: string, source: TranscriptSource): 
   const alternatives = readObject(parsed.channel)?.alternatives;
   const alternative = Array.isArray(alternatives) ? readObject(alternatives[0]) : undefined;
   const transcript = readString(alternative?.transcript).trim();
-  if (!transcript || parsed.is_final !== true) {
+  if (!transcript) {
     return [];
   }
 
@@ -68,7 +80,9 @@ export function parseDeepgramLiveResult(raw: string, source: TranscriptSource): 
       startMs: Math.round(startSeconds * 1000),
       endMs: Math.round((startSeconds + durationSeconds) * 1000),
       confidence: readNumber(alternative?.confidence),
-      language: languages[0]
+      language: languages[0],
+      isFinal: parsed.is_final === true,
+      speechFinal: parsed.speech_final === true
     }
   ];
 }
@@ -124,8 +138,12 @@ export class DeepgramLiveTranscriber {
         return;
       }
 
-      for (const event of parseDeepgramLiveResult(message.data, this.input.source)) {
-        this.input.onTranscript(event);
+      for (const event of parseDeepgramLiveMessage(message.data, this.input.source)) {
+        if (event.isFinal) {
+          this.input.onTranscript(event);
+        } else {
+          this.input.onInterimTranscript?.(event);
+        }
       }
     };
     socket.onerror = () => {
