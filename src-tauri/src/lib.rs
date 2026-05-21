@@ -3,6 +3,7 @@ pub mod audio;
 pub mod commands;
 pub mod db;
 pub mod models;
+pub mod ocr;
 pub mod overlay;
 pub mod plugins;
 pub mod secrets;
@@ -51,6 +52,7 @@ pub fn run() {
             commands::set_overlay_window_bounds,
             commands::list_prompt_templates,
             commands::load_plugin_manifests,
+            commands::capture_screen_frame,
             commands::type_text_into_active_window
         ])
         .run(tauri::generate_context!())

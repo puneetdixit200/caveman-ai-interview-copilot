@@ -40,6 +40,14 @@ export interface TypingResult {
   inputEventCount: number;
 }
 
+export interface NativeScreenFrame {
+  imageDataUrl: string;
+  width: number;
+  height: number;
+  monitorName?: string | null;
+  capturedAtMs: number;
+}
+
 declare global {
   interface Window {
     __TAURI_INTERNALS__?: unknown;
@@ -337,6 +345,12 @@ export async function setOverlayWindowBounds(bounds: OverlayWindowBounds): Promi
 
 export async function loadPluginManifests(directory: string): Promise<PluginManifestFile[]> {
   return invokeStrictOrFallback<PluginManifestFile[]>("load_plugin_manifests", { directory }, () => []);
+}
+
+export async function captureNativeScreenFrame(): Promise<NativeScreenFrame> {
+  return invokeStrictOrFallback<NativeScreenFrame>("capture_screen_frame", {}, async () => {
+    throw new Error("Native screen capture is available only inside the Caveman desktop app.");
+  });
 }
 
 export async function typeTextIntoActiveWindow(text: string): Promise<TypingResult> {

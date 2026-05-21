@@ -4,6 +4,8 @@ use crate::ai;
 use crate::audio::{self, AudioCaptureManager, AudioCaptureState, AudioProcessingSettings};
 use crate::db::{Database, NewAiResponse, NewSession};
 use crate::models::{AiResponse, PromptTemplate, Session, Transcript};
+use crate::ocr;
+use crate::ocr::ScreenFrame;
 use crate::overlay::{OverlayProtectionStatus, OverlayWindowBounds};
 use crate::plugins::PluginManifestFile;
 use crate::secrets::SecretStatus;
@@ -189,6 +191,11 @@ pub fn list_prompt_templates() -> Vec<PromptTemplate> {
 #[tauri::command]
 pub fn load_plugin_manifests(directory: String) -> Result<Vec<PluginManifestFile>, String> {
     crate::plugins::load_plugin_manifest_files(directory).map_err(to_command_error)
+}
+
+#[tauri::command]
+pub fn capture_screen_frame() -> Result<ScreenFrame, String> {
+    ocr::capture_screen_frame().map_err(to_command_error)
 }
 
 #[tauri::command]

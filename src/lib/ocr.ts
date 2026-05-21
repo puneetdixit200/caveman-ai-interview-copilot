@@ -1,13 +1,18 @@
 import type { OcrSettings, ProviderKind } from "../types/settings";
+import { captureNativeScreenFrame, isRunningInTauri, type NativeScreenFrame } from "./tauri";
 
 export interface ScreenOcrResult {
   provider: OcrSettings["provider"];
   text: string;
+  width?: number;
+  height?: number;
+  monitorName?: string | null;
   capturedAtMs: number;
 }
 
 export interface ScreenOcrDependencies {
   captureFrame?: () => Promise<string>;
+  captureNativeFrame?: () => Promise<NativeScreenFrame>;
   recognizeImage?: (imageDataUrl: string) => Promise<string>;
   now?: () => number;
 }
@@ -57,14 +62,39 @@ export async function runScreenOcr(
     throw new Error("Cloud OCR needs a configured provider before it can run.");
   }
 
-  const captureFrame = dependencies.captureFrame ?? captureScreenFrame;
+  const frame = await captureOcrFrame(settings, dependencies);
   const recognizeImage = dependencies.recognizeImage ?? recognizeWithTesseract;
-  const imageDataUrl = await captureFrame();
-  const text = normalizeOcrText(await recognizeImage(imageDataUrl));
+  const text = normalizeOcrText(await recognizeImage(frame.imageDataUrl));
 
   return {
     provider: settings.provider,
     text,
+    width: frame.width,
+    height: frame.height,
+    monitorName: frame.monitorName,
+    capturedAtMs: frame.capturedAtMs ?? dependencies.now?.() ?? Date.now()
+  };
+}
+
+async function captureOcrFrame(
+  settings: OcrSettings,
+  dependencies: ScreenOcrDependencies
+): Promise<Partial<NativeScreenFrame> & { imageDataUrl: string; capturedAtMs?: number }> {
+  const captureFrame = dependencies.captureFrame ?? captureScreenFrame;
+  const captureNativeFrame = dependencies.captureNativeFrame ?? captureNativeScreenFrame;
+
+  if (settings.provider === "windows_ocr" || isRunningInTauri()) {
+    try {
+      return await captureNativeFrame();
+    } catch (error) {
+      if (settings.provider === "windows_ocr") {
+        throw error;
+      }
+    }
+  }
+
+  return {
+    imageDataUrl: await captureFrame(),
     capturedAtMs: dependencies.now?.() ?? Date.now()
   };
 }

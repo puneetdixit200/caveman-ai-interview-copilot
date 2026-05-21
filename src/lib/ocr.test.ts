@@ -41,4 +41,36 @@ describe("ocr", () => {
     });
     expect(result.capturedAtMs).toBeGreaterThan(0);
   });
+
+  it("uses the native desktop frame capture path for Windows OCR", async () => {
+    const settings: OcrSettings = {
+      enabled: true,
+      provider: "windows_ocr",
+      includeInPrompt: true,
+      reviewBeforeSend: true
+    };
+
+    const result = await runScreenOcr(settings, {
+      captureFrame: async () => {
+        throw new Error("browser capture should not be used");
+      },
+      captureNativeFrame: async () => ({
+        imageDataUrl: "data:image/png;base64,native",
+        width: 1920,
+        height: 1080,
+        monitorName: "Primary",
+        capturedAtMs: 1234
+      }),
+      recognizeImage: async (image) => `${image}\n  Two sum prompt   `
+    });
+
+    expect(result).toEqual({
+      provider: "windows_ocr",
+      text: "data:image/png;base64,native\nTwo sum prompt",
+      width: 1920,
+      height: 1080,
+      monitorName: "Primary",
+      capturedAtMs: 1234
+    });
+  });
 });
