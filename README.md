@@ -32,13 +32,13 @@ Implemented now:
 - Resume, job description, OCR, and local knowledge-base context injection
 - Code answer extraction and active-window typing for code/editor/chat handoff
 - Practice interview mode with local scoring and AI follow-up question generation
-- Analytics, TTS queue/playback, plugin manifests/practice packs, OS keychain API key storage, and signed-update configuration
+- Analytics, TTS queue/playback, plugin manifests/practice packs, OS keychain API key storage, signed-update configuration, and GitHub `latest.json` release manifest generation
 - SQLite-backed Rust command layer for sessions, transcripts, responses, settings, screenshots, secrets, and native actions
 - Unit tests for audio, STT parsing, provider fallback, overlay safety, exports, analytics, plugins, hotkeys, OCR, practice, RAG, TTS, collaboration, and persistence
 
 Planned full build:
 
-- Production release signing, hosted update manifest publishing, and broader platform packaging
+- OS store code-signing certificates and broader platform packaging
 
 ## Core Features
 
@@ -65,6 +65,10 @@ Practice mode lets an AI interviewer ask questions, score answers, and track wea
 ### Collaborative Helper
 
 Dashboard helper links run from the desktop app on localhost by default. A trusted helper can open the tokenized link, watch the active session transcript and saved AI answers, then send short hints back into the dashboard during a live interview.
+
+### Signed Updates
+
+Use `npm run tauri:build:signed` after creating a Tauri updater signing key. The script builds updater artifacts, verifies signed Windows bundles exist, and writes `latest.json` for GitHub Releases at `src-tauri/target/release/bundle/latest.json`.
 
 ## Architecture
 

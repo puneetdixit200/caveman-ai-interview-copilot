@@ -7,11 +7,12 @@
     "dev": "vite --host 127.0.0.1 --port 1420",
     "build": "tsc --noEmit && vite build",
     "test": "vitest run",
+    "test:release": "node --test scripts/generate-latest-json.test.mjs",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
     "tauri": "tauri",
     "tauri:build:signed": "powershell -ExecutionPolicy Bypass -File scripts/build-signed-update.ps1",
-    "verify": "npm run test && npm run typecheck && npm run build"
+    "verify": "npm run test:release && npm run test && npm run typecheck && npm run build"
   },
   "dependencies": {
     "@tauri-apps/api": "^2.11.0",
