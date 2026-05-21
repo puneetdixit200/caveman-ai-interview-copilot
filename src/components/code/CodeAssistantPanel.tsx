@@ -1,6 +1,7 @@
-import { Clipboard, Code2, Copy } from "lucide-react";
+import { Clipboard, Code2, Copy, Keyboard } from "lucide-react";
 import { useMemo, useState } from "react";
 import { extractCodeSuggestions } from "../../lib/codeBlocks";
+import { typeTextIntoActiveWindow } from "../../lib/tauri";
 import type { AIResponseRecord } from "../../types/session";
 import { Button } from "../common/Button";
 
@@ -21,6 +22,15 @@ export function CodeAssistantPanel({ responses }: CodeAssistantPanelProps) {
 
     await navigator.clipboard.writeText(text);
     setStatus(`${label} copied`);
+  }
+
+  async function typeIntoActiveEditor(text: string, label: string) {
+    try {
+      const typed = await typeTextIntoActiveWindow(text);
+      setStatus(`Typed ${typed.characterCount} ${label.toLowerCase()} characters into the active editor`);
+    } catch (error) {
+      setStatus(`Could not type ${label.toLowerCase()}: ${error instanceof Error ? error.message : String(error)}`);
+    }
   }
 
   return (
@@ -51,6 +61,9 @@ export function CodeAssistantPanel({ responses }: CodeAssistantPanelProps) {
                 <span>{suggestion.language}</span>
                 <Button icon={<Copy size={16} />} onClick={() => copyText(suggestion.code, "Code")}>
                   Copy Code
+                </Button>
+                <Button icon={<Keyboard size={16} />} onClick={() => typeIntoActiveEditor(suggestion.code, "Code")}>
+                  Type Code
                 </Button>
               </div>
               <pre>
