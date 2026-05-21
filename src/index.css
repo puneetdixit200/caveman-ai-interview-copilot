@@ -926,6 +926,28 @@ input[type="checkbox"] {
   white-space: pre;
 }
 
+.syntax-keyword {
+  color: #82d2ff;
+  font-weight: 700;
+}
+
+.syntax-string {
+  color: #f3c982;
+}
+
+.syntax-number {
+  color: #a4f0a7;
+}
+
+.syntax-comment {
+  color: #7f928a;
+  font-style: italic;
+}
+
+.syntax-operator {
+  color: #d3d8ff;
+}
+
 .settings-two-column {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }

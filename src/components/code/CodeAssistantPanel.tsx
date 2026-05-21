@@ -1,6 +1,7 @@
 import { Clipboard, Code2, Copy, Keyboard } from "lucide-react";
 import { useMemo, useState } from "react";
 import { extractCodeSuggestions } from "../../lib/codeBlocks";
+import { displayLanguageLabel, highlightCode, normalizeLanguage } from "../../lib/codeHighlight";
 import { typeTextIntoActiveWindow } from "../../lib/tauri";
 import type { AIResponseRecord } from "../../types/session";
 import { Button } from "../common/Button";
@@ -58,7 +59,7 @@ export function CodeAssistantPanel({ responses }: CodeAssistantPanelProps) {
           {suggestions.map((suggestion, index) => (
             <article className="code-snippet" key={`${suggestion.responseId}-${index}`}>
               <div className="code-snippet-header">
-                <span>{suggestion.language}</span>
+                <span>{displayLanguageLabel(suggestion.language)}</span>
                 <Button icon={<Copy size={16} />} onClick={() => copyText(suggestion.code, "Code")}>
                   Copy Code
                 </Button>
@@ -67,7 +68,13 @@ export function CodeAssistantPanel({ responses }: CodeAssistantPanelProps) {
                 </Button>
               </div>
               <pre>
-                <code>{suggestion.code}</code>
+                <code className={`language-${normalizeLanguage(suggestion.language) || "text"}`}>
+                  {highlightCode(suggestion.code, suggestion.language).map((token, tokenIndex) => (
+                    <span className={`syntax-token syntax-${token.type}`} key={`${token.type}-${tokenIndex}`}>
+                      {token.text}
+                    </span>
+                  ))}
+                </code>
               </pre>
             </article>
           ))}

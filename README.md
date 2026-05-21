@@ -31,7 +31,7 @@ Implemented now:
 - Session archive with search, cursor-paged replay for long histories, transcript correction, Markdown, JSON, and PDF export
 - Trusted collaborative helper link with token-gated live transcript/answer snapshot sharing and inbound helper hints
 - Resume, job description, OCR, and local knowledge-base context injection
-- Code answer extraction and active-window typing for code/editor/chat handoff
+- Syntax-highlighted code answer extraction with clipboard copy and active-window typing for code/editor/chat handoff
 - Practice interview mode with local scoring and AI follow-up question generation
 - Analytics, TTS queue/playback, plugin manifests/practice packs, OS keychain API key storage, signed-update configuration, and GitHub `latest.json` release manifest generation
 - SQLite-backed Rust command layer for sessions, transcripts, responses, settings, screenshots, secrets, and native actions
