@@ -73,18 +73,22 @@ export function parseDeepgramLiveMessage(raw: string, source: TranscriptSource):
     .find((speaker): speaker is number => typeof speaker === "number");
   const languages = Array.isArray(alternative?.languages) ? alternative.languages.map(readString).filter(Boolean) : [];
 
-  return [
-    {
-      speaker: deepgramSpeakerToCaveman(firstSpeaker, source),
-      text: transcript,
-      startMs: Math.round(startSeconds * 1000),
-      endMs: Math.round((startSeconds + durationSeconds) * 1000),
-      confidence: readNumber(alternative?.confidence),
-      language: languages[0],
-      isFinal: parsed.is_final === true,
-      speechFinal: parsed.speech_final === true
-    }
-  ];
+  const event: DeepgramLiveTranscriptEvent = {
+    speaker: deepgramSpeakerToCaveman(firstSpeaker, source),
+    text: transcript,
+    startMs: Math.round(startSeconds * 1000),
+    endMs: Math.round((startSeconds + durationSeconds) * 1000),
+    confidence: readNumber(alternative?.confidence),
+    language: languages[0],
+    isFinal: parsed.is_final === true,
+    speechFinal: parsed.speech_final === true
+  };
+
+  if (firstSpeaker !== undefined) {
+    event.providerSpeaker = String(firstSpeaker);
+  }
+
+  return [event];
 }
 
 export class DeepgramLiveTranscriber {

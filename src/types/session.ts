@@ -41,6 +41,7 @@ export interface TranscriptSegment {
 
 export interface SttTranscriptEvent {
   speaker: Speaker;
+  providerSpeaker?: string;
   text: string;
   startMs: number;
   endMs: number;

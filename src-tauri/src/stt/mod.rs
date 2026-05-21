@@ -83,6 +83,8 @@ pub struct WhisperModelDownloadResult {
 #[serde(rename_all = "camelCase")]
 pub struct TranscriptEvent {
     pub speaker: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub provider_speaker: Option<String>,
     pub text: String,
     pub start_ms: i64,
     pub end_ms: i64,
@@ -218,6 +220,7 @@ struct GoogleWord {
 #[derive(Debug)]
 struct ParsedWord {
     speaker: String,
+    provider_speaker: Option<String>,
     text: String,
     start_ms: i64,
     end_ms: i64,
@@ -864,6 +867,7 @@ pub fn parse_whisper_json(json: &str) -> anyhow::Result<Vec<TranscriptEvent>> {
             let offsets = segment.offsets.unwrap_or(WhisperOffsets { from: 0, to: 0 });
             Some(TranscriptEvent {
                 speaker: whisper_speaker_to_caveman(segment.speaker.as_deref()),
+                provider_speaker: provider_speaker_from_text(segment.speaker.as_deref()),
                 text,
                 start_ms: offsets.from,
                 end_ms: offsets.to,
@@ -897,6 +901,7 @@ pub fn parse_deepgram_json(
                 .into_iter()
                 .map(|word| ParsedWord {
                     speaker: numeric_speaker_to_caveman(word.speaker, 0),
+                    provider_speaker: provider_speaker_from_number(word.speaker, 0),
                     text: word.punctuated_word.unwrap_or(word.word),
                     start_ms: seconds_to_ms(word.start),
                     end_ms: seconds_to_ms(word.end),
@@ -910,6 +915,7 @@ pub fn parse_deepgram_json(
         {
             events.push(TranscriptEvent {
                 speaker: "unknown".to_string(),
+                provider_speaker: None,
                 text: transcript.trim().to_string(),
                 start_ms: 0,
                 end_ms: 0,
@@ -944,6 +950,7 @@ pub fn parse_assemblyai_json(
 
                 Some(TranscriptEvent {
                     speaker: assembly_speaker_to_caveman(utterance.speaker.as_deref()),
+                    provider_speaker: provider_speaker_from_text(utterance.speaker.as_deref()),
                     text: text.to_string(),
                     start_ms: utterance.start,
                     end_ms: utterance.end,
@@ -960,6 +967,7 @@ pub fn parse_assemblyai_json(
         .map(|text| {
             vec![TranscriptEvent {
                 speaker: "unknown".to_string(),
+                provider_speaker: None,
                 text: text.trim().to_string(),
                 start_ms: 0,
                 end_ms: 0,
@@ -989,6 +997,7 @@ pub fn parse_google_json(
                 .into_iter()
                 .map(|word| ParsedWord {
                     speaker: numeric_speaker_to_caveman(word.speaker_tag, 1),
+                    provider_speaker: provider_speaker_from_number(word.speaker_tag, 1),
                     text: word.word,
                     start_ms: duration_to_ms(word.start_time.as_deref()),
                     end_ms: duration_to_ms(word.end_time.as_deref()),
@@ -1002,6 +1011,7 @@ pub fn parse_google_json(
         {
             events.push(TranscriptEvent {
                 speaker: "unknown".to_string(),
+                provider_speaker: None,
                 text: transcript.trim().to_string(),
                 start_ms: 0,
                 end_ms: 0,
@@ -1258,18 +1268,45 @@ fn assembly_speaker_to_caveman(speaker: Option<&str>) -> String {
     }
 }
 
+fn provider_speaker_from_text(speaker: Option<&str>) -> Option<String> {
+    let normalized = speaker?
+        .trim()
+        .trim_matches(|character| character == '[' || character == ']')
+        .to_ascii_lowercase()
+        .replace(['_', '-'], " ");
+    let collapsed = normalized.split_whitespace().collect::<Vec<_>>().join(" ");
+
+    match collapsed.as_str() {
+        "a" | "0" | "speaker 0" | "speaker 00" => Some("0".to_string()),
+        "b" | "1" | "speaker 1" | "speaker 01" => Some("1".to_string()),
+        _ => None,
+    }
+}
+
+fn provider_speaker_from_number(speaker: Option<i64>, interviewer_value: i64) -> Option<String> {
+    let provider_slot = speaker? - interviewer_value;
+    match provider_slot {
+        0 | 1 => Some(provider_slot.to_string()),
+        _ => None,
+    }
+}
+
 fn group_words_by_speaker(words: Vec<ParsedWord>, language: Option<&str>) -> Vec<TranscriptEvent> {
     let mut events = Vec::new();
     let mut current_speaker = String::new();
+    let mut current_provider_speaker: Option<String> = None;
     let mut current_words = Vec::new();
     let mut start_ms = 0;
     let mut end_ms = 0;
     let mut confidences = Vec::new();
 
     for word in words {
-        if current_speaker != word.speaker && !current_words.is_empty() {
+        let speaker_changed = current_speaker != word.speaker
+            || current_provider_speaker.as_deref() != word.provider_speaker.as_deref();
+        if speaker_changed && !current_words.is_empty() {
             events.push(build_grouped_event(
                 &current_speaker,
+                current_provider_speaker.as_deref(),
                 &current_words,
                 start_ms,
                 end_ms,
@@ -1282,6 +1319,7 @@ fn group_words_by_speaker(words: Vec<ParsedWord>, language: Option<&str>) -> Vec
 
         if current_words.is_empty() {
             current_speaker = word.speaker.clone();
+            current_provider_speaker = word.provider_speaker.clone();
             start_ms = word.start_ms;
         }
 
@@ -1295,6 +1333,7 @@ fn group_words_by_speaker(words: Vec<ParsedWord>, language: Option<&str>) -> Vec
     if !current_words.is_empty() {
         events.push(build_grouped_event(
             &current_speaker,
+            current_provider_speaker.as_deref(),
             &current_words,
             start_ms,
             end_ms,
@@ -1308,6 +1347,7 @@ fn group_words_by_speaker(words: Vec<ParsedWord>, language: Option<&str>) -> Vec
 
 fn build_grouped_event(
     speaker: &str,
+    provider_speaker: Option<&str>,
     words: &[String],
     start_ms: i64,
     end_ms: i64,
@@ -1322,6 +1362,7 @@ fn build_grouped_event(
 
     TranscriptEvent {
         speaker: speaker.to_string(),
+        provider_speaker: provider_speaker.map(str::to_string),
         text: words.join(" ").trim().to_string(),
         start_ms,
         end_ms,
@@ -1376,6 +1417,7 @@ mod tests {
             vec![
                 TranscriptEvent {
                     speaker: "interviewer".to_string(),
+                    provider_speaker: Some("0".to_string()),
                     text: "Explain HashMap internals".to_string(),
                     start_ms: 0,
                     end_ms: 1420,
@@ -1384,6 +1426,7 @@ mod tests {
                 },
                 TranscriptEvent {
                     speaker: "unknown".to_string(),
+                    provider_speaker: None,
                     text: "It uses buckets.".to_string(),
                     start_ms: 1500,
                     end_ms: 2300,
@@ -1590,8 +1633,10 @@ mod tests {
 
         assert_eq!(events.len(), 2);
         assert_eq!(events[0].speaker, "interviewer");
+        assert_eq!(events[0].provider_speaker.as_deref(), Some("0"));
         assert_eq!(events[0].text, "What is a hashmap?");
         assert_eq!(events[1].speaker, "candidate");
+        assert_eq!(events[1].provider_speaker.as_deref(), Some("1"));
         assert_eq!(events[1].text, "It stores");
     }
 
@@ -1637,9 +1682,11 @@ mod tests {
 
         assert_eq!(events.len(), 2);
         assert_eq!(events[0].speaker, "interviewer");
+        assert_eq!(events[0].provider_speaker.as_deref(), Some("0"));
         assert_eq!(events[0].text, "Tell me about indexes.");
         assert_eq!(events[0].language, Some("en".to_string()));
         assert_eq!(events[1].speaker, "candidate");
+        assert_eq!(events[1].provider_speaker.as_deref(), Some("1"));
     }
 
     #[test]
@@ -1670,9 +1717,11 @@ mod tests {
 
         assert_eq!(events.len(), 2);
         assert_eq!(events[0].speaker, "interviewer");
+        assert_eq!(events[0].provider_speaker.as_deref(), Some("0"));
         assert_eq!(events[0].text, "Explain caching");
         assert_eq!(events[0].language, Some("en-us".to_string()));
         assert_eq!(events[1].speaker, "candidate");
+        assert_eq!(events[1].provider_speaker.as_deref(), Some("1"));
         assert_eq!(events[1].start_ms, 1100);
         assert_eq!(events[1].end_ms, 2200);
     }

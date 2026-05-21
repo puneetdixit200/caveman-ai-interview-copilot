@@ -1,4 +1,4 @@
-import type { InterviewType } from "./session";
+import type { InterviewType, Speaker } from "./session";
 
 export type ProviderKind = "local" | "cloud";
 export type ProviderId = "ollama" | "lmstudio" | "openrouter" | "openai" | "anthropic" | "groq";
@@ -43,11 +43,20 @@ export interface SttSettings {
   selectedMode: SttMode;
   language: string;
   diarizationEnabled: boolean;
+  speakerCalibration: SpeakerCalibrationSettings;
   localWhisperBinaryPath: string;
   localWhisperModelPath: string;
   cloudEndpoint: string;
   apiKeyStored: boolean;
   apiKey?: string;
+}
+
+export interface SpeakerCalibrationSettings {
+  systemAudioSpeaker: Speaker;
+  microphoneSpeaker: Speaker;
+  providerSpeaker0: Speaker;
+  providerSpeaker1: Speaker;
+  preferProviderDiarization: boolean;
 }
 
 export interface AutoTriggerSettings {

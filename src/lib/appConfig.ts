@@ -12,10 +12,12 @@ import type {
   ProviderId,
   SecuritySettings,
   ShortcutSettings,
+  SpeakerCalibrationSettings,
   SttMode,
   SttSettings,
   TtsSettings
 } from "../types/settings";
+import type { Speaker } from "../types/session";
 import {
   DEFAULT_CAPTURE_SHORTCUT,
   DEFAULT_GENERATE_SHORTCUT,
@@ -23,6 +25,7 @@ import {
   DEFAULT_TYPE_LATEST_SHORTCUT,
   normalizeShortcut
 } from "./hotkeys";
+import { DEFAULT_SPEAKER_CALIBRATION } from "./speakerCalibration";
 
 export interface AppConfig {
   selectedProviderId: ProviderId;
@@ -118,6 +121,7 @@ export const DEFAULT_APP_CONFIG: AppConfig = {
     selectedMode: "manual",
     language: "en",
     diarizationEnabled: true,
+    speakerCalibration: DEFAULT_SPEAKER_CALIBRATION,
     localWhisperBinaryPath: "",
     localWhisperModelPath: "",
     cloudEndpoint: "",
@@ -270,7 +274,7 @@ function cloneConfig(config: AppConfig): AppConfig {
     ...config,
     providers: config.providers.map((provider) => ({ ...provider })),
     audio: { ...config.audio },
-    stt: { ...config.stt },
+    stt: { ...config.stt, speakerCalibration: { ...config.stt.speakerCalibration } },
     autoTrigger: { ...config.autoTrigger },
     ocr: { ...config.ocr },
     tts: { ...config.tts },
@@ -334,7 +338,31 @@ function mergeSttSettings(raw: unknown): SttSettings {
     localWhisperModelPath: readString(value.localWhisperModelPath, DEFAULT_APP_CONFIG.stt.localWhisperModelPath),
     cloudEndpoint: readString(value.cloudEndpoint, DEFAULT_APP_CONFIG.stt.cloudEndpoint),
     apiKeyStored: typeof value.apiKeyStored === "boolean" ? value.apiKeyStored : DEFAULT_APP_CONFIG.stt.apiKeyStored,
-    apiKey: typeof value.apiKey === "string" ? value.apiKey : DEFAULT_APP_CONFIG.stt.apiKey
+    apiKey: typeof value.apiKey === "string" ? value.apiKey : DEFAULT_APP_CONFIG.stt.apiKey,
+    speakerCalibration: mergeSpeakerCalibrationSettings(value.speakerCalibration)
+  };
+}
+
+function mergeSpeakerCalibrationSettings(raw: unknown): SpeakerCalibrationSettings {
+  const value = isObject(raw) ? raw : {};
+  return {
+    ...DEFAULT_SPEAKER_CALIBRATION,
+    systemAudioSpeaker: isSpeaker(value.systemAudioSpeaker)
+      ? value.systemAudioSpeaker
+      : DEFAULT_SPEAKER_CALIBRATION.systemAudioSpeaker,
+    microphoneSpeaker: isSpeaker(value.microphoneSpeaker)
+      ? value.microphoneSpeaker
+      : DEFAULT_SPEAKER_CALIBRATION.microphoneSpeaker,
+    providerSpeaker0: isSpeaker(value.providerSpeaker0)
+      ? value.providerSpeaker0
+      : DEFAULT_SPEAKER_CALIBRATION.providerSpeaker0,
+    providerSpeaker1: isSpeaker(value.providerSpeaker1)
+      ? value.providerSpeaker1
+      : DEFAULT_SPEAKER_CALIBRATION.providerSpeaker1,
+    preferProviderDiarization:
+      typeof value.preferProviderDiarization === "boolean"
+        ? value.preferProviderDiarization
+        : DEFAULT_SPEAKER_CALIBRATION.preferProviderDiarization
   };
 }
 
@@ -573,6 +601,10 @@ function isAutoTriggerMode(value: unknown): value is AutoTriggerMode {
 
 function isOcrProvider(value: unknown): value is OcrProvider {
   return value === "disabled" || value === "local_tesseract" || value === "windows_ocr" || value === "cloud";
+}
+
+function isSpeaker(value: unknown): value is Speaker {
+  return value === "interviewer" || value === "candidate" || value === "unknown";
 }
 
 function isInterviewType(value: unknown): value is AppProfile["interviewType"] {

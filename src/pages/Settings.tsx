@@ -76,9 +76,17 @@ import type {
   ProviderId,
   SecuritySettings,
   ShortcutSettings,
+  SpeakerCalibrationSettings,
   SttSettings,
   TtsSettings
 } from "../types/settings";
+import type { Speaker } from "../types/session";
+
+const SPEAKER_ROLE_OPTIONS: Array<{ value: Speaker; label: string }> = [
+  { value: "interviewer", label: "Interviewer" },
+  { value: "candidate", label: "You" },
+  { value: "unknown", label: "Unknown" }
+];
 
 export function Settings() {
   const [config, setConfig] = useState<AppConfig>(DEFAULT_APP_CONFIG);
@@ -423,6 +431,19 @@ export function Settings() {
 
   function updateStt(patch: Partial<SttSettings>) {
     setConfig((current) => ({ ...current, stt: { ...current.stt, ...patch } }));
+  }
+
+  function updateSpeakerCalibration(patch: Partial<SpeakerCalibrationSettings>) {
+    setConfig((current) => ({
+      ...current,
+      stt: {
+        ...current.stt,
+        speakerCalibration: {
+          ...current.stt.speakerCalibration,
+          ...patch
+        }
+      }
+    }));
   }
 
   async function updateSelectedSttMode(selectedMode: SttSettings["selectedMode"]) {
@@ -1356,6 +1377,68 @@ export function Settings() {
               type="checkbox"
               checked={config.stt.diarizationEnabled}
               onChange={(event) => updateStt({ diarizationEnabled: event.currentTarget.checked })}
+            />
+          </label>
+          <label className="settings-field">
+            <span>System audio default speaker</span>
+            <select
+              value={config.stt.speakerCalibration.systemAudioSpeaker}
+              onChange={(event) => updateSpeakerCalibration({ systemAudioSpeaker: event.currentTarget.value as Speaker })}
+            >
+              {SPEAKER_ROLE_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="settings-field">
+            <span>Microphone default speaker</span>
+            <select
+              value={config.stt.speakerCalibration.microphoneSpeaker}
+              onChange={(event) => updateSpeakerCalibration({ microphoneSpeaker: event.currentTarget.value as Speaker })}
+            >
+              {SPEAKER_ROLE_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="settings-field">
+            <span>Provider speaker 0</span>
+            <select
+              value={config.stt.speakerCalibration.providerSpeaker0}
+              onChange={(event) => updateSpeakerCalibration({ providerSpeaker0: event.currentTarget.value as Speaker })}
+            >
+              {SPEAKER_ROLE_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="settings-field">
+            <span>Provider speaker 1</span>
+            <select
+              value={config.stt.speakerCalibration.providerSpeaker1}
+              onChange={(event) => updateSpeakerCalibration({ providerSpeaker1: event.currentTarget.value as Speaker })}
+            >
+              {SPEAKER_ROLE_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="toggle-row">
+            <span>Prefer provider diarization labels</span>
+            <input
+              type="checkbox"
+              checked={config.stt.speakerCalibration.preferProviderDiarization}
+              onChange={(event) =>
+                updateSpeakerCalibration({ preferProviderDiarization: event.currentTarget.checked })
+              }
             />
           </label>
           <Button icon={<Wifi size={16} />} onClick={testLocalWhisper} disabled={testingStt}>

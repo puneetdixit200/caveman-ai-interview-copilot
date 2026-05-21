@@ -272,6 +272,69 @@ describe("liveTranscription", () => {
     });
   });
 
+  it("applies speaker calibration before saving snapshot transcript events", async () => {
+    const saveCaptureSnapshot = vi.fn(async () => ({
+      source: "system" as const,
+      audioPath: "C:\\tmp\\system.wav",
+      sampleRateHz: 16000,
+      channels: 1,
+      durationMs: 1600,
+      sampleCount: 25600
+    }));
+    const transcribeWithCloudStt = vi.fn(async () => [
+      {
+        speaker: "interviewer" as const,
+        providerSpeaker: "0",
+        text: "I want to add one constraint.",
+        startMs: 0,
+        endMs: 900,
+        confidence: 0.82,
+        language: "en"
+      }
+    ]);
+    const addTranscript = vi.fn(async (input) => ({
+      id: 7,
+      sessionId: input.sessionId,
+      speaker: input.speaker,
+      content: input.content,
+      timestampMs: input.timestampMs,
+      confidence: input.confidence
+    }));
+
+    await runLiveTranscriptionPass({
+      sessionId: "s1",
+      config: {
+        ...DEFAULT_APP_CONFIG,
+        audio: {
+          ...DEFAULT_APP_CONFIG.audio,
+          captureMode: "system"
+        },
+        stt: {
+          ...DEFAULT_APP_CONFIG.stt,
+          selectedMode: "assemblyai",
+          apiKey: "stt_key",
+          speakerCalibration: {
+            ...DEFAULT_APP_CONFIG.stt.speakerCalibration,
+            preferProviderDiarization: true,
+            providerSpeaker0: "candidate"
+          }
+        }
+      },
+      seenTranscriptKeys: new Set<string>(),
+      saveCaptureSnapshot,
+      transcribeWithCloudStt,
+      addTranscript
+    });
+
+    expect(addTranscript).toHaveBeenCalledWith({
+      sessionId: "s1",
+      speaker: "candidate",
+      content: "I want to add one constraint.",
+      timestampMs: 0,
+      confidence: 0.82
+    });
+  });
+
   it("leaves Deepgram to the live WebSocket path instead of snapshot transcription", async () => {
     const saveCaptureSnapshot = vi.fn();
     const transcribeWithCloudStt = vi.fn();

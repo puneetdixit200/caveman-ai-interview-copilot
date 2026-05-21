@@ -8,6 +8,7 @@ import {
 } from "./tauri";
 import type { SttTranscriptEvent, TranscriptSegment } from "../types/session";
 import type { AudioCaptureMode, SttMode } from "../types/settings";
+import { resolveCalibratedSpeaker } from "./speakerCalibration";
 
 type SttCloudMode = "assemblyai" | "google";
 type SnapshotSource = "microphone" | "system";
@@ -60,7 +61,12 @@ export async function runLiveTranscriptionPass(input: {
         continue;
       }
 
-      const speaker = normalizeSpeakerForSource(event.speaker, snapshot.source);
+      const speaker = resolveCalibratedSpeaker({
+        speaker: event.speaker,
+        providerSpeaker: event.providerSpeaker,
+        source: snapshot.source,
+        calibration: input.config.stt.speakerCalibration
+      });
       const key = transcriptKey(speaker, text);
       if (input.seenTranscriptKeys.has(key)) {
         continue;
@@ -157,22 +163,6 @@ function isCloudSttMode(mode: SttMode): mode is SttCloudMode {
 
 function cloudSttLanguage(language: string): string {
   return language.trim() || "auto";
-}
-
-function normalizeSpeakerForSource(speaker: SttTranscriptEvent["speaker"], source: CaptureSnapshot["source"]) {
-  if (speaker !== "unknown") {
-    return speaker;
-  }
-
-  if (source === "system") {
-    return "interviewer";
-  }
-
-  if (source === "microphone") {
-    return "candidate";
-  }
-
-  return speaker;
 }
 
 function transcriptTimestampMs(input: {

@@ -54,6 +54,16 @@ describe("Settings", () => {
     expect(screen.getByRole("button", { name: "Download Base.en Model" })).toBeInTheDocument();
   });
 
+  it("shows speaker calibration controls for source and provider diarization labels", async () => {
+    render(<Settings />);
+
+    expect(await screen.findByRole("combobox", { name: "System audio default speaker" })).toBeInTheDocument();
+    expect(screen.getByRole("combobox", { name: "Microphone default speaker" })).toBeInTheDocument();
+    expect(screen.getByRole("combobox", { name: "Provider speaker 0" })).toBeInTheDocument();
+    expect(screen.getByRole("combobox", { name: "Provider speaker 1" })).toBeInTheDocument();
+    expect(screen.getByLabelText("Prefer provider diarization labels")).toBeInTheDocument();
+  });
+
   it("shows screen OCR capture and review controls", async () => {
     render(<Settings />);
 

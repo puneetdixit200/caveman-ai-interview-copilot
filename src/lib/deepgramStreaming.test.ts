@@ -86,6 +86,7 @@ describe("deepgramStreaming", () => {
     ).toEqual([
       {
         speaker: "interviewer",
+        providerSpeaker: "0",
         text: "Explain indexes.",
         startMs: 1200,
         endMs: 2000,
@@ -120,6 +121,7 @@ describe("deepgramStreaming", () => {
     ).toEqual([
       {
         speaker: "interviewer",
+        providerSpeaker: "0",
         text: "Walk me through",
         startMs: 2400,
         endMs: 3100,

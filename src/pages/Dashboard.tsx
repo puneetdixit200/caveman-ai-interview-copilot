@@ -33,6 +33,7 @@ import { hydrateProviderApiKeys } from "../lib/providerSecrets";
 import { selectRunnableProviders } from "../lib/providerSelection";
 import { promptTemplates } from "../lib/promptTemplates";
 import { estimateTokens, nextTranscriptTimestampMs } from "../lib/sessionRuntime";
+import { resolveCalibratedSpeaker } from "../lib/speakerCalibration";
 import { enqueueTtsResponse, playTtsItem } from "../lib/tts";
 import { runLiveTranscriptionPass } from "../lib/liveTranscription";
 import {
@@ -430,7 +431,12 @@ export function Dashboard() {
         return;
       }
 
-      const speaker = normalizeStreamingSpeakerForSource(event.speaker, source);
+      const speaker = resolveCalibratedSpeaker({
+        speaker: event.speaker,
+        providerSpeaker: event.providerSpeaker,
+        source,
+        calibration: config.stt.speakerCalibration
+      });
       const key = `${speaker}:${text.toLowerCase().replace(/\s+/g, " ")}`;
       if (seenLiveTranscriptKeys.current.has(key)) {
         return;
@@ -535,6 +541,7 @@ export function Dashboard() {
     config.stt.localWhisperBinaryPath,
     config.stt.localWhisperModelPath,
     config.stt.selectedMode,
+    config.stt.speakerCalibration,
     lastTriggeredTranscriptId,
     running,
     session?.createdAt,
@@ -561,7 +568,7 @@ export function Dashboard() {
       : 0;
     const transcribers = new Map<"microphone" | "system", DeepgramLiveTranscriber>();
 
-    async function saveStreamingTranscript(event: SttTranscriptEvent) {
+    async function saveStreamingTranscript(event: SttTranscriptEvent, source: "microphone" | "system") {
       if (!session || disposed) {
         return;
       }
@@ -571,7 +578,13 @@ export function Dashboard() {
         return;
       }
 
-      const key = `${event.speaker}:${text.toLowerCase().replace(/\s+/g, " ")}`;
+      const speaker = resolveCalibratedSpeaker({
+        speaker: event.speaker,
+        providerSpeaker: event.providerSpeaker,
+        source,
+        calibration: config.stt.speakerCalibration
+      });
+      const key = `${speaker}:${text.toLowerCase().replace(/\s+/g, " ")}`;
       if (seenLiveTranscriptKeys.current.has(key)) {
         return;
       }
@@ -580,7 +593,7 @@ export function Dashboard() {
       try {
         const saved = await addTranscript({
           sessionId: session.id,
-          speaker: event.speaker,
+          speaker,
           content: text,
           timestampMs: sessionOffsetMs + event.startMs,
           confidence: event.confidence
@@ -590,7 +603,7 @@ export function Dashboard() {
           return;
         }
 
-        setInterimPreviews((current) => current.filter((preview) => preview.source !== eventSourceForSpeaker(saved.speaker)));
+        setInterimPreviews((current) => current.filter((preview) => preview.source !== source));
 
         setTranscripts((current) => {
           const nextTranscripts = [...current, saved];
@@ -625,9 +638,15 @@ export function Dashboard() {
       }
 
       setInterimPreviews((current) => {
+        const speaker = resolveCalibratedSpeaker({
+          speaker: event.speaker,
+          providerSpeaker: event.providerSpeaker,
+          source,
+          calibration: config.stt.speakerCalibration
+        });
         const nextPreview: InterimTranscriptPreview = {
           id: `deepgram-${source}`,
-          speaker: event.speaker,
+          speaker,
           content: text,
           timestampMs: sessionOffsetMs + event.startMs,
           confidence: event.confidence,
@@ -650,7 +669,7 @@ export function Dashboard() {
         language: config.stt.language || "auto",
         diarizationEnabled: config.stt.diarizationEnabled,
         endpoint: websocketSttEndpoint(config.stt.cloudEndpoint),
-        onTranscript: (event) => void saveStreamingTranscript(event),
+        onTranscript: (event) => void saveStreamingTranscript(event, source),
         onInterimTranscript: (event) => previewStreamingTranscript(event, source),
         onStatus: (message) => {
           if (!disposed) {
@@ -698,6 +717,7 @@ export function Dashboard() {
     config.stt.diarizationEnabled,
     config.stt.language,
     config.stt.selectedMode,
+    config.stt.speakerCalibration,
     lastTriggeredTranscriptId,
     running,
     session?.createdAt,
@@ -1070,16 +1090,4 @@ function websocketSttEndpoint(endpoint: string): string | undefined {
 
 function isSnapshotSttMode(mode: AppConfig["stt"]["selectedMode"]): mode is "assemblyai" | "google" {
   return mode === "assemblyai" || mode === "google";
-}
-
-function normalizeStreamingSpeakerForSource(speaker: Speaker, source: "microphone" | "system"): Speaker {
-  if (speaker !== "unknown") {
-    return speaker;
-  }
-
-  return source === "system" ? "interviewer" : "candidate";
-}
-
-function eventSourceForSpeaker(speaker: Speaker): "microphone" | "system" {
-  return speaker === "candidate" ? "microphone" : "system";
 }

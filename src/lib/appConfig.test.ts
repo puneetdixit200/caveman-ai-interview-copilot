@@ -166,7 +166,14 @@ describe("appConfig", () => {
     expect(config.stt).toMatchObject({
       selectedMode: "manual",
       diarizationEnabled: true,
-      language: "en"
+      language: "en",
+      speakerCalibration: {
+        systemAudioSpeaker: "interviewer",
+        microphoneSpeaker: "candidate",
+        providerSpeaker0: "interviewer",
+        providerSpeaker1: "candidate",
+        preferProviderDiarization: true
+      }
     });
     expect(config.autoTrigger).toMatchObject({
       mode: "manual",
@@ -219,7 +226,14 @@ describe("appConfig", () => {
         stt: {
           selectedMode: "deepgram",
           language: "hi",
-          diarizationEnabled: false
+          diarizationEnabled: false,
+          speakerCalibration: {
+            systemAudioSpeaker: "candidate",
+            microphoneSpeaker: "bad",
+            providerSpeaker0: "candidate",
+            providerSpeaker1: "interviewer",
+            preferProviderDiarization: false
+          }
         },
         autoTrigger: {
           mode: "suggest_on_question",
@@ -266,7 +280,14 @@ describe("appConfig", () => {
     expect(parsed.stt).toMatchObject({
       selectedMode: "deepgram",
       language: "hi",
-      diarizationEnabled: false
+      diarizationEnabled: false,
+      speakerCalibration: {
+        systemAudioSpeaker: "candidate",
+        microphoneSpeaker: "candidate",
+        providerSpeaker0: "candidate",
+        providerSpeaker1: "interviewer",
+        preferProviderDiarization: false
+      }
     });
     expect(parsed.autoTrigger).toMatchObject({
       mode: "suggest_on_question",
