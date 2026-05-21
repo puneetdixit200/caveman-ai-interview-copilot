@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { buildChatMessages } from "./contextBuilder";
+import { estimateTokens } from "./sessionRuntime";
 import type { PromptTemplate, TranscriptSegment } from "../types/session";
 
 const template: PromptTemplate = {
@@ -89,5 +90,46 @@ describe("buildChatMessages", () => {
       role: "system",
       content: "Relevant knowledge base context:\nproject: Payments\nStripe webhook retries used queue backoff."
     });
+  });
+
+  it("keeps prompt messages inside a token budget by dropping oldest transcript turns first", () => {
+    const messages = buildChatMessages({
+      template,
+      transcripts: [
+        {
+          id: 1,
+          sessionId: "s1",
+          speaker: "interviewer",
+          content: `Old background ${"architecture ".repeat(80)}`,
+          timestampMs: 1000,
+          confidence: 0.9
+        },
+        {
+          id: 2,
+          sessionId: "s1",
+          speaker: "candidate",
+          content: "Recent answer used queues.",
+          timestampMs: 2000,
+          confidence: 0.9
+        },
+        {
+          id: 3,
+          sessionId: "s1",
+          speaker: "interviewer",
+          content: "How would you prevent duplicate jobs?",
+          timestampMs: 3000,
+          confidence: 0.9
+        }
+      ],
+      maxHistoryCharacters: 20_000,
+      maxContextTokens: 70
+    });
+
+    const totalTokens = estimateTokens(messages.map((message) => message.content).join("\n"));
+
+    expect(totalTokens).toBeLessThanOrEqual(70);
+    expect(messages.some((message) => message.content.includes("Old background"))).toBe(false);
+    expect(messages.some((message) => message.content.includes("Recent answer used queues."))).toBe(true);
+    expect(messages.at(-1)?.content).toContain("How would you prevent duplicate jobs?");
   });
 });
