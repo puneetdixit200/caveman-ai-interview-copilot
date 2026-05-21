@@ -58,4 +58,68 @@ describe("autoTrigger", () => {
       })
     ).toEqual({ shouldTrigger: true, transcriptId: 13, reason: "silence" });
   });
+
+  it("suppresses repeated interviewer questions inside the duplicate window", () => {
+    const segments: TranscriptSegment[] = [
+      {
+        id: 21,
+        sessionId: "s1",
+        speaker: "interviewer",
+        content: "How would you design a rate limiter?",
+        timestampMs: 1000,
+        confidence: 0.95
+      },
+      {
+        id: 22,
+        sessionId: "s1",
+        speaker: "interviewer",
+        content: "how would you design a rate limiter",
+        timestampMs: 12_000,
+        confidence: 0.9
+      }
+    ];
+
+    expect(
+      shouldTriggerAnswer({
+        segments,
+        settings,
+        lastTriggeredTranscriptId: 21,
+        nowMs: 14_000
+      })
+    ).toEqual({ shouldTrigger: false });
+  });
+
+  it("allows a repeated interviewer question after the duplicate window expires", () => {
+    const segments: TranscriptSegment[] = [
+      {
+        id: 31,
+        sessionId: "s1",
+        speaker: "interviewer",
+        content: "How would you design a rate limiter?",
+        timestampMs: 1000,
+        confidence: 0.95
+      },
+      {
+        id: 32,
+        sessionId: "s1",
+        speaker: "interviewer",
+        content: "How would you design a rate limiter?",
+        timestampMs: 45_000,
+        confidence: 0.9
+      }
+    ];
+
+    expect(
+      shouldTriggerAnswer({
+        segments,
+        settings,
+        lastTriggeredTranscriptId: 31,
+        nowMs: 45_500
+      })
+    ).toEqual({
+      shouldTrigger: true,
+      transcriptId: 32,
+      reason: "question"
+    });
+  });
 });

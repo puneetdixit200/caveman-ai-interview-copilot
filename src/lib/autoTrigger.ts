@@ -52,6 +52,10 @@ export function shouldTriggerAnswer({
     return { shouldTrigger: false };
   }
 
+  if (isDuplicateRecentQuestion(segments, latest, lastTriggeredTranscriptId, settings.duplicateWindowMs)) {
+    return { shouldTrigger: false };
+  }
+
   if (settings.requireInterviewerSpeaker && latest.speaker !== "interviewer") {
     return { shouldTrigger: false };
   }
@@ -78,4 +82,33 @@ function isExplicitQuestion(content: string): boolean {
 function isQuestionLikePrompt(content: string): boolean {
   const first = content.trim().toLowerCase().split(/\s+/)[0] ?? "";
   return QUESTION_STARTERS.includes(first);
+}
+
+function isDuplicateRecentQuestion(
+  segments: TranscriptSegment[],
+  latest: TranscriptSegment,
+  lastTriggeredTranscriptId: number | undefined,
+  duplicateWindowMs: number
+): boolean {
+  if (!lastTriggeredTranscriptId || duplicateWindowMs <= 0) {
+    return false;
+  }
+
+  const previous = segments.find((segment) => segment.id === lastTriggeredTranscriptId);
+  if (!previous) {
+    return false;
+  }
+
+  return (
+    normalizeQuestionFingerprint(previous.content) === normalizeQuestionFingerprint(latest.content) &&
+    Math.abs(latest.timestampMs - previous.timestampMs) <= duplicateWindowMs
+  );
+}
+
+function normalizeQuestionFingerprint(content: string): string {
+  return content
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}\s]/gu, " ")
+    .replace(/\s+/g, " ")
+    .trim();
 }
