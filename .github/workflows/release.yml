@@ -12,9 +12,16 @@ on:
         required: false
         default: Caveman signed desktop update.
         type: string
+  push:
+    tags:
+      - "v*"
 
 permissions:
   contents: write
+
+env:
+  RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
+  RELEASE_NOTES: ${{ inputs.release_notes || format('Caveman {0} signed desktop update.', github.ref_name) }}
 
 jobs:
   build-windows:
@@ -61,8 +68,8 @@ jobs:
         shell: powershell
         run: >
           npm run tauri:build:signed --
-          -ReleaseBaseUrl "https://github.com/${{ github.repository }}/releases/download/${{ inputs.tag }}"
-          -ReleaseNotes "${{ inputs.release_notes }}"
+          -ReleaseBaseUrl "https://github.com/${{ github.repository }}/releases/download/${{ env.RELEASE_TAG }}"
+          -ReleaseNotes "${{ env.RELEASE_NOTES }}"
 
       - name: Upload Windows build artifact
         uses: actions/upload-artifact@v4
@@ -172,15 +179,15 @@ jobs:
           node scripts/generate-latest-json.mjs
           --bundle-dir release-assets
           --output release-assets/latest.json
-          --base-url "https://github.com/${{ github.repository }}/releases/download/${{ inputs.tag }}"
-          --notes "${{ inputs.release_notes }}"
+          --base-url "https://github.com/${{ github.repository }}/releases/download/${{ env.RELEASE_TAG }}"
+          --notes "${{ env.RELEASE_NOTES }}"
 
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ inputs.tag }}
-          name: Caveman ${{ inputs.tag }}
-          body: ${{ inputs.release_notes }}
+          tag_name: ${{ env.RELEASE_TAG }}
+          name: Caveman ${{ env.RELEASE_TAG }}
+          body: ${{ env.RELEASE_NOTES }}
           draft: false
           prerelease: false
           files: |

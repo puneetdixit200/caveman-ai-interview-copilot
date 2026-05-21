@@ -71,6 +71,20 @@ test("release workflow builds macOS and Linux packages before publishing one rel
   assert.match(workflow, /release-assets\/latest\.json/);
 });
 
+test("release workflow can run from pushed version tags without manual inputs", async () => {
+  const workflow = await readFile(workflowPath, "utf8");
+
+  assert.match(workflow, /push:/);
+  assert.match(workflow, /tags:/);
+  assert.match(workflow, /v\*/);
+  assert.match(workflow, /RELEASE_TAG:\s*\$\{\{\s*inputs\.tag\s*\|\|\s*github\.ref_name\s*\}\}/);
+  assert.match(workflow, /RELEASE_NOTES:\s*\$\{\{\s*inputs\.release_notes\s*\|\|/);
+  assert.match(workflow, /releases\/download\/\$\{\{\s*env\.RELEASE_TAG\s*\}\}/);
+  assert.match(workflow, /-ReleaseNotes "\$\{\{\s*env\.RELEASE_NOTES\s*\}\}"/);
+  assert.match(workflow, /tag_name:\s*\$\{\{\s*env\.RELEASE_TAG\s*\}\}/);
+  assert.match(workflow, /body:\s*\$\{\{\s*env\.RELEASE_NOTES\s*\}\}/);
+});
+
 test("release workflow contract is part of the release test suite", async () => {
   const packageJson = JSON.parse(await readFile("package.json", "utf8"));
 
