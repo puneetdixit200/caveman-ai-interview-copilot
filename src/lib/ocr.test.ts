@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { canSendOcrContext, normalizeOcrText, runScreenOcr } from "./ocr";
+import { canSendOcrContext, isCloudOcrBlocked, normalizeOcrText, runScreenOcr } from "./ocr";
 import type { OcrSettings } from "../types/settings";
 
 describe("ocr", () => {
@@ -20,6 +20,30 @@ describe("ocr", () => {
     expect(canSendOcrContext({ settings, reviewed: false, providerKind: "local", localOnlyMode: false })).toBe(false);
     expect(canSendOcrContext({ settings, reviewed: true, providerKind: "cloud", localOnlyMode: true })).toBe(false);
     expect(canSendOcrContext({ settings, reviewed: true, providerKind: "local", localOnlyMode: true })).toBe(true);
+  });
+
+  it("blocks cloud OCR capture when local-only cloud blocking is enabled", () => {
+    const settings: OcrSettings = {
+      enabled: true,
+      provider: "cloud",
+      includeInPrompt: true,
+      reviewBeforeSend: true
+    };
+
+    expect(
+      isCloudOcrBlocked({
+        settings,
+        localOnlyMode: true,
+        blockCloudWhenLocalOnly: true
+      })
+    ).toBe(true);
+    expect(
+      isCloudOcrBlocked({
+        settings,
+        localOnlyMode: true,
+        blockCloudWhenLocalOnly: false
+      })
+    ).toBe(false);
   });
 
   it("captures a screen frame and normalizes recognized OCR text", async () => {

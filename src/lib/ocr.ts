@@ -46,6 +46,14 @@ export function canSendOcrContext(input: {
   return true;
 }
 
+export function isCloudOcrBlocked(input: {
+  settings: OcrSettings;
+  localOnlyMode: boolean;
+  blockCloudWhenLocalOnly: boolean;
+}): boolean {
+  return input.settings.provider === "cloud" && input.localOnlyMode && input.blockCloudWhenLocalOnly;
+}
+
 export async function runScreenOcr(
   settings: OcrSettings,
   dependencies: ScreenOcrDependencies = {}

@@ -35,7 +35,7 @@ import {
   upsertKnowledgeDocument,
   type KnowledgeBase
 } from "../lib/knowledge";
-import { runScreenOcr } from "../lib/ocr";
+import { isCloudOcrBlocked, runScreenOcr } from "../lib/ocr";
 import {
   PLUGIN_CATALOG_SETTING_KEY,
   buildPluginCatalog,
@@ -172,6 +172,11 @@ export function Settings() {
   }
 
   async function testProvider(provider: ModelProviderConfig) {
+    if (isCloudProviderBlocked(provider, config)) {
+      setStatus("Cloud providers are blocked by local-only mode.");
+      return;
+    }
+
     setTestingProviderId(provider.id);
     setStatus(`Testing ${provider.label}...`);
     const result = await createConfiguredProvider(provider).healthCheck();
@@ -184,6 +189,11 @@ export function Settings() {
   }
 
   async function refreshProviderModels(provider: ModelProviderConfig) {
+    if (isCloudProviderBlocked(provider, config)) {
+      setStatus("Cloud providers are blocked by local-only mode.");
+      return;
+    }
+
     setLoadingProviderModelsId(provider.id);
     setStatus(`Loading models for ${provider.label}...`);
 
@@ -550,6 +560,17 @@ export function Settings() {
   }
 
   async function captureOcrContext() {
+    if (
+      isCloudOcrBlocked({
+        settings: config.ocr,
+        localOnlyMode: config.security.localOnlyMode,
+        blockCloudWhenLocalOnly: config.security.blockCloudWhenLocalOnly
+      })
+    ) {
+      setStatus("Cloud OCR is blocked by local-only mode.");
+      return;
+    }
+
     setCapturingOcr(true);
     setStatus("Capturing screen OCR...");
     try {
@@ -1932,6 +1953,10 @@ function normalizeSttLanguage(language: string): string {
 
 function isCloudBlocked(config: AppConfig): boolean {
   return config.security.localOnlyMode && config.security.blockCloudWhenLocalOnly;
+}
+
+function isCloudProviderBlocked(provider: ModelProviderConfig, config: AppConfig): boolean {
+  return provider.kind === "cloud" && isCloudBlocked(config);
 }
 
 function formatModelOption(model: ModelInfo): string {

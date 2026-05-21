@@ -1,6 +1,8 @@
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { APP_CONFIG_SETTING_KEY, DEFAULT_APP_CONFIG, serializeAppConfig, type AppConfig } from "../lib/appConfig";
+import { runScreenOcr } from "../lib/ocr";
 import { createConfiguredProvider } from "../lib/providerClients";
 import { Settings } from "./Settings";
 
@@ -11,10 +13,21 @@ vi.mock("../lib/providerClients", () => ({
   }))
 }));
 
+vi.mock("../lib/ocr", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../lib/ocr")>()),
+  runScreenOcr: vi.fn(async () => ({
+    provider: "local_tesseract",
+    text: "captured text",
+    capturedAtMs: 1234
+  }))
+}));
+
 describe("Settings", () => {
   afterEach(() => {
     vi.clearAllMocks();
     cleanup();
+    localStorage.clear();
+    sessionStorage.clear();
   });
 
   it("shows controls for live audio, STT, automation, OCR, TTS, security, and plugins", async () => {
@@ -184,4 +197,89 @@ describe("Settings", () => {
     expect(screen.getAllByLabelText("Model")[0]).toHaveValue("llama3.1:8b");
     expect(screen.getByText("Loaded 1 model for Ollama")).toBeInTheDocument();
   });
+
+  it("blocks cloud provider health checks and model refreshes in local-only mode", async () => {
+    const user = userEvent.setup();
+    storeConfig({
+      security: {
+        ...DEFAULT_APP_CONFIG.security,
+        localOnlyMode: true,
+        blockCloudWhenLocalOnly: true
+      }
+    });
+
+    render(<Settings />);
+
+    const openRouterLabel = (await screen.findAllByText("OpenRouter")).find(
+      (element) => element.tagName.toLowerCase() === "strong"
+    );
+    const openRouterEditor = openRouterLabel?.closest("article");
+    expect(openRouterEditor).not.toBeNull();
+
+    await user.click(within(openRouterEditor as HTMLElement).getByRole("button", { name: "Refresh Models" }));
+    expect(createConfiguredProvider).not.toHaveBeenCalled();
+    expect(screen.getByText("Cloud providers are blocked by local-only mode.")).toBeInTheDocument();
+
+    await user.click(within(openRouterEditor as HTMLElement).getByRole("button", { name: "Test" }));
+    expect(createConfiguredProvider).not.toHaveBeenCalled();
+    expect(screen.getByText("Cloud providers are blocked by local-only mode.")).toBeInTheDocument();
+  });
+
+  it("blocks cloud OCR capture in local-only mode", async () => {
+    const user = userEvent.setup();
+    storeConfig({
+      security: {
+        ...DEFAULT_APP_CONFIG.security,
+        localOnlyMode: true,
+        blockCloudWhenLocalOnly: true
+      },
+      ocr: {
+        ...DEFAULT_APP_CONFIG.ocr,
+        enabled: true,
+        provider: "cloud"
+      }
+    });
+
+    render(<Settings />);
+
+    await user.click(await screen.findByRole("button", { name: "Capture Screen OCR" }));
+
+    expect(runScreenOcr).not.toHaveBeenCalled();
+    expect(screen.getByText("Cloud OCR is blocked by local-only mode.")).toBeInTheDocument();
+  });
 });
+
+function storeConfig(patch: Partial<AppConfig>) {
+  const config: AppConfig = {
+    ...DEFAULT_APP_CONFIG,
+    ...patch,
+    providers: patch.providers ?? DEFAULT_APP_CONFIG.providers.map((provider) => ({ ...provider })),
+    audio: { ...DEFAULT_APP_CONFIG.audio, ...patch.audio },
+    stt: {
+      ...DEFAULT_APP_CONFIG.stt,
+      ...patch.stt,
+      speakerCalibration: {
+        ...DEFAULT_APP_CONFIG.stt.speakerCalibration,
+        ...patch.stt?.speakerCalibration
+      }
+    },
+    autoTrigger: { ...DEFAULT_APP_CONFIG.autoTrigger, ...patch.autoTrigger },
+    contextWindow: { ...DEFAULT_APP_CONFIG.contextWindow, ...patch.contextWindow },
+    ocr: { ...DEFAULT_APP_CONFIG.ocr, ...patch.ocr },
+    tts: { ...DEFAULT_APP_CONFIG.tts, ...patch.tts },
+    overlay: {
+      ...DEFAULT_APP_CONFIG.overlay,
+      ...patch.overlay,
+      bounds: {
+        ...DEFAULT_APP_CONFIG.overlay.bounds,
+        ...patch.overlay?.bounds
+      }
+    },
+    shortcuts: { ...DEFAULT_APP_CONFIG.shortcuts, ...patch.shortcuts },
+    security: { ...DEFAULT_APP_CONFIG.security, ...patch.security },
+    plugins: { ...DEFAULT_APP_CONFIG.plugins, ...patch.plugins },
+    profiles: patch.profiles ?? []
+  };
+
+  localStorage.setItem(APP_CONFIG_SETTING_KEY, serializeAppConfig(config));
+}
