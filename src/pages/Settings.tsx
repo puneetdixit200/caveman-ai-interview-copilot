@@ -26,6 +26,7 @@ import {
   parseAppConfig,
   serializeAppConfig
 } from "../lib/appConfig";
+import { runAudioCaptureRehearsal, type AudioRehearsalResult } from "../lib/audioRehearsal";
 import {
   KNOWLEDGE_BASE_SETTING_KEY,
   createKnowledgeBase,
@@ -116,6 +117,8 @@ export function Settings() {
   const [providerModelOptions, setProviderModelOptions] = useState<Partial<Record<ProviderId, ModelInfo[]>>>({});
   const [sttSampleAudioPath, setSttSampleAudioPath] = useState("");
   const [testingStt, setTestingStt] = useState(false);
+  const [testingAudioRehearsal, setTestingAudioRehearsal] = useState(false);
+  const [audioRehearsalResult, setAudioRehearsalResult] = useState<AudioRehearsalResult | null>(null);
   const [detectingWhisper, setDetectingWhisper] = useState(false);
   const [downloadingWhisper, setDownloadingWhisper] = useState(false);
   const [providerSecretInputs, setProviderSecretInputs] = useState<Partial<Record<ProviderId, string>>>({});
@@ -297,6 +300,26 @@ export function Settings() {
       setStatus(`${config.stt.selectedMode} failed: ${error instanceof Error ? error.message : String(error)}`);
     } finally {
       setTestingStt(false);
+    }
+  }
+
+  async function runAudioRehearsal() {
+    setTestingAudioRehearsal(true);
+    setStatus("Running audio rehearsal...");
+
+    try {
+      const result = await runAudioCaptureRehearsal({ config });
+      setAudioRehearsalResult(result);
+      setStatus(
+        result.status === "ready"
+          ? "Audio rehearsal complete"
+          : `Audio rehearsal ${result.status === "blocked" ? "blocked" : "needs attention"}`
+      );
+    } catch (error) {
+      setAudioRehearsalResult(null);
+      setStatus(`Audio rehearsal failed: ${error instanceof Error ? error.message : String(error)}`);
+    } finally {
+      setTestingAudioRehearsal(false);
     }
   }
 
@@ -1549,6 +1572,25 @@ export function Settings() {
               ))}
             </select>
           </label>
+          <div className="button-row settings-actions">
+            <Button icon={<Play size={16} />} onClick={runAudioRehearsal} disabled={testingAudioRehearsal}>
+              {testingAudioRehearsal ? "Testing Audio" : "Run Audio Rehearsal"}
+            </Button>
+          </div>
+          {audioRehearsalResult ? (
+            <div className="settings-field audio-rehearsal-result">
+              <span>Audio rehearsal</span>
+              <strong>{audioRehearsalResult.message}</strong>
+              <div className="audio-rehearsal-metrics">
+                <span>Mic peak {formatPeakPercent(audioRehearsalResult.microphonePeak)}</span>
+                <span>System peak {formatPeakPercent(audioRehearsalResult.systemPeak)}</span>
+                <span>{audioRehearsalResult.durationMs} ms</span>
+              </div>
+              {audioRehearsalResult.warnings.length > 0 ? (
+                <small>{audioRehearsalResult.warnings.join(" ")}</small>
+              ) : null}
+            </div>
+          ) : null}
           <label className="settings-field">
             <span>Gain dB</span>
             <input
@@ -2177,6 +2219,10 @@ function isCloudProviderBlocked(provider: ModelProviderConfig, config: AppConfig
 function formatModelOption(model: ModelInfo): string {
   const context = model.contextLength > 0 ? ` (${model.contextLength.toLocaleString()} ctx)` : "";
   return `${model.name || model.id}${context}`;
+}
+
+function formatPeakPercent(value: number): string {
+  return `${Math.round(Math.max(0, Math.min(1, value)) * 100)}%`;
 }
 
 function parentDirectory(path: string): string {

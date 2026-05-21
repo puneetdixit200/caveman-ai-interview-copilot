@@ -2,6 +2,7 @@ import { cleanup, fireEvent, render, screen, within } from "@testing-library/rea
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { APP_CONFIG_SETTING_KEY, DEFAULT_APP_CONFIG, serializeAppConfig, type AppConfig } from "../lib/appConfig";
+import { runAudioCaptureRehearsal } from "../lib/audioRehearsal";
 import { runScreenOcr } from "../lib/ocr";
 import { createConfiguredProvider } from "../lib/providerClients";
 import { checkForSignedUpdate, downloadInstallAndRelaunchSignedUpdate } from "../lib/updater";
@@ -11,6 +12,23 @@ vi.mock("../lib/providerClients", () => ({
   createConfiguredProvider: vi.fn(() => ({
     healthCheck: vi.fn(async () => ({ ok: true, latencyMs: 1 })),
     listModels: vi.fn(async () => [])
+  }))
+}));
+
+vi.mock("../lib/audioRehearsal", () => ({
+  runAudioCaptureRehearsal: vi.fn(async () => ({
+    status: "ready",
+    started: true,
+    durationMs: 500,
+    expectedSources: ["microphone"],
+    microphonePeak: 0.32,
+    systemPeak: 0,
+    microphoneEvents: 2,
+    systemEvents: 0,
+    microphoneReady: true,
+    systemReady: true,
+    warnings: [],
+    message: "Audio rehearsal detected microphone."
   }))
 }));
 
@@ -80,6 +98,28 @@ describe("Settings", () => {
 
     expect(await screen.findByRole("combobox", { name: "Microphone device" })).toBeInTheDocument();
     expect(screen.getByRole("combobox", { name: "System audio device" })).toBeInTheDocument();
+  });
+
+  it("runs a live audio rehearsal from Settings", async () => {
+    const user = userEvent.setup();
+    storeConfig({
+      audio: {
+        ...DEFAULT_APP_CONFIG.audio,
+        captureMode: "microphone",
+        microphoneDeviceId: "microphone-default"
+      }
+    });
+    render(<Settings />);
+
+    await user.click(await screen.findByRole("button", { name: "Run Audio Rehearsal" }));
+
+    expect(runAudioCaptureRehearsal).toHaveBeenCalledWith({
+      config: expect.objectContaining({
+        audio: expect.objectContaining({ captureMode: "microphone" })
+      })
+    });
+    expect(await screen.findByText("Audio rehearsal detected microphone.")).toBeInTheDocument();
+    expect(screen.getByText("Mic peak 32%")).toBeInTheDocument();
   });
 
   it("shows application audio source selection", async () => {
