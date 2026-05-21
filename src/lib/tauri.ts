@@ -12,6 +12,7 @@ import type {
   TranscriptSegment
 } from "../types/session";
 import type { AudioDevice, OverlayWindowBounds } from "../types/settings";
+import type { CollaborationHint, CollaborationServerStatus, CollaborationSnapshot } from "../types/collaboration";
 import type { PluginManifestFile } from "./pluginLoader";
 
 export interface OverlayProtectionStatus {
@@ -507,4 +508,49 @@ export async function typeTextIntoActiveWindow(text: string): Promise<TypingResu
     characterCount: Array.from(text).length,
     inputEventCount: text.length * 2
   }));
+}
+
+export async function startCollaborationServer(
+  input: { bindHost?: string; port?: number; token?: string } = {}
+): Promise<CollaborationServerStatus> {
+  return invokeStrictOrFallback<CollaborationServerStatus>(
+    "start_collaboration_server",
+    {
+      bindHost: input.bindHost,
+      port: input.port,
+      token: input.token
+    },
+    () => ({
+      running: false,
+      hintCount: 0,
+      message: "Collaboration helper links are available only inside the Caveman desktop app."
+    })
+  );
+}
+
+export async function stopCollaborationServer(): Promise<CollaborationServerStatus> {
+  return invokeOrFallback<CollaborationServerStatus>("stop_collaboration_server", {}, () => ({
+    running: false,
+    hintCount: 0,
+    message: "Collaboration helper stopped"
+  }));
+}
+
+export async function getCollaborationStatus(): Promise<CollaborationServerStatus> {
+  return invokeOrFallback<CollaborationServerStatus>("get_collaboration_status", {}, () => ({
+    running: false,
+    hintCount: 0
+  }));
+}
+
+export async function publishCollaborationSnapshot(snapshot: CollaborationSnapshot): Promise<void> {
+  return invokeOrFallback<void>("publish_collaboration_snapshot", { snapshot }, () => undefined);
+}
+
+export async function listCollaborationHints(): Promise<CollaborationHint[]> {
+  return invokeOrFallback<CollaborationHint[]>("list_collaboration_hints", {}, () => []);
+}
+
+export async function clearCollaborationHint(id: string): Promise<void> {
+  return invokeOrFallback<void>("clear_collaboration_hint", { id }, () => undefined);
 }

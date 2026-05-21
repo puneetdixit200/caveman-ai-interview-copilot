@@ -2,6 +2,9 @@ use tauri::{AppHandle, Manager, State};
 
 use crate::ai;
 use crate::audio::{self, AudioCaptureManager, AudioCaptureState, AudioProcessingSettings};
+use crate::collaboration::{
+    CollaborationHint, CollaborationManager, CollaborationServerStatus, CollaborationSnapshot,
+};
 use crate::db::{Database, NewAiResponse, NewSession, TranscriptCursor, TranscriptPage};
 use crate::models::{AiResponse, PromptTemplate, Session, Transcript};
 use crate::ocr;
@@ -302,6 +305,59 @@ pub fn capture_screen_frame() -> Result<ScreenFrame, String> {
 #[tauri::command]
 pub fn type_text_into_active_window(text: String) -> Result<typing::TypingResult, String> {
     typing::type_text_into_active_window(&text).map_err(to_command_error)
+}
+
+#[tauri::command]
+pub fn start_collaboration_server(
+    collaboration_manager: State<'_, CollaborationManager>,
+    bind_host: Option<String>,
+    port: Option<u16>,
+    token: Option<String>,
+) -> Result<CollaborationServerStatus, String> {
+    collaboration_manager
+        .start_server(bind_host, port, token)
+        .map_err(to_command_error)
+}
+
+#[tauri::command]
+pub fn stop_collaboration_server(
+    collaboration_manager: State<'_, CollaborationManager>,
+) -> CollaborationServerStatus {
+    collaboration_manager.stop_server()
+}
+
+#[tauri::command]
+pub fn get_collaboration_status(
+    collaboration_manager: State<'_, CollaborationManager>,
+) -> CollaborationServerStatus {
+    collaboration_manager.status()
+}
+
+#[tauri::command]
+pub fn publish_collaboration_snapshot(
+    collaboration_manager: State<'_, CollaborationManager>,
+    snapshot: CollaborationSnapshot,
+) -> Result<(), String> {
+    collaboration_manager
+        .publish_snapshot(snapshot)
+        .map_err(to_command_error)
+}
+
+#[tauri::command]
+pub fn list_collaboration_hints(
+    collaboration_manager: State<'_, CollaborationManager>,
+) -> Vec<CollaborationHint> {
+    collaboration_manager.list_hints()
+}
+
+#[tauri::command]
+pub fn clear_collaboration_hint(
+    collaboration_manager: State<'_, CollaborationManager>,
+    id: String,
+) -> Result<(), String> {
+    collaboration_manager
+        .clear_hint(&id)
+        .map_err(to_command_error)
 }
 
 fn to_command_error(error: anyhow::Error) -> String {

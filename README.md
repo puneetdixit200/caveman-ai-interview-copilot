@@ -10,7 +10,7 @@ Interviews move fast. You may understand the topic and still lose time structuri
 
 ## SEO Keywords
 
-AI interview copilot, AI interview assistant, real-time interview assistant, live interview transcription, Whisper interview assistant, Ollama interview copilot, OpenRouter interview assistant, Tauri desktop app, Rust desktop app, React interview tool, system design interview helper, coding interview assistant, behavioral interview practice, stealth overlay app.
+AI interview copilot, AI interview assistant, real-time interview assistant, live interview transcription, Whisper interview assistant, Ollama interview copilot, OpenRouter interview assistant, Tauri desktop app, Rust desktop app, React interview tool, system design interview helper, coding interview assistant, behavioral interview practice, collaborative interview helper, stealth overlay app.
 
 ## Current Status
 
@@ -28,16 +28,16 @@ Implemented now:
 - Ollama, LM Studio, OpenRouter, OpenAI, Anthropic, and Groq provider routing with streaming fallback
 - Stealth overlay window with opacity, font controls, global hotkeys, click-through mode, position persistence, and Windows capture exclusion
 - Session archive with search, cursor-paged replay for long histories, transcript correction, Markdown, JSON, and PDF export
+- Trusted collaborative helper link with token-gated live transcript/answer snapshot sharing and inbound helper hints
 - Resume, job description, OCR, and local knowledge-base context injection
 - Code answer extraction and active-window typing for code/editor/chat handoff
 - Practice interview mode with local scoring and AI follow-up question generation
 - Analytics, TTS queue/playback, plugin manifests/practice packs, OS keychain API key storage, and signed-update configuration
 - SQLite-backed Rust command layer for sessions, transcripts, responses, settings, screenshots, secrets, and native actions
-- Unit tests for audio, STT parsing, provider fallback, overlay safety, exports, analytics, plugins, hotkeys, OCR, practice, RAG, TTS, and persistence
+- Unit tests for audio, STT parsing, provider fallback, overlay safety, exports, analytics, plugins, hotkeys, OCR, practice, RAG, TTS, collaboration, and persistence
 
 Planned full build:
 
-- Collaborative helper mode for trusted remote observers
 - Production release signing, hosted update manifest publishing, and broader platform packaging
 
 ## Core Features
@@ -60,7 +60,11 @@ Sessions can store transcripts, AI responses, tags, notes, providers, model meta
 
 ### Interview Practice
 
-The full roadmap includes a practice mode where an AI interviewer asks questions, scores answers, and tracks weak areas across sessions.
+Practice mode lets an AI interviewer ask questions, score answers, and track weak areas across sessions.
+
+### Collaborative Helper
+
+Dashboard helper links run from the desktop app on localhost by default. A trusted helper can open the tokenized link, watch the active session transcript and saved AI answers, then send short hints back into the dashboard during a live interview.
 
 ## Architecture
 

@@ -1,4 +1,4 @@
-import { Eye, EyeOff, Keyboard, Play, Send, ShieldCheck, Square, Wand2 } from "lucide-react";
+import { Copy, Eye, EyeOff, Keyboard, Link2, Play, Send, ShieldCheck, Square, Users, Wand2, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AudioControls } from "../components/audio/AudioControls";
 import { CodeAssistantPanel } from "../components/code/CodeAssistantPanel";
@@ -39,20 +39,26 @@ import { runLiveTranscriptionPass } from "../lib/liveTranscription";
 import {
   addAiResponse,
   addTranscript,
+  clearCollaborationHint,
   createSession,
   getCaptureStatus,
+  getCollaborationStatus,
   getSetting,
   isRunningInTauri,
   listAudioDevices,
   listAiResponses,
+  listCollaborationHints,
   listSessions,
   listTranscripts,
   onAudioLevel,
   onAudioChunk,
   protectOverlayWindow,
+  publishCollaborationSnapshot,
+  startCollaborationServer,
   setOverlayWindowBounds,
   setOverlayWindowVisible,
   startCapture,
+  stopCollaborationServer,
   stopCapture,
   typeTextIntoActiveWindow
 } from "../lib/tauri";
@@ -60,6 +66,7 @@ import { ProviderRouter } from "../lib/providerRouter";
 import { useOverlayStore } from "../stores/overlayStore";
 import type { AIResponseRecord, ChatMessage, SessionRecord, Speaker, SttTranscriptEvent, TranscriptSegment } from "../types/session";
 import type { AudioDevice } from "../types/settings";
+import type { CollaborationHint, CollaborationServerStatus, CollaborationSnapshot } from "../types/collaboration";
 import type { AppConfig } from "../lib/appConfig";
 import type { OverlayProtectionStatus } from "../lib/tauri";
 
@@ -75,6 +82,11 @@ const DEFAULT_CAPTURE_STATUS: AudioCaptureState = {
   gainDb: 0,
   noiseGateDb: -80,
   systemCaptureSupported: false
+};
+
+const DEFAULT_COLLABORATION_STATUS: CollaborationServerStatus = {
+  running: false,
+  hintCount: 0
 };
 
 export function Dashboard() {
@@ -97,6 +109,10 @@ export function Dashboard() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [knowledgeBase, setKnowledgeBase] = useState<KnowledgeBase>(createKnowledgeBase());
   const [pluginCatalog, setPluginCatalog] = useState<PluginCatalog>(createEmptyPluginCatalog());
+  const [collaborationStatus, setCollaborationStatus] =
+    useState<CollaborationServerStatus>(DEFAULT_COLLABORATION_STATUS);
+  const [collaborationHints, setCollaborationHints] = useState<CollaborationHint[]>([]);
+  const [collaborationMessage, setCollaborationMessage] = useState<string | null>(null);
   const seenLiveTranscriptKeys = useRef(new Set<string>());
   const liveTranscriptionBusy = useRef(false);
   const captureShortcutAction = useRef<() => void>(() => undefined);
@@ -164,6 +180,16 @@ export function Dashboard() {
     setResponses([...freshResponses].reverse());
   }, []);
 
+  const refreshCollaborationHints = useCallback(async () => {
+    try {
+      const hints = await listCollaborationHints();
+      setCollaborationHints(hints);
+      setCollaborationStatus((current) => ({ ...current, hintCount: hints.length }));
+    } catch (error) {
+      setCollaborationMessage(error instanceof Error ? error.message : String(error));
+    }
+  }, []);
+
   useEffect(() => {
     let cancelled = false;
 
@@ -176,7 +202,12 @@ export function Dashboard() {
         ]);
         const storedConfig = parseAppConfig(rawConfig);
         const hydratedConfig = await hydrateProviderApiKeys(storedConfig);
-        const [sessions, devices, status] = await Promise.all([listSessions(), listAudioDevices(), getCaptureStatus()]);
+        const [sessions, devices, status, collaboration] = await Promise.all([
+          listSessions(),
+          listAudioDevices(),
+          getCaptureStatus(),
+          getCollaborationStatus()
+        ]);
         const activeSession =
           sessions.find((item) => item.status === "active") ??
           (await createSession({
@@ -201,6 +232,7 @@ export function Dashboard() {
         setPluginCatalog(parsePluginCatalog(rawPluginCatalog));
         setAudioDevices(devices);
         setCaptureStatus(status);
+        setCollaborationStatus(collaboration);
         setRunning(status.running);
         setSession(activeSession);
         await refreshSessionData(activeSession.id);
@@ -336,6 +368,39 @@ export function Dashboard() {
     seenLiveTranscriptKeys.current.clear();
     setInterimPreviews([]);
   }, [session?.id]);
+
+  useEffect(() => {
+    if (!collaborationStatus.running) {
+      return;
+    }
+
+    publishCollaborationSnapshot(buildCollaborationSnapshot(session, transcripts, responses)).catch((error) => {
+      setCollaborationMessage(error instanceof Error ? error.message : String(error));
+    });
+  }, [collaborationStatus.running, responses, session, transcripts]);
+
+  useEffect(() => {
+    if (!collaborationStatus.running) {
+      return;
+    }
+
+    let disposed = false;
+
+    async function refresh() {
+      if (disposed) {
+        return;
+      }
+      await refreshCollaborationHints();
+    }
+
+    void refresh();
+    const interval = window.setInterval(() => void refresh(), 2500);
+
+    return () => {
+      disposed = true;
+      window.clearInterval(interval);
+    };
+  }, [collaborationStatus.running, refreshCollaborationHints]);
 
   useEffect(() => {
     if (!running || !session || !isSnapshotSttMode(config.stt.selectedMode)) {
@@ -724,6 +789,53 @@ export function Dashboard() {
     session?.id
   ]);
 
+  async function startHelperLink() {
+    try {
+      const status = await startCollaborationServer({ bindHost: "127.0.0.1", port: 0 });
+      setCollaborationStatus(status);
+      setCollaborationMessage(status.message ?? (status.running ? "Helper link started" : "Helper link unavailable"));
+      if (status.running) {
+        await publishCollaborationSnapshot(buildCollaborationSnapshot(session, transcripts, responses));
+        await refreshCollaborationHints();
+      }
+    } catch (error) {
+      setCollaborationMessage(error instanceof Error ? error.message : String(error));
+    }
+  }
+
+  async function stopHelperLink() {
+    const status = await stopCollaborationServer();
+    setCollaborationStatus(status);
+    setCollaborationHints([]);
+    setCollaborationMessage(status.message ?? "Helper link stopped");
+  }
+
+  async function copyHelperLink() {
+    if (!collaborationStatus.url) {
+      return;
+    }
+
+    try {
+      await navigator.clipboard?.writeText(collaborationStatus.url);
+      setCollaborationMessage("Helper link copied");
+    } catch {
+      setCollaborationMessage("Could not copy helper link");
+    }
+  }
+
+  async function dismissCollaborationHint(id: string) {
+    try {
+      await clearCollaborationHint(id);
+      setCollaborationHints((current) => current.filter((hint) => hint.id !== id));
+      setCollaborationStatus((current) => ({
+        ...current,
+        hintCount: Math.max(0, current.hintCount - 1)
+      }));
+    } catch (error) {
+      setCollaborationMessage(error instanceof Error ? error.message : String(error));
+    }
+  }
+
   async function toggleCapture() {
     if (running) {
       const stopped = await stopCapture();
@@ -957,6 +1069,61 @@ export function Dashboard() {
           </div>
         </div>
 
+        <div className="collaboration-strip">
+          <div className="collaboration-header">
+            <div>
+              <p className="eyebrow">Helper</p>
+              <h2>Collaborative Link</h2>
+            </div>
+            <span className={`status-pill ${collaborationStatus.running ? "status-live" : "status-muted"}`}>
+              {collaborationStatus.running ? "Live" : "Off"}
+            </span>
+          </div>
+          <div className="collaboration-actions">
+            <Button
+              variant={collaborationStatus.running ? "danger" : "secondary"}
+              icon={collaborationStatus.running ? <X size={16} /> : <Users size={16} />}
+              onClick={collaborationStatus.running ? stopHelperLink : startHelperLink}
+            >
+              {collaborationStatus.running ? "Stop Helper Link" : "Start Helper Link"}
+            </Button>
+            <Button icon={<Copy size={16} />} onClick={copyHelperLink} disabled={!collaborationStatus.url}>
+              Copy Helper Link
+            </Button>
+          </div>
+          {collaborationStatus.url ? (
+            <label className="collaboration-link-field">
+              <span>URL</span>
+              <input aria-label="Helper share link" readOnly value={collaborationStatus.url} />
+            </label>
+          ) : null}
+          <div className="collaboration-hints">
+            <div className="collaboration-hints-heading">
+              <span>
+                <Link2 size={14} />
+                {collaborationStatus.hintCount} hints
+              </span>
+              {collaborationMessage ? <span>{collaborationMessage}</span> : null}
+            </div>
+            {collaborationHints.length > 0 ? (
+              <div className="helper-hint-list">
+                {collaborationHints.map((hint) => (
+                  <article className="helper-hint" key={hint.id}>
+                    <p>{hint.message}</p>
+                    <button
+                      type="button"
+                      aria-label={`Dismiss helper hint ${hint.id}`}
+                      onClick={() => void dismissCollaborationHint(hint.id)}
+                    >
+                      <X size={14} />
+                    </button>
+                  </article>
+                ))}
+              </div>
+            ) : null}
+          </div>
+        </div>
+
         <div className="manual-transcript-form">
           <label>
             <span>Speaker</span>
@@ -1081,6 +1248,38 @@ function buildPromptMessages(
     ocrContext: includeOcrContext ? config.ocr.lastText : undefined,
     knowledgeContext: knowledgeContext || undefined
   });
+}
+
+function buildCollaborationSnapshot(
+  session: SessionRecord | null,
+  transcripts: TranscriptSegment[],
+  responses: AIResponseRecord[]
+): CollaborationSnapshot {
+  return {
+    session: session
+      ? {
+          id: session.id,
+          title: session.title,
+          company: session.company?.trim() || undefined,
+          role: session.role?.trim() || undefined
+        }
+      : undefined,
+    transcripts: transcripts.slice(-80).map((segment) => ({
+      speaker: segment.speaker,
+      content: segment.content,
+      timestampMs: segment.timestampMs
+    })),
+    responses: responses
+      .filter((response) => response.id !== TEMP_STREAM_ID && response.response.trim())
+      .slice(0, 10)
+      .map((response) => ({
+        response: response.response,
+        model: response.model,
+        provider: response.provider,
+        createdAt: response.createdAt
+      })),
+    updatedAtMs: Date.now()
+  };
 }
 
 function websocketSttEndpoint(endpoint: string): string | undefined {

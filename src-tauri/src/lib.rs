@@ -1,5 +1,6 @@
 pub mod ai;
 pub mod audio;
+pub mod collaboration;
 pub mod commands;
 pub mod db;
 pub mod models;
@@ -23,6 +24,7 @@ pub fn run() {
             let database = db::Database::open(app_data_dir.join("caveman.sqlite3"))?;
             app.manage(database);
             app.manage(audio::AudioCaptureManager::default());
+            app.manage(collaboration::CollaborationManager::default());
             overlay::configure_overlay_security(app);
             Ok(())
         })
@@ -59,7 +61,13 @@ pub fn run() {
             commands::list_prompt_templates,
             commands::load_plugin_manifests,
             commands::capture_screen_frame,
-            commands::type_text_into_active_window
+            commands::type_text_into_active_window,
+            commands::start_collaboration_server,
+            commands::stop_collaboration_server,
+            commands::get_collaboration_status,
+            commands::publish_collaboration_snapshot,
+            commands::list_collaboration_hints,
+            commands::clear_collaboration_hint
         ])
         .run(tauri::generate_context!())
         .expect("failed to run Caveman");
