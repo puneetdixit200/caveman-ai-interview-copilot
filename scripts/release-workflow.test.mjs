@@ -85,6 +85,16 @@ test("release workflow can run from pushed version tags without manual inputs", 
   assert.match(workflow, /body:\s*\$\{\{\s*env\.RELEASE_NOTES\s*\}\}/);
 });
 
+test("release workflow fails fast when updater signing secrets are missing", async () => {
+  const workflow = await readFile(workflowPath, "utf8");
+
+  const validationSteps = [...workflow.matchAll(/Validate release signing secrets/g)];
+  assert.equal(validationSteps.length, 3);
+  assert.match(workflow, /IsNullOrWhiteSpace\(\$env:TAURI_SIGNING_PRIVATE_KEY\)/);
+  assert.match(workflow, /Missing TAURI_SIGNING_PRIVATE_KEY repository secret/);
+  assert.match(workflow, /npm run tauri signer generate/);
+});
+
 test("release workflow contract is part of the release test suite", async () => {
   const packageJson = JSON.parse(await readFile("package.json", "utf8"));
 

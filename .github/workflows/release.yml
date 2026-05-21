@@ -45,6 +45,13 @@ jobs:
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
 
+      - name: Validate release signing secrets
+        shell: pwsh
+        run: |
+          if ([string]::IsNullOrWhiteSpace($env:TAURI_SIGNING_PRIVATE_KEY)) {
+            throw "Missing TAURI_SIGNING_PRIVATE_KEY repository secret. Generate an updater key with npm run tauri signer generate and save the private key in GitHub Actions secrets."
+          }
+
       - name: Install dependencies
         run: npm ci
 
@@ -101,6 +108,13 @@ jobs:
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
 
+      - name: Validate release signing secrets
+        shell: pwsh
+        run: |
+          if ([string]::IsNullOrWhiteSpace($env:TAURI_SIGNING_PRIVATE_KEY)) {
+            throw "Missing TAURI_SIGNING_PRIVATE_KEY repository secret. Generate an updater key with npm run tauri signer generate and save the private key in GitHub Actions secrets."
+          }
+
       - name: Install dependencies
         run: npm ci
 
@@ -134,6 +148,13 @@ jobs:
 
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
+
+      - name: Validate release signing secrets
+        shell: pwsh
+        run: |
+          if ([string]::IsNullOrWhiteSpace($env:TAURI_SIGNING_PRIVATE_KEY)) {
+            throw "Missing TAURI_SIGNING_PRIVATE_KEY repository secret. Generate an updater key with npm run tauri signer generate and save the private key in GitHub Actions secrets."
+          }
 
       - name: Install Linux Tauri dependencies
         run: |
