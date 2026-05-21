@@ -73,6 +73,50 @@ describe("appConfig", () => {
     expect(parsed.providers.find((provider) => provider.id === "openrouter")?.apiKey).toBeUndefined();
   });
 
+  it("round trips saved interview profiles without raw secrets", () => {
+    const parsed = parseAppConfig(
+      JSON.stringify({
+        profiles: [
+          {
+            id: "system-design",
+            name: "System Design",
+            interviewType: "system_design",
+            providerId: "openrouter",
+            sttMode: "deepgram",
+            overlay: {
+              ...DEFAULT_APP_CONFIG.overlay,
+              opacity: 0.7
+            },
+            shortcuts: {
+              ...DEFAULT_APP_CONFIG.shortcuts,
+              generateAnswer: "control + shift + y"
+            }
+          },
+          {
+            id: "",
+            name: "",
+            interviewType: "bad",
+            providerId: "bad",
+            sttMode: "bad"
+          }
+        ]
+      })
+    );
+
+    expect(parsed.profiles).toEqual([
+      expect.objectContaining({
+        id: "system-design",
+        name: "System Design",
+        interviewType: "system_design",
+        providerId: "openrouter",
+        sttMode: "deepgram",
+        overlay: expect.objectContaining({ opacity: 0.7 }),
+        shortcuts: expect.objectContaining({ generateAnswer: "CommandOrControl+Shift+Y" })
+      })
+    ]);
+    expect(serializeAppConfig(parsed)).toContain('"profiles"');
+  });
+
   it("does not serialize raw provider or STT API keys into local settings", () => {
     const serialized = serializeAppConfig({
       ...DEFAULT_APP_CONFIG,

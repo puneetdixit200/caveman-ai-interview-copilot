@@ -3,6 +3,7 @@ import type {
   AudioSettings,
   AutoTriggerMode,
   AutoTriggerSettings,
+  AppProfile,
   ModelProviderConfig,
   OcrProvider,
   OcrSettings,
@@ -37,6 +38,7 @@ export interface AppConfig {
   shortcuts: ShortcutSettings;
   security: SecuritySettings;
   plugins: PluginSettings;
+  profiles: AppProfile[];
 }
 
 export const APP_CONFIG_SETTING_KEY = "app.config";
@@ -176,7 +178,8 @@ export const DEFAULT_APP_CONFIG: AppConfig = {
     allowPromptTemplates: true,
     allowExportFormats: true,
     allowPracticePacks: true
-  }
+  },
+  profiles: []
 };
 
 export function parseAppConfig(raw: string | null | undefined): AppConfig {
@@ -208,7 +211,8 @@ export function parseAppConfig(raw: string | null | undefined): AppConfig {
       overlay,
       shortcuts: mergeShortcutSettings(parsed.shortcuts, overlay.hotkey),
       security: mergeSecuritySettings(parsed.security),
-      plugins: mergePluginSettings(parsed.plugins)
+      plugins: mergePluginSettings(parsed.plugins),
+      profiles: mergeProfiles(parsed.profiles)
     };
   } catch {
     return cloneConfig(DEFAULT_APP_CONFIG);
@@ -273,7 +277,12 @@ function cloneConfig(config: AppConfig): AppConfig {
     overlay: { ...config.overlay },
     shortcuts: { ...config.shortcuts },
     security: { ...config.security },
-    plugins: { ...config.plugins }
+    plugins: { ...config.plugins },
+    profiles: config.profiles.map((profile) => ({
+      ...profile,
+      overlay: { ...profile.overlay, bounds: { ...profile.overlay.bounds } },
+      shortcuts: { ...profile.shortcuts }
+    }))
   };
 }
 
@@ -476,6 +485,39 @@ function mergePluginSettings(raw: unknown): PluginSettings {
   };
 }
 
+function mergeProfiles(raw: unknown): AppProfile[] {
+  if (!Array.isArray(raw)) {
+    return [];
+  }
+
+  return raw.filter(isObject).flatMap((value): AppProfile[] => {
+    const id = readString(value.id, "").trim();
+    const name = readString(value.name, "").trim();
+    if (
+      !id ||
+      !name ||
+      !isInterviewType(value.interviewType) ||
+      !isProviderId(value.providerId) ||
+      !isSttMode(value.sttMode)
+    ) {
+      return [];
+    }
+
+    const overlay = mergeOverlaySettings(value.overlay);
+    return [
+      {
+        id,
+        name,
+        interviewType: value.interviewType,
+        providerId: value.providerId,
+        sttMode: value.sttMode,
+        overlay,
+        shortcuts: mergeShortcutSettings(value.shortcuts, overlay.hotkey)
+      }
+    ];
+  });
+}
+
 function isObject(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
 }
@@ -531,4 +573,8 @@ function isAutoTriggerMode(value: unknown): value is AutoTriggerMode {
 
 function isOcrProvider(value: unknown): value is OcrProvider {
   return value === "disabled" || value === "local_tesseract" || value === "windows_ocr" || value === "cloud";
+}
+
+function isInterviewType(value: unknown): value is AppProfile["interviewType"] {
+  return value === "dsa" || value === "system_design" || value === "behavioral" || value === "hr" || value === "mixed";
 }

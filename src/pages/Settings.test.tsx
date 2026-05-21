@@ -1,4 +1,4 @@
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it } from "vitest";
 import { Settings } from "./Settings";
@@ -96,5 +96,25 @@ describe("Settings", () => {
     expect(screen.getByRole("spinbutton", { name: "Overlay width" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Read Overlay Position" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Apply Overlay Position" })).toBeInTheDocument();
+  });
+
+  it("saves and applies a reusable interview profile", async () => {
+    const user = userEvent.setup();
+    render(<Settings />);
+
+    fireEvent.change(await screen.findByLabelText("Primary provider"), { target: { value: "openrouter" } });
+    fireEvent.change(screen.getByRole("textbox", { name: "Generate answer hotkey" }), {
+      target: { value: "Ctrl+Alt+G" }
+    });
+    fireEvent.change(screen.getByRole("textbox", { name: "Profile name" }), {
+      target: { value: "System Design Profile" }
+    });
+    await user.click(screen.getByRole("button", { name: "Save Profile" }));
+    fireEvent.change(screen.getByLabelText("Primary provider"), { target: { value: "ollama" } });
+
+    await user.click(await screen.findByRole("button", { name: "Apply Profile" }));
+
+    expect(screen.getByLabelText("Primary provider")).toHaveValue("openrouter");
+    expect(screen.getByRole("textbox", { name: "Generate answer hotkey" })).toHaveValue("Ctrl+Alt+G");
   });
 });

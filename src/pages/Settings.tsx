@@ -65,6 +65,7 @@ import { checkForSignedUpdate, downloadInstallAndRelaunchSignedUpdate } from "..
 import type {
   AudioSettings,
   AudioDevice,
+  AppProfile,
   AutoTriggerSettings,
   ModelProviderConfig,
   OcrSettings,
@@ -94,6 +95,8 @@ export function Settings() {
   const [knowledgeText, setKnowledgeText] = useState("");
   const [knowledgeQuery, setKnowledgeQuery] = useState("");
   const [pluginCatalog, setPluginCatalog] = useState<PluginCatalog>(createEmptyPluginCatalog());
+  const [profileName, setProfileName] = useState("");
+  const [profileInterviewType, setProfileInterviewType] = useState<AppProfile["interviewType"]>("mixed");
   const [checkingUpdate, setCheckingUpdate] = useState(false);
   const [installingUpdate, setInstallingUpdate] = useState(false);
   const [updateProgress, setUpdateProgress] = useState("");
@@ -221,6 +224,65 @@ export function Settings() {
       ...current,
       providers: current.providers.map((provider) => (provider.id === id ? { ...provider, ...patch } : provider))
     }));
+  }
+
+  async function saveCurrentProfile() {
+    const name = profileName.trim();
+    if (!name) {
+      setStatus("Name the profile before saving it.");
+      return;
+    }
+
+    const profile: AppProfile = {
+      id: createProfileId(name),
+      name,
+      interviewType: profileInterviewType,
+      providerId: config.selectedProviderId,
+      sttMode: config.stt.selectedMode,
+      overlay: cloneOverlaySettings(config.overlay),
+      shortcuts: { ...config.shortcuts }
+    };
+    const nextConfig = {
+      ...config,
+      profiles: [profile, ...config.profiles.filter((item) => item.id !== profile.id)]
+    };
+
+    setConfig(nextConfig);
+    setProfileName("");
+    await saveSetting(APP_CONFIG_SETTING_KEY, serializeAppConfig(nextConfig));
+    setStatus(`Saved ${profile.name} profile`);
+  }
+
+  async function applyProfile(profile: AppProfile) {
+    const nextConfig = {
+      ...config,
+      selectedProviderId: profile.providerId,
+      audio: {
+        ...config.audio,
+        sttMode: profile.sttMode
+      },
+      stt: {
+        ...config.stt,
+        selectedMode: profile.sttMode
+      },
+      overlay: cloneOverlaySettings(profile.overlay),
+      shortcuts: { ...profile.shortcuts }
+    };
+
+    setConfig(nextConfig);
+    await saveSetting(APP_CONFIG_SETTING_KEY, serializeAppConfig(nextConfig));
+    setStatus(`Applied ${profile.name} profile`);
+  }
+
+  async function deleteProfile(profile: AppProfile) {
+    const nextConfig = {
+      ...config,
+      profiles: config.profiles.filter((item) => item.id !== profile.id)
+    };
+
+    setConfig(nextConfig);
+    await saveSetting(APP_CONFIG_SETTING_KEY, serializeAppConfig(nextConfig));
+    setStatus(`Deleted ${profile.name} profile`);
   }
 
   function patchProviderConfig(
@@ -652,12 +714,13 @@ export function Settings() {
           <span>Primary provider</span>
           <select
             value={config.selectedProviderId}
-            onChange={(event) =>
+            onChange={(event) => {
+              const selectedProviderId = event.currentTarget.value as ProviderId;
               setConfig((current) => ({
                 ...current,
-                selectedProviderId: event.currentTarget.value as ProviderId
-              }))
-            }
+                selectedProviderId
+              }));
+            }}
           >
             {config.providers.map((provider) => (
               <option key={provider.id} value={provider.id}>
@@ -742,6 +805,65 @@ export function Settings() {
           <span>{status}</span>
           <strong>Cloud provider API keys are stored in the OS keychain, not local app settings.</strong>
         </div>
+      </section>
+
+      <section className="panel">
+        <div className="panel-heading">
+          <div>
+            <p className="eyebrow">Profiles</p>
+            <h2>Interview Profiles</h2>
+          </div>
+          <Save size={18} />
+        </div>
+        <div className="settings-two-column">
+          <label className="settings-field">
+            <span>Profile name</span>
+            <input
+              value={profileName}
+              placeholder="Coding Interview, System Design, Behavioral"
+              onChange={(event) => setProfileName(event.currentTarget.value)}
+            />
+          </label>
+          <label className="settings-field">
+            <span>Profile interview type</span>
+            <select
+              value={profileInterviewType}
+              onChange={(event) => setProfileInterviewType(event.currentTarget.value as AppProfile["interviewType"])}
+            >
+              <option value="dsa">DSA</option>
+              <option value="system_design">System Design</option>
+              <option value="behavioral">Behavioral</option>
+              <option value="hr">HR</option>
+              <option value="mixed">Mixed</option>
+            </select>
+          </label>
+          <Button variant="primary" icon={<Save size={16} />} onClick={saveCurrentProfile}>
+            Save Profile
+          </Button>
+        </div>
+        {config.profiles.length > 0 ? (
+          <div className="profile-grid">
+            {config.profiles.map((profile) => (
+              <article className="profile-tile" key={profile.id}>
+                <strong>{profile.name}</strong>
+                <span>{profile.interviewType.replace(/_/g, " ")}</span>
+                <span>
+                  {profile.providerId} / {profile.sttMode}
+                </span>
+                <div className="button-row settings-actions">
+                  <Button icon={<Save size={16} />} onClick={() => applyProfile(profile)}>
+                    Apply Profile
+                  </Button>
+                  <Button variant="danger" icon={<Trash2 size={16} />} onClick={() => deleteProfile(profile)}>
+                    Delete Profile
+                  </Button>
+                </div>
+              </article>
+            ))}
+          </div>
+        ) : (
+          <p className="empty-copy">Saved interview profiles appear here after you capture the current settings.</p>
+        )}
       </section>
 
       <section className="panel">
@@ -1538,6 +1660,22 @@ function normalizeSttLanguage(language: string): string {
 
 function appendPromptContext(existing: string, imported: string): string {
   return [existing.trim(), imported.trim()].filter(Boolean).join("\n\n");
+}
+
+function cloneOverlaySettings(overlay: OverlaySettings): OverlaySettings {
+  return {
+    ...overlay,
+    bounds: { ...overlay.bounds }
+  };
+}
+
+function createProfileId(name: string): string {
+  const slug = name
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/(^-|-$)/g, "");
+
+  return slug || globalThis.crypto?.randomUUID?.() || `profile-${Date.now()}`;
 }
 
 function createKnowledgeDocumentId(title: string): string {
