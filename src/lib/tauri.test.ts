@@ -1,6 +1,10 @@
 import { afterEach, describe, expect, it } from "vitest";
 import {
+  clearKnowledgeBaseNative,
   deleteProviderApiKey,
+  deleteKnowledgeDocumentNative,
+  listKnowledgeBase,
+  saveKnowledgeDocumentNative,
   listSecurityEvents,
   saveProviderApiKey,
   typeTextIntoActiveWindow
@@ -30,5 +34,41 @@ describe("tauri fallback security events", () => {
       target: "openai"
     });
     expect(serialized).not.toContain("sk-live-secret");
+  });
+});
+
+describe("tauri fallback knowledge persistence", () => {
+  afterEach(() => {
+    localStorage.clear();
+    sessionStorage.clear();
+  });
+
+  it("persists, deletes, and clears knowledge documents through native-compatible wrappers", async () => {
+    await saveKnowledgeDocumentNative({
+      id: "payments",
+      title: "Payments Project",
+      sourceType: "project",
+      text: "Built Stripe webhook retries with queue backoff.",
+      createdAtMs: 500
+    });
+
+    expect(await listKnowledgeBase()).toMatchObject({
+      documents: [expect.objectContaining({ id: "payments", title: "Payments Project" })],
+      chunks: [expect.objectContaining({ documentId: "payments" })]
+    });
+
+    await deleteKnowledgeDocumentNative("payments");
+    expect((await listKnowledgeBase()).documents).toHaveLength(0);
+
+    await saveKnowledgeDocumentNative({
+      id: "resume",
+      title: "Resume",
+      sourceType: "resume",
+      text: "Led platform migrations.",
+      createdAtMs: 700
+    });
+    await clearKnowledgeBaseNative();
+
+    expect(await listKnowledgeBase()).toEqual({ documents: [], chunks: [] });
   });
 });

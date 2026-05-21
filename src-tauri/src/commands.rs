@@ -7,10 +7,12 @@ use crate::collaboration::{
     CollaborationHint, CollaborationManager, CollaborationServerStatus, CollaborationSnapshot,
 };
 use crate::db::{
-    Database, NewAiResponse, NewSecurityEvent, NewSession, TranscriptCursor, TranscriptPage,
-    UpdateSession,
+    Database, NewAiResponse, NewKnowledgeDocument, NewSecurityEvent, NewSession, TranscriptCursor,
+    TranscriptPage, UpdateSession,
 };
-use crate::models::{AiResponse, PromptTemplate, SecurityEvent, Session, Transcript};
+use crate::models::{
+    AiResponse, KnowledgeBase, PromptTemplate, SecurityEvent, Session, Transcript,
+};
 use crate::ocr;
 use crate::ocr::ScreenFrame;
 use crate::overlay::{OverlayProtectionStatus, OverlayWindowBounds};
@@ -180,6 +182,36 @@ pub fn list_security_events(
     database
         .list_security_events(limit.unwrap_or(25))
         .map_err(to_command_error)
+}
+
+#[tauri::command]
+pub fn list_knowledge_base(database: State<'_, Database>) -> Result<KnowledgeBase, String> {
+    database.list_knowledge_base().map_err(to_command_error)
+}
+
+#[tauri::command]
+pub fn upsert_knowledge_document(
+    database: State<'_, Database>,
+    input: NewKnowledgeDocument,
+) -> Result<KnowledgeBase, String> {
+    database
+        .upsert_knowledge_document(input)
+        .map_err(to_command_error)
+}
+
+#[tauri::command]
+pub fn delete_knowledge_document(
+    database: State<'_, Database>,
+    document_id: String,
+) -> Result<KnowledgeBase, String> {
+    database
+        .delete_knowledge_document(&document_id)
+        .map_err(to_command_error)
+}
+
+#[tauri::command]
+pub fn clear_knowledge_base(database: State<'_, Database>) -> Result<KnowledgeBase, String> {
+    database.clear_knowledge_base().map_err(to_command_error)
 }
 
 #[tauri::command]

@@ -1,6 +1,17 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import type { AudioCaptureState, AudioChunkEvent, AudioLevelEvent } from "./audioEvents";
+import {
+  KNOWLEDGE_BASE_SETTING_KEY,
+  chunkKnowledgeDocument,
+  clearKnowledgeBase,
+  parseKnowledgeBase,
+  removeKnowledgeDocument,
+  serializeKnowledgeBase,
+  upsertKnowledgeDocument,
+  type KnowledgeBase,
+  type KnowledgeDocumentInput
+} from "./knowledge";
 import type {
   AIResponseRecord,
   NewAIResponseInput,
@@ -137,6 +148,56 @@ export async function saveSetting(key: string, value: string): Promise<void> {
   return invokeOrFallback<void>("save_setting", { key, value }, () => {
     localStorage.setItem(key, value);
   });
+}
+
+export async function listKnowledgeBase(): Promise<KnowledgeBase> {
+  return invokeOrFallback<KnowledgeBase>("list_knowledge_base", {}, () =>
+    parseKnowledgeBase(localStorage.getItem(KNOWLEDGE_BASE_SETTING_KEY))
+  );
+}
+
+export async function saveKnowledgeDocumentNative(input: KnowledgeDocumentInput): Promise<KnowledgeBase> {
+  const normalized = normalizeKnowledgeDocumentInput(input);
+  return invokeOrFallback<KnowledgeBase>(
+    "upsert_knowledge_document",
+    {
+      input: {
+        ...normalized,
+        chunks: chunkKnowledgeDocument(normalized)
+      }
+    },
+    () => {
+      const base = upsertKnowledgeDocument(parseKnowledgeBase(localStorage.getItem(KNOWLEDGE_BASE_SETTING_KEY)), normalized);
+      localStorage.setItem(KNOWLEDGE_BASE_SETTING_KEY, serializeKnowledgeBase(base));
+      return base;
+    }
+  );
+}
+
+export async function deleteKnowledgeDocumentNative(documentId: string): Promise<KnowledgeBase> {
+  return invokeOrFallback<KnowledgeBase>("delete_knowledge_document", { documentId }, () => {
+    const base = removeKnowledgeDocument(parseKnowledgeBase(localStorage.getItem(KNOWLEDGE_BASE_SETTING_KEY)), documentId);
+    localStorage.setItem(KNOWLEDGE_BASE_SETTING_KEY, serializeKnowledgeBase(base));
+    return base;
+  });
+}
+
+export async function clearKnowledgeBaseNative(): Promise<KnowledgeBase> {
+  return invokeOrFallback<KnowledgeBase>("clear_knowledge_base", {}, () => {
+    const base = clearKnowledgeBase();
+    localStorage.setItem(KNOWLEDGE_BASE_SETTING_KEY, serializeKnowledgeBase(base));
+    return base;
+  });
+}
+
+function normalizeKnowledgeDocumentInput(input: KnowledgeDocumentInput): KnowledgeDocumentInput {
+  return {
+    ...input,
+    id: input.id.trim(),
+    title: input.title.trim(),
+    sourceType: input.sourceType.trim() || "note",
+    text: input.text.trim()
+  };
 }
 
 function providerSecretStorageKey(providerId: string): string {

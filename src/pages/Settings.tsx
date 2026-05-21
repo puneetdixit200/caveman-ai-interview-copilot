@@ -28,14 +28,8 @@ import {
 } from "../lib/appConfig";
 import { runAudioCaptureRehearsal, type AudioRehearsalResult } from "../lib/audioRehearsal";
 import {
-  KNOWLEDGE_BASE_SETTING_KEY,
-  clearKnowledgeBase,
   createKnowledgeBase,
-  parseKnowledgeBase,
-  removeKnowledgeDocument,
   searchKnowledgeBase,
-  serializeKnowledgeBase,
-  upsertKnowledgeDocument,
   type KnowledgeBase
 } from "../lib/knowledge";
 import { isCloudOcrBlocked, runScreenOcr } from "../lib/ocr";
@@ -50,9 +44,12 @@ import {
 import { createConfiguredProvider } from "../lib/providerClients";
 import { hydrateProviderApiKeys } from "../lib/providerSecrets";
 import {
+  clearKnowledgeBaseNative,
+  deleteKnowledgeDocumentNative,
   deleteProviderApiKey,
   detectLocalWhisperSetup,
   downloadWhisperModel,
+  listKnowledgeBase,
   getProviderApiKey,
   getSetting,
   getOverlayWindowBounds,
@@ -61,6 +58,7 @@ import {
   listAudioDevices,
   listSecurityEvents,
   saveProviderApiKey,
+  saveKnowledgeDocumentNative,
   saveSetting,
   setOverlayWindowBounds,
   transcribeWithCloudStt,
@@ -156,11 +154,11 @@ export function Settings() {
     let cancelled = false;
 
     async function load() {
-      const [rawConfig, devices, applications, rawKnowledgeBase, rawPluginCatalog, events] = await Promise.all([
+      const [rawConfig, devices, applications, loadedKnowledgeBase, rawPluginCatalog, events] = await Promise.all([
         getSetting(APP_CONFIG_SETTING_KEY),
         listAudioDevices(),
         listAudioApplications(),
-        getSetting(KNOWLEDGE_BASE_SETTING_KEY),
+        listKnowledgeBase(),
         getSetting(PLUGIN_CATALOG_SETTING_KEY),
         listSecurityEvents(8)
       ]);
@@ -179,7 +177,7 @@ export function Settings() {
       };
       if (!cancelled) {
         setConfig(nextConfig);
-        setKnowledgeBase(parseKnowledgeBase(rawKnowledgeBase));
+        setKnowledgeBase(loadedKnowledgeBase);
         setPluginCatalog(parsePluginCatalog(rawPluginCatalog));
         setSttSecretInput(sttSecret ?? "");
         setOcrReviewText(nextConfig.ocr.lastText ?? "");
@@ -685,7 +683,7 @@ export function Settings() {
 
     const title = knowledgeTitle.trim() || `Knowledge ${knowledgeBase.documents.length + 1}`;
     const id = createKnowledgeDocumentId(title);
-    const nextKnowledgeBase = upsertKnowledgeDocument(knowledgeBase, {
+    const nextKnowledgeBase = await saveKnowledgeDocumentNative({
       id,
       title,
       sourceType: knowledgeSourceType.trim() || "note",
@@ -696,7 +694,6 @@ export function Settings() {
     setKnowledgeBase(nextKnowledgeBase);
     setKnowledgeText("");
     setKnowledgeTitle("");
-    await saveSetting(KNOWLEDGE_BASE_SETTING_KEY, serializeKnowledgeBase(nextKnowledgeBase));
     setStatus(`Added ${title} to the knowledge base`);
   }
 
@@ -715,7 +712,7 @@ export function Settings() {
       }
 
       const title = file.name.replace(/\.[^.]+$/, "") || `Knowledge ${nextKnowledgeBase.documents.length + 1}`;
-      nextKnowledgeBase = upsertKnowledgeDocument(nextKnowledgeBase, {
+      nextKnowledgeBase = await saveKnowledgeDocumentNative({
         id: createKnowledgeDocumentId(`${file.name}-${file.lastModified}`),
         title,
         sourceType: knowledgeSourceType.trim() || "file",
@@ -731,21 +728,18 @@ export function Settings() {
     }
 
     setKnowledgeBase(nextKnowledgeBase);
-    await saveSetting(KNOWLEDGE_BASE_SETTING_KEY, serializeKnowledgeBase(nextKnowledgeBase));
     setStatus(`Imported ${importedCount} knowledge file${importedCount === 1 ? "" : "s"}`);
   }
 
   async function deleteKnowledgeDocument(documentId: string, title: string) {
-    const nextKnowledgeBase = removeKnowledgeDocument(knowledgeBase, documentId);
+    const nextKnowledgeBase = await deleteKnowledgeDocumentNative(documentId);
     setKnowledgeBase(nextKnowledgeBase);
-    await saveSetting(KNOWLEDGE_BASE_SETTING_KEY, serializeKnowledgeBase(nextKnowledgeBase));
     setStatus(`Deleted ${title} from the knowledge base`);
   }
 
   async function clearStoredKnowledgeBase() {
-    const nextKnowledgeBase = clearKnowledgeBase();
+    const nextKnowledgeBase = await clearKnowledgeBaseNative();
     setKnowledgeBase(nextKnowledgeBase);
-    await saveSetting(KNOWLEDGE_BASE_SETTING_KEY, serializeKnowledgeBase(nextKnowledgeBase));
     setStatus("Cleared knowledge base");
   }
 

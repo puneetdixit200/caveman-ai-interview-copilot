@@ -1,5 +1,6 @@
 use caveman_lib::db::{
-    Database, NewAiResponse, NewSecurityEvent, NewSession, TranscriptCursor, UpdateSession,
+    Database, NewAiResponse, NewKnowledgeChunk, NewKnowledgeDocument, NewSecurityEvent, NewSession,
+    TranscriptCursor, UpdateSession,
 };
 use rusqlite::Connection;
 
@@ -235,6 +236,108 @@ fn security_events_round_trip_without_storing_secrets() {
     assert!(!serde_json::to_string(&events)
         .expect("serialize events")
         .contains("sk-"));
+}
+
+#[test]
+fn knowledge_documents_and_chunks_persist_locally() {
+    let db = Database::in_memory().expect("in-memory database");
+
+    db.upsert_knowledge_document(NewKnowledgeDocument {
+        id: "payments".to_string(),
+        title: " Payments Project ".to_string(),
+        source_type: " project ".to_string(),
+        text: "Built Stripe webhook retries with queue backoff.".to_string(),
+        created_at_ms: Some(500),
+        chunks: vec![NewKnowledgeChunk {
+            id: "payments-1".to_string(),
+            source_label: "project: Payments Project".to_string(),
+            text: "Built Stripe webhook retries with queue backoff.".to_string(),
+            created_at_ms: Some(500),
+        }],
+    })
+    .expect("upsert knowledge document");
+
+    let base = db.list_knowledge_base().expect("list knowledge base");
+    assert_eq!(base.documents.len(), 1);
+    assert_eq!(base.documents[0].id, "payments");
+    assert_eq!(base.documents[0].title, "Payments Project");
+    assert_eq!(base.documents[0].source_type, "project");
+    assert_eq!(
+        base.documents[0].character_count,
+        "Built Stripe webhook retries with queue backoff.".len() as i64
+    );
+    assert_eq!(base.chunks.len(), 1);
+    assert_eq!(base.chunks[0].document_id, "payments");
+    assert_eq!(base.chunks[0].source_label, "project: Payments Project");
+
+    db.delete_knowledge_document("payments")
+        .expect("delete knowledge document");
+    assert!(db
+        .list_knowledge_base()
+        .expect("list after delete")
+        .documents
+        .is_empty());
+
+    db.upsert_knowledge_document(NewKnowledgeDocument {
+        id: "resume".to_string(),
+        title: "Resume".to_string(),
+        source_type: "resume".to_string(),
+        text: "Led platform migrations.".to_string(),
+        created_at_ms: Some(700),
+        chunks: vec![],
+    })
+    .expect("upsert second document");
+    db.clear_knowledge_base().expect("clear knowledge base");
+    assert!(db
+        .list_knowledge_base()
+        .expect("list after clear")
+        .chunks
+        .is_empty());
+}
+
+#[test]
+fn legacy_knowledge_setting_migrates_to_sqlite_tables() {
+    let db = Database::in_memory().expect("in-memory database");
+    db.save_setting(
+        "knowledge.base",
+        r#"{
+          "documents": [
+            {
+              "id": "legacy-payments",
+              "title": "Legacy Payments",
+              "sourceType": "project",
+              "characterCount": 32,
+              "createdAtMs": 800
+            }
+          ],
+          "chunks": [
+            {
+              "id": "legacy-payments-1",
+              "documentId": "legacy-payments",
+              "sourceLabel": "project: Legacy Payments",
+              "text": "Old stored Stripe notes.",
+              "createdAtMs": 800
+            }
+          ]
+        }"#,
+    )
+    .expect("save legacy setting");
+
+    let base = db.list_knowledge_base().expect("legacy knowledge migrated");
+
+    assert_eq!(base.documents.len(), 1);
+    assert_eq!(base.documents[0].id, "legacy-payments");
+    assert_eq!(base.documents[0].source_type, "project");
+    assert_eq!(base.chunks.len(), 1);
+    assert_eq!(base.chunks[0].document_id, "legacy-payments");
+
+    assert_eq!(
+        db.list_knowledge_base()
+            .expect("second list does not duplicate")
+            .chunks
+            .len(),
+        1
+    );
 }
 
 #[test]

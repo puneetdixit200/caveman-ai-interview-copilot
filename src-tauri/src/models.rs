@@ -60,6 +60,33 @@ pub struct SecurityEvent {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
+pub struct KnowledgeDocumentRecord {
+    pub id: String,
+    pub title: String,
+    pub source_type: String,
+    pub character_count: i64,
+    pub created_at_ms: i64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct KnowledgeChunk {
+    pub id: String,
+    pub document_id: String,
+    pub source_label: String,
+    pub text: String,
+    pub created_at_ms: Option<i64>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct KnowledgeBase {
+    pub documents: Vec<KnowledgeDocumentRecord>,
+    pub chunks: Vec<KnowledgeChunk>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
 pub struct PromptTemplate {
     pub id: String,
     pub name: String,

@@ -7,7 +7,12 @@ use rusqlite::{params, Connection, OptionalExtension};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use crate::models::{AiResponse, SecurityEvent, Session, Transcript};
+use crate::models::{
+    AiResponse, KnowledgeBase, KnowledgeChunk, KnowledgeDocumentRecord, SecurityEvent, Session,
+    Transcript,
+};
+
+const KNOWLEDGE_BASE_SETTING_KEY: &str = "knowledge.base";
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -54,6 +59,26 @@ pub struct NewSecurityEvent {
     pub action: String,
     pub target: Option<String>,
     pub details: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct NewKnowledgeChunk {
+    pub id: String,
+    pub source_label: String,
+    pub text: String,
+    pub created_at_ms: Option<i64>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct NewKnowledgeDocument {
+    pub id: String,
+    pub title: String,
+    pub source_type: String,
+    pub text: String,
+    pub created_at_ms: Option<i64>,
+    pub chunks: Vec<NewKnowledgeChunk>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -467,6 +492,235 @@ impl Database {
             .map_err(Into::into)
     }
 
+    pub fn upsert_knowledge_document(&self, input: NewKnowledgeDocument) -> Result<KnowledgeBase> {
+        let id = input.id.trim().to_string();
+        if id.is_empty() {
+            anyhow::bail!("knowledge document id cannot be empty");
+        }
+
+        let title = input.title.trim().to_string();
+        if title.is_empty() {
+            anyhow::bail!("knowledge document title cannot be empty");
+        }
+
+        let source_type = input.source_type.trim().to_string();
+        if source_type.is_empty() {
+            anyhow::bail!("knowledge document source type cannot be empty");
+        }
+
+        let text = input.text.trim().to_string();
+        if text.is_empty() {
+            anyhow::bail!("knowledge document text cannot be empty");
+        }
+
+        let created_at_ms = input.created_at_ms.unwrap_or_else(current_timestamp_ms);
+        let connection = self.lock()?;
+        let transaction = connection.unchecked_transaction()?;
+        transaction.execute(
+            "INSERT INTO knowledge_documents (
+                id, title, source_type, extracted_text, character_count, created_at_ms
+             ) VALUES (?1, ?2, ?3, ?4, ?5, ?6)
+             ON CONFLICT(id) DO UPDATE SET
+                title = excluded.title,
+                source_type = excluded.source_type,
+                extracted_text = excluded.extracted_text,
+                character_count = excluded.character_count,
+                created_at_ms = excluded.created_at_ms",
+            params![
+                &id,
+                &title,
+                &source_type,
+                &text,
+                text.chars().count() as i64,
+                created_at_ms
+            ],
+        )?;
+        transaction.execute(
+            "DELETE FROM knowledge_chunks WHERE document_id = ?1",
+            params![&id],
+        )?;
+
+        for (index, chunk) in input.chunks.into_iter().enumerate() {
+            let chunk_id = normalize_chunk_id(chunk.id, &id, index);
+            let source_label = chunk.source_label.trim().to_string();
+            let chunk_text = chunk.text.trim().to_string();
+            if chunk_text.is_empty() {
+                continue;
+            }
+
+            transaction.execute(
+                "INSERT INTO knowledge_chunks (
+                    id, document_id, source_label, text, rank_order, created_at_ms
+                 ) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+                params![
+                    chunk_id,
+                    &id,
+                    if source_label.is_empty() {
+                        format!("{source_type}: {title}")
+                    } else {
+                        source_label
+                    },
+                    chunk_text,
+                    index as i64,
+                    chunk.created_at_ms.or(Some(created_at_ms))
+                ],
+            )?;
+        }
+
+        transaction.commit()?;
+        drop(connection);
+
+        self.list_knowledge_base()
+    }
+
+    pub fn list_knowledge_base(&self) -> Result<KnowledgeBase> {
+        let connection = self.lock()?;
+        Self::migrate_legacy_knowledge_setting(&connection)?;
+        let mut document_statement = connection.prepare(
+            "SELECT id, title, source_type, character_count, created_at_ms
+             FROM knowledge_documents
+             ORDER BY created_at_ms ASC, id ASC",
+        )?;
+        let documents = document_statement
+            .query_map([], map_knowledge_document_record)?
+            .collect::<rusqlite::Result<Vec<_>>>()?;
+
+        let mut chunk_statement = connection.prepare(
+            "SELECT id, document_id, source_label, text, created_at_ms
+             FROM knowledge_chunks
+             ORDER BY rank_order ASC, id ASC",
+        )?;
+        let chunks = chunk_statement
+            .query_map([], map_knowledge_chunk)?
+            .collect::<rusqlite::Result<Vec<_>>>()?;
+
+        Ok(KnowledgeBase { documents, chunks })
+    }
+
+    fn migrate_legacy_knowledge_setting(connection: &Connection) -> Result<()> {
+        let document_count: i64 =
+            connection.query_row("SELECT COUNT(*) FROM knowledge_documents", [], |row| {
+                row.get(0)
+            })?;
+        if document_count > 0 {
+            return Ok(());
+        }
+
+        let raw = connection
+            .query_row(
+                "SELECT value FROM settings WHERE key = ?1",
+                params![KNOWLEDGE_BASE_SETTING_KEY],
+                |row| row.get::<_, String>(0),
+            )
+            .optional()?;
+        let Some(raw) = raw else {
+            return Ok(());
+        };
+        if raw.trim().is_empty() {
+            return Ok(());
+        }
+
+        let base = match serde_json::from_str::<KnowledgeBase>(&raw) {
+            Ok(base) => base,
+            Err(_) => return Ok(()),
+        };
+        if base.documents.is_empty() {
+            return Ok(());
+        }
+
+        let transaction = connection.unchecked_transaction()?;
+        for document in &base.documents {
+            let id = document.id.trim().to_string();
+            let title = document.title.trim().to_string();
+            if id.is_empty() || title.is_empty() {
+                continue;
+            }
+
+            let source_type = match document.source_type.trim() {
+                "" => "legacy".to_string(),
+                value => value.to_string(),
+            };
+            let document_chunks = base
+                .chunks
+                .iter()
+                .filter(|chunk| chunk.document_id == document.id)
+                .collect::<Vec<_>>();
+            let extracted_text = document_chunks
+                .iter()
+                .map(|chunk| chunk.text.trim())
+                .filter(|text| !text.is_empty())
+                .collect::<Vec<_>>()
+                .join("\n\n");
+            let character_count = if document.character_count > 0 {
+                document.character_count
+            } else {
+                extracted_text.chars().count() as i64
+            };
+
+            transaction.execute(
+                "INSERT OR IGNORE INTO knowledge_documents (
+                    id, title, source_type, extracted_text, character_count, created_at_ms
+                 ) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+                params![
+                    &id,
+                    &title,
+                    &source_type,
+                    &extracted_text,
+                    character_count,
+                    document.created_at_ms
+                ],
+            )?;
+
+            for (index, chunk) in document_chunks.into_iter().enumerate() {
+                let chunk_text = chunk.text.trim().to_string();
+                if chunk_text.is_empty() {
+                    continue;
+                }
+                let chunk_id = normalize_chunk_id(chunk.id.clone(), &id, index);
+                let source_label = match chunk.source_label.trim() {
+                    "" => format!("{source_type}: {title}"),
+                    value => value.to_string(),
+                };
+
+                transaction.execute(
+                    "INSERT OR IGNORE INTO knowledge_chunks (
+                        id, document_id, source_label, text, rank_order, created_at_ms
+                     ) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+                    params![
+                        chunk_id,
+                        &id,
+                        source_label,
+                        chunk_text,
+                        index as i64,
+                        chunk.created_at_ms
+                    ],
+                )?;
+            }
+        }
+        transaction.commit()?;
+
+        Ok(())
+    }
+
+    pub fn delete_knowledge_document(&self, document_id: &str) -> Result<KnowledgeBase> {
+        let connection = self.lock()?;
+        connection.execute(
+            "DELETE FROM knowledge_documents WHERE id = ?1",
+            params![document_id],
+        )?;
+        drop(connection);
+
+        self.list_knowledge_base()
+    }
+
+    pub fn clear_knowledge_base(&self) -> Result<KnowledgeBase> {
+        let connection = self.lock()?;
+        connection.execute("DELETE FROM knowledge_documents", [])?;
+        drop(connection);
+
+        self.list_knowledge_base()
+    }
+
     fn get_session(&self, id: &str) -> Result<Session> {
         let connection = self.lock()?;
         connection
@@ -589,6 +843,24 @@ impl Database {
                 created_at TEXT NOT NULL
             );
 
+            CREATE TABLE IF NOT EXISTS knowledge_documents (
+                id TEXT PRIMARY KEY,
+                title TEXT NOT NULL,
+                source_type TEXT NOT NULL,
+                extracted_text TEXT NOT NULL,
+                character_count INTEGER NOT NULL,
+                created_at_ms INTEGER NOT NULL
+            );
+
+            CREATE TABLE IF NOT EXISTS knowledge_chunks (
+                id TEXT PRIMARY KEY,
+                document_id TEXT NOT NULL REFERENCES knowledge_documents(id) ON DELETE CASCADE,
+                source_label TEXT NOT NULL,
+                text TEXT NOT NULL,
+                rank_order INTEGER NOT NULL DEFAULT 0,
+                created_at_ms INTEGER
+            );
+
             CREATE TABLE IF NOT EXISTS prompt_templates (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 name TEXT NOT NULL,
@@ -601,6 +873,7 @@ impl Database {
             CREATE INDEX IF NOT EXISTS idx_transcripts_session ON transcripts(session_id, timestamp_ms);
             CREATE INDEX IF NOT EXISTS idx_responses_session ON ai_responses(session_id, created_at);
             CREATE INDEX IF NOT EXISTS idx_security_events_created ON security_events(created_at);
+            CREATE INDEX IF NOT EXISTS idx_knowledge_chunks_document ON knowledge_chunks(document_id, rank_order);
             ",
         )?;
         Self::migrate_session_interview_types(&connection)?;
@@ -720,6 +993,19 @@ fn normalize_tags(tags: Vec<String>) -> Vec<String> {
     normalized
 }
 
+fn current_timestamp_ms() -> i64 {
+    Utc::now().timestamp_millis()
+}
+
+fn normalize_chunk_id(id: String, document_id: &str, index: usize) -> String {
+    let id = id.trim().to_string();
+    if id.is_empty() {
+        format!("{document_id}-{}", index + 1)
+    } else {
+        id
+    }
+}
+
 fn validate_interview_type(value: &str) -> Result<()> {
     if [
         "dsa",
@@ -824,5 +1110,27 @@ fn map_security_event(row: &rusqlite::Row<'_>) -> rusqlite::Result<SecurityEvent
         target: row.get(3)?,
         details: row.get(4)?,
         created_at: row.get(5)?,
+    })
+}
+
+fn map_knowledge_document_record(
+    row: &rusqlite::Row<'_>,
+) -> rusqlite::Result<KnowledgeDocumentRecord> {
+    Ok(KnowledgeDocumentRecord {
+        id: row.get(0)?,
+        title: row.get(1)?,
+        source_type: row.get(2)?,
+        character_count: row.get(3)?,
+        created_at_ms: row.get(4)?,
+    })
+}
+
+fn map_knowledge_chunk(row: &rusqlite::Row<'_>) -> rusqlite::Result<KnowledgeChunk> {
+    Ok(KnowledgeChunk {
+        id: row.get(0)?,
+        document_id: row.get(1)?,
+        source_label: row.get(2)?,
+        text: row.get(3)?,
+        created_at_ms: row.get(4)?,
     })
 }
