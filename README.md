@@ -25,6 +25,7 @@ Implemented now:
 - Speaker diarization calibration for microphone, system audio, and provider speaker slots from Whisper, Deepgram, AssemblyAI, and Google STT
 - Local Whisper setup helpers that scan for `whisper-cli`/`main` binaries, detect local `ggml` models, and download the official `base.en` model with SHA-1 verification
 - Automatic interviewer question detection and answer triggering from live transcript updates
+- Token-budgeted context window management with history turn limits, supplemental context trimming, and reserved answer tokens
 - Ollama, LM Studio, OpenRouter, OpenAI, Anthropic, Groq, Google Gemini, Mistral, Together AI, and Fireworks AI provider routing with streaming fallback
 - Stealth overlay window with opacity, font controls, global hotkeys, click-through mode, position persistence, and Windows capture exclusion
 - Session archive with search, cursor-paged replay for long histories, transcript correction, Markdown, JSON, and PDF export

@@ -77,6 +77,13 @@ export interface AutoTriggerSettings {
   requireInterviewerSpeaker: boolean;
 }
 
+export interface ContextWindowSettings {
+  maxPromptTokens: number;
+  reservedResponseTokens: number;
+  maxHistoryTurns: number;
+  maxStaticContextTokens: number;
+}
+
 export interface OcrSettings {
   enabled: boolean;
   provider: OcrProvider;

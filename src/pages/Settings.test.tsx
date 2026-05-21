@@ -83,6 +83,15 @@ describe("Settings", () => {
     expect(screen.getByLabelText("Knowledge files")).toBeInTheDocument();
   });
 
+  it("shows context window token budget controls", async () => {
+    render(<Settings />);
+
+    expect(await screen.findByRole("spinbutton", { name: "Prompt token budget" })).toBeInTheDocument();
+    expect(screen.getByRole("spinbutton", { name: "Reserved answer tokens" })).toBeInTheDocument();
+    expect(screen.getByRole("spinbutton", { name: "Transcript turns in prompt" })).toBeInTheDocument();
+    expect(screen.getByRole("spinbutton", { name: "Supplemental context tokens" })).toBeInTheDocument();
+  });
+
   it("imports resume and job description files into prompt context", async () => {
     const user = userEvent.setup();
     render(<Settings />);

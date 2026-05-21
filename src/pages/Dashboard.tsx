@@ -941,7 +941,11 @@ export function Dashboard() {
     let response = "";
 
     try {
-      for await (const chunk of router.chatStream({ messages, model: activeModel })) {
+      for await (const chunk of router.chatStream({
+        messages,
+        model: activeModel,
+        maxTokens: config.contextWindow.reservedResponseTokens
+      })) {
         response += chunk;
         setResponses((current) => [
           {
@@ -1246,7 +1250,10 @@ function buildPromptMessages(
     transcripts,
     resumeContext: [config.resumeContext, config.jobDescriptionContext].filter(Boolean).join("\n\n"),
     ocrContext: includeOcrContext ? config.ocr.lastText : undefined,
-    knowledgeContext: knowledgeContext || undefined
+    knowledgeContext: knowledgeContext || undefined,
+    maxContextTokens: config.contextWindow.maxPromptTokens,
+    maxStaticContextTokens: config.contextWindow.maxStaticContextTokens,
+    maxHistoryTurns: config.contextWindow.maxHistoryTurns
   });
 }
 

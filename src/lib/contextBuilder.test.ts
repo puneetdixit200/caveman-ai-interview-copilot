@@ -132,4 +132,59 @@ describe("buildChatMessages", () => {
     expect(messages.some((message) => message.content.includes("Recent answer used queues."))).toBe(true);
     expect(messages.at(-1)?.content).toContain("How would you prevent duplicate jobs?");
   });
+
+  it("trims supplemental context before it can overflow the prompt token budget", () => {
+    const messages = buildChatMessages({
+      template,
+      transcripts: [
+        {
+          id: 1,
+          sessionId: "s1",
+          speaker: "interviewer",
+          content: "How should I connect this to my payment project?",
+          timestampMs: 1000,
+          confidence: 0.9
+        }
+      ],
+      resumeContext: `Resume ${"payments ".repeat(120)}`,
+      ocrContext: `Screen ${"diagram ".repeat(80)}`,
+      knowledgeContext: `Project ${"webhook retries ".repeat(90)}`,
+      maxContextTokens: 120,
+      maxStaticContextTokens: 40,
+      maxHistoryTurns: 6
+    });
+
+    const totalTokens = estimateTokens(messages.map((message) => message.content).join("\n"));
+
+    expect(totalTokens).toBeLessThanOrEqual(120);
+    expect(messages.at(-1)?.content).toContain("payment project");
+    expect(messages.some((message) => message.content.includes("truncated to fit token budget"))).toBe(true);
+    expect(messages.find((message) => message.content.startsWith("Resume/JD context"))).toBeDefined();
+  });
+
+  it("limits transcript history by turn count while preserving the latest interview question", () => {
+    const messages = buildChatMessages({
+      template,
+      transcripts: Array.from({ length: 10 }, (_, index) => ({
+        id: index + 1,
+        sessionId: "s1",
+        speaker: index % 2 === 0 ? "interviewer" : "candidate",
+        content: `turn ${index + 1}`,
+        timestampMs: (index + 1) * 1000,
+        confidence: 0.9
+      })),
+      maxContextTokens: 1000,
+      maxHistoryTurns: 3
+    });
+
+    const historyMessages = messages.filter((message) => /^\[(INTERVIEWER|YOU|UNKNOWN)\]/.test(message.content));
+
+    expect(historyMessages.map((message) => message.content)).toEqual([
+      "[YOU] turn 8",
+      "[INTERVIEWER] turn 9",
+      "[YOU] turn 10"
+    ]);
+    expect(messages.at(-1)?.content).toContain("turn 9");
+    expect(messages.some((message) => message.content.includes("omitted 7 older transcript turn"))).toBe(true);
+  });
 });

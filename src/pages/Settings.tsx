@@ -69,6 +69,7 @@ import type {
   AudioDevice,
   AppProfile,
   AutoTriggerSettings,
+  ContextWindowSettings,
   ModelProviderConfig,
   OcrSettings,
   OverlaySettings,
@@ -509,6 +510,10 @@ export function Settings() {
 
   function updateAutoTrigger(patch: Partial<AutoTriggerSettings>) {
     setConfig((current) => ({ ...current, autoTrigger: { ...current.autoTrigger, ...patch } }));
+  }
+
+  function updateContextWindow(patch: Partial<ContextWindowSettings>) {
+    setConfig((current) => ({ ...current, contextWindow: { ...current.contextWindow, ...patch } }));
   }
 
   function updateOcr(patch: Partial<OcrSettings>) {
@@ -1076,6 +1081,65 @@ export function Settings() {
               type="checkbox"
               checked={config.overlay.autoHideOnScreenShare}
               onChange={(event) => updateOverlay({ autoHideOnScreenShare: event.currentTarget.checked })}
+            />
+          </label>
+        </div>
+      </section>
+
+      <section className="panel prompt-panel">
+        <div className="panel-heading">
+          <div>
+            <p className="eyebrow">Context</p>
+            <h2>Prompt Budget</h2>
+          </div>
+        </div>
+        <div className="settings-two-column">
+          <label className="settings-field">
+            <span>Prompt token budget</span>
+            <input
+              aria-label="Prompt token budget"
+              type="number"
+              min="500"
+              max="128000"
+              step="100"
+              value={config.contextWindow.maxPromptTokens}
+              onChange={(event) => updateContextWindow({ maxPromptTokens: Number(event.currentTarget.value) })}
+            />
+          </label>
+          <label className="settings-field">
+            <span>Reserved answer tokens</span>
+            <input
+              aria-label="Reserved answer tokens"
+              type="number"
+              min="64"
+              max="4096"
+              step="64"
+              value={config.contextWindow.reservedResponseTokens}
+              onChange={(event) => updateContextWindow({ reservedResponseTokens: Number(event.currentTarget.value) })}
+            />
+          </label>
+          <label className="settings-field">
+            <span>Transcript turns in prompt</span>
+            <input
+              aria-label="Transcript turns in prompt"
+              type="number"
+              min="1"
+              max="200"
+              step="1"
+              value={config.contextWindow.maxHistoryTurns}
+              onChange={(event) => updateContextWindow({ maxHistoryTurns: Number(event.currentTarget.value) })}
+            />
+          </label>
+          <label className="settings-field">
+            <span>Supplemental context tokens</span>
+            <input
+              aria-label="Supplemental context tokens"
+              type="number"
+              min="0"
+              max="32000"
+              step="50"
+              value={config.contextWindow.maxStaticContextTokens}
+              onChange={(event) => updateContextWindow({ maxStaticContextTokens: Number(event.currentTarget.value) })}
             />
           </label>
         </div>

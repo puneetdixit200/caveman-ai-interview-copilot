@@ -4,6 +4,7 @@ import type {
   AutoTriggerMode,
   AutoTriggerSettings,
   AppProfile,
+  ContextWindowSettings,
   ModelProviderConfig,
   OcrProvider,
   OcrSettings,
@@ -35,6 +36,7 @@ export interface AppConfig {
   audio: AudioSettings;
   stt: SttSettings;
   autoTrigger: AutoTriggerSettings;
+  contextWindow: ContextWindowSettings;
   ocr: OcrSettings;
   tts: TtsSettings;
   overlay: OverlaySettings;
@@ -170,6 +172,12 @@ export const DEFAULT_APP_CONFIG: AppConfig = {
     minQuestionCharacters: 12,
     requireInterviewerSpeaker: true
   },
+  contextWindow: {
+    maxPromptTokens: 1800,
+    reservedResponseTokens: 700,
+    maxHistoryTurns: 40,
+    maxStaticContextTokens: 700
+  },
   ocr: {
     enabled: false,
     provider: "disabled",
@@ -246,6 +254,7 @@ export function parseAppConfig(raw: string | null | undefined): AppConfig {
       audio: mergeAudioSettings(parsed.audio),
       stt: mergeSttSettings(parsed.stt),
       autoTrigger: mergeAutoTriggerSettings(parsed.autoTrigger),
+      contextWindow: mergeContextWindowSettings(parsed.contextWindow),
       ocr: mergeOcrSettings(parsed.ocr),
       tts: mergeTtsSettings(parsed.tts),
       overlay,
@@ -312,6 +321,7 @@ function cloneConfig(config: AppConfig): AppConfig {
     audio: { ...config.audio },
     stt: { ...config.stt, speakerCalibration: { ...config.stt.speakerCalibration } },
     autoTrigger: { ...config.autoTrigger },
+    contextWindow: { ...config.contextWindow },
     ocr: { ...config.ocr },
     tts: { ...config.tts },
     overlay: { ...config.overlay },
@@ -429,6 +439,35 @@ function mergeAutoTriggerSettings(raw: unknown): AutoTriggerSettings {
       typeof value.requireInterviewerSpeaker === "boolean"
         ? value.requireInterviewerSpeaker
         : DEFAULT_APP_CONFIG.autoTrigger.requireInterviewerSpeaker
+  };
+}
+
+function mergeContextWindowSettings(raw: unknown): ContextWindowSettings {
+  const value = isObject(raw) ? raw : {};
+  return {
+    ...DEFAULT_APP_CONFIG.contextWindow,
+    maxPromptTokens: Math.round(
+      clampNumber(value.maxPromptTokens, 500, 128000, DEFAULT_APP_CONFIG.contextWindow.maxPromptTokens)
+    ),
+    reservedResponseTokens: Math.round(
+      clampNumber(
+        value.reservedResponseTokens,
+        64,
+        4096,
+        DEFAULT_APP_CONFIG.contextWindow.reservedResponseTokens
+      )
+    ),
+    maxHistoryTurns: Math.round(
+      clampNumber(value.maxHistoryTurns, 1, 200, DEFAULT_APP_CONFIG.contextWindow.maxHistoryTurns)
+    ),
+    maxStaticContextTokens: Math.round(
+      clampNumber(
+        value.maxStaticContextTokens,
+        0,
+        32000,
+        DEFAULT_APP_CONFIG.contextWindow.maxStaticContextTokens
+      )
+    )
   };
 }
 

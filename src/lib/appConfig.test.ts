@@ -205,6 +205,12 @@ describe("appConfig", () => {
       duplicateWindowMs: 30000,
       requireInterviewerSpeaker: true
     });
+    expect(config.contextWindow).toMatchObject({
+      maxPromptTokens: 1800,
+      reservedResponseTokens: 700,
+      maxHistoryTurns: 40,
+      maxStaticContextTokens: 700
+    });
     expect(config.ocr).toMatchObject({
       enabled: false,
       provider: "disabled",
@@ -265,6 +271,12 @@ describe("appConfig", () => {
           duplicateWindowMs: -1,
           requireInterviewerSpeaker: false
         },
+        contextWindow: {
+          maxPromptTokens: 120,
+          reservedResponseTokens: 20_000,
+          maxHistoryTurns: 0,
+          maxStaticContextTokens: -10
+        },
         tts: {
           enabled: true,
           rate: 5,
@@ -318,6 +330,12 @@ describe("appConfig", () => {
       silenceTimeoutMs: 500,
       duplicateWindowMs: 30000,
       requireInterviewerSpeaker: false
+    });
+    expect(parsed.contextWindow).toMatchObject({
+      maxPromptTokens: 500,
+      reservedResponseTokens: 4096,
+      maxHistoryTurns: 1,
+      maxStaticContextTokens: 0
     });
     expect(parsed.tts).toMatchObject({
       enabled: true,
