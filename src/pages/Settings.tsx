@@ -1,6 +1,7 @@
 import {
   BookOpen,
   Bot,
+  Copy,
   DownloadCloud,
   FilePlus2,
   Keyboard,
@@ -41,6 +42,7 @@ import {
   serializePluginCatalog,
   type PluginCatalog
 } from "../lib/pluginLoader";
+import { buildPreflightReport, PREFLIGHT_REPORT_SETTING_KEY } from "../lib/preflightReport";
 import { createConfiguredProvider } from "../lib/providerClients";
 import { hydrateProviderApiKeys } from "../lib/providerSecrets";
 import {
@@ -139,6 +141,7 @@ export function Settings() {
   const [securityEvents, setSecurityEvents] = useState<SecurityEvent[]>([]);
   const [runtimeBudget, setRuntimeBudget] = useState<RuntimeBudgetStatus | null>(null);
   const [refreshingRuntimeBudget, setRefreshingRuntimeBudget] = useState(false);
+  const [preflightReport, setPreflightReport] = useState("");
   const [profileName, setProfileName] = useState("");
   const [profileInterviewType, setProfileInterviewType] = useState<AppProfile["interviewType"]>("mixed");
   const [checkingUpdate, setCheckingUpdate] = useState(false);
@@ -158,14 +161,24 @@ export function Settings() {
     let cancelled = false;
 
     async function load() {
-      const [rawConfig, devices, applications, loadedKnowledgeBase, rawPluginCatalog, events, loadedRuntimeBudget] = await Promise.all([
+      const [
+        rawConfig,
+        devices,
+        applications,
+        loadedKnowledgeBase,
+        rawPluginCatalog,
+        events,
+        loadedRuntimeBudget,
+        savedPreflightReport
+      ] = await Promise.all([
         getSetting(APP_CONFIG_SETTING_KEY),
         listAudioDevices(),
         listAudioApplications(),
         listKnowledgeBase(),
         getSetting(PLUGIN_CATALOG_SETTING_KEY),
         listSecurityEvents(8),
-        getRuntimeBudgetStatus()
+        getRuntimeBudgetStatus(),
+        getSetting(PREFLIGHT_REPORT_SETTING_KEY)
       ]);
       const stored = parseAppConfig(rawConfig);
       const hydrated = await hydrateProviderApiKeys(stored);
@@ -190,6 +203,7 @@ export function Settings() {
         setAudioApplications(applications);
         setSecurityEvents(events);
         setRuntimeBudget(loadedRuntimeBudget);
+        setPreflightReport(savedPreflightReport ?? "");
         setProviderSecretInputs(
           nextConfig.providers.reduce<Partial<Record<ProviderId, string>>>((values, provider) => {
             if (provider.kind === "cloud") {
@@ -247,6 +261,34 @@ export function Settings() {
     } finally {
       setRefreshingRuntimeBudget(false);
     }
+  }
+
+  function createPreflightReport() {
+    return buildPreflightReport({
+      readiness,
+      runtimeBudget,
+      audioRehearsal: audioRehearsalResult
+    });
+  }
+
+  async function savePreflightReport() {
+    const report = createPreflightReport();
+    setPreflightReport(report);
+    await saveSetting(PREFLIGHT_REPORT_SETTING_KEY, report);
+    setStatus("Preflight report saved");
+  }
+
+  async function copyPreflightReport() {
+    const report = preflightReport || createPreflightReport();
+    setPreflightReport(report);
+    await saveSetting(PREFLIGHT_REPORT_SETTING_KEY, report);
+    if (!navigator.clipboard) {
+      setStatus("Clipboard is not available for the preflight report");
+      return;
+    }
+
+    await navigator.clipboard.writeText(report);
+    setStatus("Preflight report copied");
   }
 
   async function refreshProviderModels(provider: ModelProviderConfig) {
@@ -965,6 +1007,12 @@ export function Settings() {
           <Button icon={<RefreshCw size={16} />} onClick={refreshRuntimeBudget} disabled={refreshingRuntimeBudget}>
             {refreshingRuntimeBudget ? "Refreshing Runtime" : "Refresh Runtime Budget"}
           </Button>
+          <Button icon={<Save size={16} />} onClick={savePreflightReport}>
+            Save Preflight Report
+          </Button>
+          <Button icon={<Copy size={16} />} onClick={copyPreflightReport}>
+            Copy Preflight Report
+          </Button>
         </div>
 
         <div className="metric-strip readiness-summary">
@@ -1000,6 +1048,13 @@ export function Settings() {
             </article>
           ))}
         </div>
+
+        {preflightReport ? (
+          <label className="settings-field">
+            <span>Latest preflight report</span>
+            <textarea aria-label="Latest preflight report" readOnly rows={8} value={preflightReport} />
+          </label>
+        ) : null}
       </section>
 
       <section className="panel provider-config-panel">

@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { APP_CONFIG_SETTING_KEY, DEFAULT_APP_CONFIG, serializeAppConfig, type AppConfig } from "../lib/appConfig";
 import { runAudioCaptureRehearsal } from "../lib/audioRehearsal";
 import { KNOWLEDGE_BASE_SETTING_KEY, parseKnowledgeBase } from "../lib/knowledge";
+import { PREFLIGHT_REPORT_SETTING_KEY } from "../lib/preflightReport";
 import { runScreenOcr } from "../lib/ocr";
 import { createConfiguredProvider } from "../lib/providerClients";
 import { checkForSignedUpdate, downloadInstallAndRelaunchSignedUpdate } from "../lib/updater";
@@ -78,6 +79,20 @@ describe("Settings", () => {
     expect(screen.getByText("Manual transcript mode")).toBeInTheDocument();
     expect(screen.getByText("Manual answer trigger")).toBeInTheDocument();
     expect(screen.getByText("Switch Audio capture mode to Microphone, System, or Dual before a live call.")).toBeInTheDocument();
+  });
+
+  it("saves a timestamped real-use preflight report from Settings", async () => {
+    const user = userEvent.setup();
+    render(<Settings />);
+
+    await user.click(await screen.findByRole("button", { name: "Save Preflight Report" }));
+
+    const report = localStorage.getItem(PREFLIGHT_REPORT_SETTING_KEY) ?? "";
+    expect(report).toContain("# Caveman Preflight Report");
+    expect(report).toContain("Overall:");
+    expect(report).toContain("Manual audio capture");
+    expect(await screen.findByText("Preflight report saved")).toBeInTheDocument();
+    expect(screen.getByRole("textbox", { name: "Latest preflight report" })).toHaveValue(report);
   });
 
   it("shows OS keychain controls for cloud provider API keys", async () => {
