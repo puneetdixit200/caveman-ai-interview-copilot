@@ -9,6 +9,9 @@ use std::time::Duration;
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use tauri::{AppHandle, Emitter, Manager};
 
+const TARGET_SAMPLE_RATE_HZ: u32 = 16_000;
+const TARGET_CHANNELS: u16 = 1;
+
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AudioDevice {
@@ -454,9 +457,10 @@ fn stable_device_id(kind: &str, label: &str, index: usize) -> String {
 #[cfg(test)]
 mod tests {
     use super::{
-        apply_audio_level_to_state, apply_audio_processing, classify_device_kind, stable_device_id,
-        AudioCaptureManager, AudioCaptureState, AudioLevelEvent, AudioProcessingSettings,
-        RollingAudioBuffer,
+        apply_audio_level_to_state, apply_audio_processing, classify_device_kind,
+        prepare_stt_samples, stable_device_id, AudioCaptureManager, AudioCaptureState,
+        AudioLevelEvent, AudioProcessingSettings, RollingAudioBuffer, TARGET_CHANNELS,
+        TARGET_SAMPLE_RATE_HZ,
     };
 
     #[test]
@@ -568,6 +572,37 @@ mod tests {
         assert_eq!(system.samples, vec![0.7]);
         assert_eq!(system.sample_rate_hz, 48_000);
         assert_eq!(system.channels, 2);
+    }
+
+    #[test]
+    fn prepares_stt_samples_by_downmixing_capture_to_mono() {
+        let snapshot = prepare_stt_samples(
+            &[0.5, -0.5, 0.25, 0.75],
+            TARGET_SAMPLE_RATE_HZ,
+            2,
+            AudioProcessingSettings::default(),
+        );
+
+        assert_eq!(snapshot.sample_rate_hz, TARGET_SAMPLE_RATE_HZ);
+        assert_eq!(snapshot.channels, TARGET_CHANNELS);
+        assert_eq!(snapshot.samples, vec![0.0, 0.5]);
+    }
+
+    #[test]
+    fn prepares_stt_samples_by_resampling_capture_to_sixteen_khz() {
+        let snapshot = prepare_stt_samples(
+            &[0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8],
+            48_000,
+            1,
+            AudioProcessingSettings::default(),
+        );
+
+        assert_eq!(snapshot.sample_rate_hz, TARGET_SAMPLE_RATE_HZ);
+        assert_eq!(snapshot.channels, TARGET_CHANNELS);
+        assert_eq!(snapshot.samples.len(), 3);
+        assert!((snapshot.samples[0] - 0.0).abs() < 0.001);
+        assert!((snapshot.samples[1] - 0.3).abs() < 0.001);
+        assert!((snapshot.samples[2] - 0.6).abs() < 0.001);
     }
 }
 
@@ -699,8 +734,6 @@ fn run_audio_capture_thread(
         ) {
             Ok(spec) => {
                 state.microphone_device_id = spec.device_id;
-                state.sample_rate_hz = spec.sample_rate_hz;
-                state.channels = spec.channels;
                 streams.push(spec.stream);
             }
             Err(error) => errors.push(format!("microphone: {error}")),
@@ -717,10 +750,6 @@ fn run_audio_capture_thread(
             Ok(spec) => {
                 state.system_device_id = spec.device_id;
                 state.system_capture_supported = true;
-                if streams.is_empty() {
-                    state.sample_rate_hz = spec.sample_rate_hz;
-                    state.channels = spec.channels;
-                }
                 streams.push(spec.stream);
             }
             Err(error) => errors.push(format!("system audio: {error}")),
@@ -733,6 +762,8 @@ fn run_audio_capture_thread(
         if !errors.is_empty() {
             state.error = Some(errors.join("; "));
         }
+        state.sample_rate_hz = TARGET_SAMPLE_RATE_HZ;
+        state.channels = TARGET_CHANNELS;
 
         if let Ok(mut shared) = shared_state.lock() {
             *shared = state;
@@ -774,8 +805,6 @@ fn run_audio_capture_thread(
 struct CaptureStreamSpec {
     stream: cpal::Stream,
     device_id: String,
-    sample_rate_hz: u32,
-    channels: u16,
 }
 
 fn build_microphone_stream(
@@ -810,8 +839,6 @@ fn build_microphone_stream(
     Ok(CaptureStreamSpec {
         stream,
         device_id: selected_device_id,
-        sample_rate_hz,
-        channels,
     })
 }
 
@@ -848,8 +875,6 @@ fn build_system_loopback_stream(
     Ok(CaptureStreamSpec {
         stream,
         device_id: selected_device_id,
-        sample_rate_hz,
-        channels,
     })
 }
 
@@ -873,12 +898,22 @@ fn process_capture_samples(
     let samples = samples
         .map(|sample| sample.clamp(-1.0, 1.0))
         .collect::<Vec<_>>();
-    let samples = apply_audio_processing(&samples, processing_settings);
-    let event =
-        AudioLevelEvent::from_samples(source, device_id, &samples, sample_rate_hz, channels);
+    let snapshot = prepare_stt_samples(&samples, sample_rate_hz, channels, processing_settings);
+    let event = AudioLevelEvent::from_samples(
+        source,
+        device_id,
+        &snapshot.samples,
+        snapshot.sample_rate_hz,
+        snapshot.channels,
+    );
 
     if let Ok(mut buffer) = shared_samples.lock() {
-        buffer.push(source, sample_rate_hz, channels, &samples);
+        buffer.push(
+            source,
+            snapshot.sample_rate_hz,
+            snapshot.channels,
+            &snapshot.samples,
+        );
     }
 
     if let Ok(mut state) = shared_state.lock() {
@@ -886,6 +921,58 @@ fn process_capture_samples(
     }
 
     let _ = app_handle.emit("audio-level", event);
+}
+
+fn prepare_stt_samples(
+    samples: &[f32],
+    sample_rate_hz: u32,
+    channels: u16,
+    processing_settings: AudioProcessingSettings,
+) -> AudioSampleSnapshot {
+    let mono = downmix_interleaved_to_mono(samples, channels);
+    let resampled = resample_mono_linear(&mono, sample_rate_hz, TARGET_SAMPLE_RATE_HZ);
+    let processed = apply_audio_processing(&resampled, processing_settings);
+
+    AudioSampleSnapshot {
+        samples: processed,
+        sample_rate_hz: TARGET_SAMPLE_RATE_HZ,
+        channels: TARGET_CHANNELS,
+    }
+}
+
+fn downmix_interleaved_to_mono(samples: &[f32], channels: u16) -> Vec<f32> {
+    let channel_count = channels as usize;
+    if channel_count <= 1 {
+        return samples.to_vec();
+    }
+
+    samples
+        .chunks(channel_count)
+        .map(|frame| frame.iter().copied().sum::<f32>() / frame.len() as f32)
+        .collect()
+}
+
+fn resample_mono_linear(samples: &[f32], input_rate_hz: u32, output_rate_hz: u32) -> Vec<f32> {
+    if samples.is_empty() || input_rate_hz == 0 || input_rate_hz == output_rate_hz {
+        return samples.to_vec();
+    }
+
+    let output_len =
+        ((samples.len() as f64 * output_rate_hz as f64) / input_rate_hz as f64).floor() as usize;
+    let output_len = output_len.max(1);
+    let ratio = input_rate_hz as f64 / output_rate_hz as f64;
+
+    (0..output_len)
+        .map(|index| {
+            let source_position = index as f64 * ratio;
+            let left_index = source_position.floor() as usize;
+            let right_index = (left_index + 1).min(samples.len() - 1);
+            let fraction = (source_position - left_index as f64) as f32;
+            let left = samples[left_index.min(samples.len() - 1)];
+            let right = samples[right_index];
+            left + (right - left) * fraction
+        })
+        .collect()
 }
 
 pub fn apply_audio_processing(

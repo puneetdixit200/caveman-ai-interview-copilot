@@ -20,24 +20,25 @@ Implemented now:
 
 - Tauri v2 desktop app with Rust backend and React frontend
 - Dashboard for active interview sessions
-- Overlay preview with opacity, font size, and visibility controls
-- Session archive and Markdown export preview
-- Prompt templates for DSA, system design, and behavioral interviews
-- TypeScript provider-router interface with fallback streaming tests
-- SQLite-backed Rust command layer for sessions, transcripts, and settings
-- Unit tests for context building, provider fallback, overlay state, export, and persistence
+- Native CPAL microphone, system audio, and dual-stream capture with device selection, gain, noise gate, meters, and STT-ready 16 kHz mono snapshots
+- Local Whisper sidecar transcription plus Deepgram, AssemblyAI, and Google STT fallback commands
+- Automatic interviewer question detection and answer triggering from live transcript updates
+- Ollama, LM Studio, OpenRouter, OpenAI, Anthropic, and Groq provider routing with streaming fallback
+- Stealth overlay window with opacity, font controls, global hotkeys, click-through mode, position persistence, and Windows capture exclusion
+- Session archive with search, replay, Markdown, JSON, and PDF export
+- Resume, job description, OCR, and local knowledge-base context injection
+- Code answer extraction and active-window typing for code/editor/chat handoff
+- Practice interview mode with local scoring and AI follow-up question generation
+- Analytics, TTS queue/playback, plugin manifests/practice packs, OS keychain API key storage, and signed-update configuration
+- SQLite-backed Rust command layer for sessions, transcripts, responses, settings, screenshots, secrets, and native actions
+- Unit tests for audio, STT parsing, provider fallback, overlay safety, exports, analytics, plugins, hotkeys, OCR, practice, RAG, TTS, and persistence
 
 Planned full build:
 
-- Real microphone and system audio capture
-- Local Whisper transcription and cloud STT fallback
-- Ollama, LM Studio, OpenRouter, and OpenAI-compatible provider clients
-- Global hotkeys and Windows overlay capture exclusion
-- Resume and job description context
-- Screen OCR for coding questions and shared prompts
-- Practice interview mode with scoring
-- RAG over personal notes and project docs
-- TTS playback, analytics, plugins, and collaborative helper mode
+- Lower-latency true word-by-word STT streaming
+- Richer speaker diarization calibration and long-session transcript cursoring
+- Collaborative helper mode for trusted remote observers
+- Production release signing, hosted update manifest publishing, and broader platform packaging
 
 ## Core Features
 
