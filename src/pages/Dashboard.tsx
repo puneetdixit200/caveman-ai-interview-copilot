@@ -872,8 +872,22 @@ export function Dashboard() {
       return;
     }
 
+    if (config.audio.captureMode === "manual") {
+      setCaptureStatus({
+        ...DEFAULT_CAPTURE_STATUS,
+        gainDb: config.audio.gainDb,
+        noiseGateDb: config.audio.noiseGateDb
+      });
+      setRunning(true);
+      setErrorMessage(null);
+      setStatusMessage("Manual transcript mode active");
+      return;
+    }
+
     try {
       const started = await startCapture({
+        captureMode: config.audio.captureMode,
+        dualStreamEnabled: config.audio.dualStreamEnabled,
         systemDeviceId: config.audio.systemDeviceId,
         microphoneDeviceId: config.audio.microphoneDeviceId,
         gainDb: config.audio.gainDb,

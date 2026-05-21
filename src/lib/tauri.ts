@@ -11,7 +11,7 @@ import type {
   TranscriptPage,
   TranscriptSegment
 } from "../types/session";
-import type { AudioDevice, OverlayWindowBounds } from "../types/settings";
+import type { AudioCaptureMode, AudioDevice, OverlayWindowBounds } from "../types/settings";
 import type { CollaborationHint, CollaborationServerStatus, CollaborationSnapshot } from "../types/collaboration";
 import type { PluginManifestFile } from "./pluginLoader";
 
@@ -306,6 +306,8 @@ export async function listAudioDevices(): Promise<AudioDevice[]> {
 }
 
 export async function startCapture(input: {
+  captureMode: AudioCaptureMode;
+  dualStreamEnabled: boolean;
   systemDeviceId: string;
   microphoneDeviceId: string;
   gainDb: number;
@@ -314,6 +316,8 @@ export async function startCapture(input: {
   return invokeStrictOrFallback<AudioCaptureState>(
     "start_capture",
     {
+      captureMode: input.captureMode,
+      dualStreamEnabled: input.dualStreamEnabled,
       systemDeviceId: input.systemDeviceId,
       microphoneDeviceId: input.microphoneDeviceId,
       gainDb: input.gainDb,
@@ -321,17 +325,27 @@ export async function startCapture(input: {
     },
     () => ({
       running: true,
-      systemDeviceId: input.systemDeviceId,
-      microphoneDeviceId: input.microphoneDeviceId,
+      systemDeviceId: shouldCaptureSystem(input.captureMode, input.dualStreamEnabled) ? input.systemDeviceId : "",
+      microphoneDeviceId: shouldCaptureMicrophone(input.captureMode, input.dualStreamEnabled)
+        ? input.microphoneDeviceId
+        : "",
       sampleRateHz: 16000,
       channels: 1,
       microphoneLevel: 0,
       systemLevel: 0,
       gainDb: input.gainDb,
       noiseGateDb: input.noiseGateDb,
-      systemCaptureSupported: false
+      systemCaptureSupported: shouldCaptureSystem(input.captureMode, input.dualStreamEnabled)
     })
   );
+}
+
+function shouldCaptureMicrophone(captureMode: AudioCaptureMode, dualStreamEnabled: boolean): boolean {
+  return captureMode === "microphone" || (captureMode === "dual" && dualStreamEnabled);
+}
+
+function shouldCaptureSystem(captureMode: AudioCaptureMode, dualStreamEnabled: boolean): boolean {
+  return captureMode === "system" || (captureMode === "dual" && dualStreamEnabled);
 }
 
 export async function stopCapture(): Promise<AudioCaptureState> {

@@ -66,6 +66,52 @@ impl Default for AudioProcessingSettings {
     }
 }
 
+#[derive(Debug, Copy, Clone)]
+pub struct CaptureSourceSelection {
+    pub microphone: bool,
+    pub system: bool,
+}
+
+impl CaptureSourceSelection {
+    pub fn from_mode(capture_mode: Option<&str>, dual_stream_enabled: Option<bool>) -> Self {
+        match capture_mode.unwrap_or("dual") {
+            "manual" => Self {
+                microphone: false,
+                system: false,
+            },
+            "microphone" => Self {
+                microphone: true,
+                system: false,
+            },
+            "system" => Self {
+                microphone: false,
+                system: true,
+            },
+            "dual" => {
+                if dual_stream_enabled.unwrap_or(true) {
+                    Self {
+                        microphone: true,
+                        system: true,
+                    }
+                } else {
+                    Self {
+                        microphone: true,
+                        system: false,
+                    }
+                }
+            }
+            _ => Self {
+                microphone: true,
+                system: true,
+            },
+        }
+    }
+
+    fn has_any_source(self) -> bool {
+        self.microphone || self.system
+    }
+}
+
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AudioLevelEvent {
@@ -345,9 +391,16 @@ impl AudioCaptureManager {
         app_handle: AppHandle,
         system_device_id: &str,
         microphone_device_id: &str,
+        source_selection: CaptureSourceSelection,
         processing_settings: AudioProcessingSettings,
     ) -> anyhow::Result<AudioCaptureState> {
         self.stop();
+
+        if !source_selection.has_any_source() {
+            return Err(anyhow::anyhow!(
+                "No audio capture source selected for manual transcript mode"
+            ));
+        }
 
         let (stop_tx, stop_rx) = mpsc::channel();
         let (ready_tx, ready_rx) = mpsc::channel();
@@ -367,6 +420,7 @@ impl AudioCaptureManager {
                 app_handle,
                 system_device_id,
                 microphone_device_id,
+                source_selection,
                 processing_settings,
                 shared_state,
                 shared_samples,
@@ -590,7 +644,7 @@ mod tests {
         apply_audio_level_to_state, apply_audio_processing, classify_device_kind,
         prepare_stt_samples, stable_device_id, AudioCaptureManager, AudioCaptureState,
         AudioChunkAccumulator, AudioChunkEvent, AudioLevelEvent, AudioProcessingSettings,
-        RollingAudioBuffer, TARGET_CHANNELS, TARGET_SAMPLE_RATE_HZ,
+        CaptureSourceSelection, RollingAudioBuffer, TARGET_CHANNELS, TARGET_SAMPLE_RATE_HZ,
     };
 
     #[test]
@@ -669,6 +723,25 @@ mod tests {
         assert!((state.microphone_level - 0.4).abs() < 0.001);
         assert!((state.system_level - 0.8).abs() < 0.001);
         assert!(state.system_capture_supported);
+    }
+
+    #[test]
+    fn maps_capture_modes_to_requested_sources() {
+        let microphone = CaptureSourceSelection::from_mode(Some("microphone"), Some(false));
+        assert!(microphone.microphone);
+        assert!(!microphone.system);
+
+        let system = CaptureSourceSelection::from_mode(Some("system"), Some(false));
+        assert!(!system.microphone);
+        assert!(system.system);
+
+        let dual = CaptureSourceSelection::from_mode(Some("dual"), Some(true));
+        assert!(dual.microphone);
+        assert!(dual.system);
+
+        let manual = CaptureSourceSelection::from_mode(Some("manual"), Some(false));
+        assert!(!manual.microphone);
+        assert!(!manual.system);
     }
 
     #[test]
@@ -897,6 +970,7 @@ fn run_audio_capture_thread(
     app_handle: AppHandle,
     system_device_id: String,
     microphone_device_id: String,
+    source_selection: CaptureSourceSelection,
     processing_settings: AudioProcessingSettings,
     shared_state: Arc<Mutex<AudioCaptureState>>,
     shared_samples: Arc<Mutex<RollingAudioBuffer>>,
@@ -910,8 +984,16 @@ fn run_audio_capture_thread(
         let mut errors = Vec::new();
         let mut state = AudioCaptureState {
             running: true,
-            system_device_id: system_device_id.clone(),
-            microphone_device_id: microphone_device_id.clone(),
+            system_device_id: if source_selection.system {
+                system_device_id.clone()
+            } else {
+                String::new()
+            },
+            microphone_device_id: if source_selection.microphone {
+                microphone_device_id.clone()
+            } else {
+                String::new()
+            },
             sample_rate_hz: 16_000,
             channels: 1,
             microphone_level: 0.0,
@@ -922,37 +1004,41 @@ fn run_audio_capture_thread(
             error: None,
         };
 
-        match build_microphone_stream(
-            &host,
-            &microphone_device_id,
-            processing_settings,
-            shared_state.clone(),
-            shared_samples.clone(),
-            shared_chunks.clone(),
-            app_handle.clone(),
-        ) {
-            Ok(spec) => {
-                state.microphone_device_id = spec.device_id;
-                streams.push(spec.stream);
+        if source_selection.microphone {
+            match build_microphone_stream(
+                &host,
+                &microphone_device_id,
+                processing_settings,
+                shared_state.clone(),
+                shared_samples.clone(),
+                shared_chunks.clone(),
+                app_handle.clone(),
+            ) {
+                Ok(spec) => {
+                    state.microphone_device_id = spec.device_id;
+                    streams.push(spec.stream);
+                }
+                Err(error) => errors.push(format!("microphone: {error}")),
             }
-            Err(error) => errors.push(format!("microphone: {error}")),
         }
 
-        match build_system_loopback_stream(
-            &host,
-            &system_device_id,
-            processing_settings,
-            shared_state.clone(),
-            shared_samples,
-            shared_chunks,
-            app_handle,
-        ) {
-            Ok(spec) => {
-                state.system_device_id = spec.device_id;
-                state.system_capture_supported = true;
-                streams.push(spec.stream);
+        if source_selection.system {
+            match build_system_loopback_stream(
+                &host,
+                &system_device_id,
+                processing_settings,
+                shared_state.clone(),
+                shared_samples,
+                shared_chunks,
+                app_handle,
+            ) {
+                Ok(spec) => {
+                    state.system_device_id = spec.device_id;
+                    state.system_capture_supported = true;
+                    streams.push(spec.stream);
+                }
+                Err(error) => errors.push(format!("system audio: {error}")),
             }
-            Err(error) => errors.push(format!("system audio: {error}")),
         }
 
         if streams.is_empty() {

@@ -1,6 +1,7 @@
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { DEFAULT_APP_CONFIG, serializeAppConfig } from "../lib/appConfig";
 import * as tauri from "../lib/tauri";
 import { Dashboard } from "./Dashboard";
 
@@ -189,5 +190,62 @@ describe("Dashboard collaboration helper", () => {
     });
     expect(await screen.findByText("Frontend Loop")).toBeInTheDocument();
     expect(screen.queryByText("How would you design retries?")).not.toBeInTheDocument();
+  });
+
+  it("passes the selected capture mode to native audio capture", async () => {
+    vi.mocked(tauri.getSetting)
+      .mockResolvedValueOnce(
+        serializeAppConfig({
+          ...DEFAULT_APP_CONFIG,
+          audio: {
+            ...DEFAULT_APP_CONFIG.audio,
+            captureMode: "system",
+            dualStreamEnabled: false,
+            systemDeviceId: "speaker-loopback",
+            microphoneDeviceId: "mic-1",
+            gainDb: 4,
+            noiseGateDb: -50
+          }
+        })
+      )
+      .mockResolvedValueOnce(undefined)
+      .mockResolvedValueOnce(undefined);
+    vi.mocked(tauri.startCapture).mockResolvedValueOnce({
+      running: true,
+      systemDeviceId: "speaker-loopback",
+      microphoneDeviceId: "",
+      sampleRateHz: 16000,
+      channels: 1,
+      microphoneLevel: 0,
+      systemLevel: 0,
+      gainDb: 4,
+      noiseGateDb: -50,
+      systemCaptureSupported: true
+    });
+    const user = userEvent.setup();
+    render(<Dashboard />);
+
+    expect(await screen.findByText("Live Interview Session")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Start" }));
+
+    expect(tauri.startCapture).toHaveBeenCalledWith({
+      captureMode: "system",
+      dualStreamEnabled: false,
+      systemDeviceId: "speaker-loopback",
+      microphoneDeviceId: "mic-1",
+      gainDb: 4,
+      noiseGateDb: -50
+    });
+  });
+
+  it("keeps manual transcript mode active without opening native audio streams", async () => {
+    const user = userEvent.setup();
+    render(<Dashboard />);
+
+    expect(await screen.findByText("Live Interview Session")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Start" }));
+
+    expect(tauri.startCapture).not.toHaveBeenCalled();
+    expect(await screen.findByText("Manual transcript mode active")).toBeInTheDocument();
   });
 });

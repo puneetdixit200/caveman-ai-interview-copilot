@@ -144,16 +144,23 @@ pub fn list_audio_devices() -> Vec<audio::AudioDevice> {
 pub fn start_capture(
     app_handle: AppHandle,
     capture_manager: State<'_, AudioCaptureManager>,
+    capture_mode: Option<String>,
+    dual_stream_enabled: Option<bool>,
     system_device_id: String,
     microphone_device_id: String,
     gain_db: Option<f32>,
     noise_gate_db: Option<f32>,
 ) -> Result<AudioCaptureState, String> {
+    let source_selection = audio::CaptureSourceSelection::from_mode(
+        capture_mode.as_deref(),
+        dual_stream_enabled,
+    );
     capture_manager
         .start(
             app_handle,
             &system_device_id,
             &microphone_device_id,
+            source_selection,
             AudioProcessingSettings::from_optional(gain_db, noise_gate_db),
         )
         .map_err(to_command_error)
