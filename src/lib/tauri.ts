@@ -9,7 +9,8 @@ import type {
   SttTranscriptEvent,
   TranscriptCursor,
   TranscriptPage,
-  TranscriptSegment
+  TranscriptSegment,
+  UpdateSessionInput
 } from "../types/session";
 import type { AudioApplication, AudioCaptureMode, AudioDevice, OverlayWindowBounds } from "../types/settings";
 import type { CollaborationHint, CollaborationServerStatus, CollaborationSnapshot } from "../types/collaboration";
@@ -171,6 +172,45 @@ export async function createSession(input: NewSessionInput): Promise<SessionReco
     notes: input.notes,
     createdAt: new Date().toISOString()
   }));
+}
+
+export async function updateSession(input: UpdateSessionInput): Promise<SessionRecord> {
+  const normalized = normalizeUpdateSessionInput(input);
+
+  return invokeOrFallback<SessionRecord>("update_session", { input: normalized }, () => ({
+    id: normalized.id,
+    title: normalized.title,
+    company: normalized.company,
+    role: normalized.role,
+    interviewType: normalized.interviewType,
+    tags: normalized.tags,
+    status: normalized.status,
+    totalTokens: 0,
+    durationSeconds: 0,
+    notes: normalized.notes,
+    createdAt: new Date().toISOString(),
+    endedAt: normalized.status === "active" ? undefined : new Date().toISOString()
+  }));
+}
+
+function normalizeUpdateSessionInput(input: UpdateSessionInput): UpdateSessionInput {
+  return {
+    ...input,
+    title: input.title.trim(),
+    company: normalizeOptionalText(input.company),
+    role: normalizeOptionalText(input.role),
+    notes: normalizeOptionalText(input.notes),
+    tags: normalizeTags(input.tags)
+  };
+}
+
+function normalizeOptionalText(value: string | undefined): string | undefined {
+  const trimmed = value?.trim();
+  return trimmed ? trimmed : undefined;
+}
+
+function normalizeTags(tags: string[]): string[] {
+  return tags.map((tag) => tag.trim()).filter((tag, index, all) => tag && all.indexOf(tag) === index);
 }
 
 export async function addTranscript(input: {

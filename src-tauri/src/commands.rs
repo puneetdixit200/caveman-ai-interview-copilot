@@ -6,7 +6,9 @@ use crate::audio_apps;
 use crate::collaboration::{
     CollaborationHint, CollaborationManager, CollaborationServerStatus, CollaborationSnapshot,
 };
-use crate::db::{Database, NewAiResponse, NewSession, TranscriptCursor, TranscriptPage};
+use crate::db::{
+    Database, NewAiResponse, NewSession, TranscriptCursor, TranscriptPage, UpdateSession,
+};
 use crate::models::{AiResponse, PromptTemplate, Session, Transcript};
 use crate::ocr;
 use crate::ocr::ScreenFrame;
@@ -25,6 +27,14 @@ pub fn create_session(database: State<'_, Database>, input: NewSession) -> Resul
 #[tauri::command]
 pub fn list_sessions(database: State<'_, Database>) -> Result<Vec<Session>, String> {
     database.list_sessions().map_err(to_command_error)
+}
+
+#[tauri::command]
+pub fn update_session(
+    database: State<'_, Database>,
+    input: UpdateSession,
+) -> Result<Session, String> {
+    database.update_session(input).map_err(to_command_error)
 }
 
 #[tauri::command]

@@ -33,6 +33,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             commands::create_session,
             commands::list_sessions,
+            commands::update_session,
             commands::add_transcript,
             commands::list_transcripts,
             commands::list_transcripts_page,

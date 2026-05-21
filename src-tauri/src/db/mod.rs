@@ -22,6 +22,19 @@ pub struct NewSession {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub struct UpdateSession {
+    pub id: String,
+    pub title: String,
+    pub company: Option<String>,
+    pub role: Option<String>,
+    pub interview_type: String,
+    pub tags: Vec<String>,
+    pub status: String,
+    pub notes: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct NewAiResponse {
     pub session_id: String,
     pub trigger_transcript_id: Option<i64>,
@@ -117,6 +130,62 @@ impl Database {
         let rows = statement.query_map([], map_session)?;
         rows.collect::<rusqlite::Result<Vec<_>>>()
             .map_err(Into::into)
+    }
+
+    pub fn update_session(&self, input: UpdateSession) -> Result<Session> {
+        let title = input.title.trim().to_string();
+        if title.is_empty() {
+            anyhow::bail!("session title cannot be empty");
+        }
+
+        let interview_type = input.interview_type.trim().to_string();
+        validate_interview_type(&interview_type)?;
+        let status = input.status.trim().to_string();
+        validate_session_status(&status)?;
+
+        let company = normalize_optional_text(input.company);
+        let role = normalize_optional_text(input.role);
+        let notes = normalize_optional_text(input.notes);
+        let tags_json = serde_json::to_string(&normalize_tags(input.tags))?;
+        let ended_at = if status == "active" {
+            None
+        } else {
+            Some(Utc::now().to_rfc3339())
+        };
+        let connection = self.lock()?;
+
+        let updated_rows = connection.execute(
+            "UPDATE sessions
+             SET title = ?2,
+                 company = ?3,
+                 role = ?4,
+                 interview_type = ?5,
+                 tags = ?6,
+                 status = ?7,
+                 notes = ?8,
+                 ended_at = CASE
+                   WHEN ?7 = 'active' THEN NULL
+                   ELSE COALESCE(ended_at, ?9)
+                 END
+            WHERE id = ?1",
+            params![
+                &input.id,
+                title,
+                company,
+                role,
+                interview_type,
+                tags_json,
+                status,
+                notes,
+                ended_at
+            ],
+        )?;
+        if updated_rows == 0 {
+            anyhow::bail!("session was not found");
+        }
+        drop(connection);
+
+        self.get_session(&input.id)
     }
 
     pub fn add_transcript(
@@ -559,6 +628,52 @@ fn map_session(row: &rusqlite::Row<'_>) -> rusqlite::Result<Session> {
         created_at: row.get(12)?,
         ended_at: row.get(13)?,
     })
+}
+
+fn normalize_optional_text(value: Option<String>) -> Option<String> {
+    value
+        .map(|text| text.trim().to_string())
+        .filter(|text| !text.is_empty())
+}
+
+fn normalize_tags(tags: Vec<String>) -> Vec<String> {
+    let mut normalized = Vec::new();
+
+    for tag in tags {
+        let tag = tag.trim().to_string();
+        if !tag.is_empty() && !normalized.contains(&tag) {
+            normalized.push(tag);
+        }
+    }
+
+    normalized
+}
+
+fn validate_interview_type(value: &str) -> Result<()> {
+    if [
+        "dsa",
+        "system_design",
+        "frontend",
+        "backend",
+        "devops_cloud",
+        "behavioral",
+        "hr",
+        "mixed",
+    ]
+    .contains(&value)
+    {
+        return Ok(());
+    }
+
+    anyhow::bail!("unsupported interview type: {value}");
+}
+
+fn validate_session_status(value: &str) -> Result<()> {
+    if ["active", "completed", "archived"].contains(&value) {
+        return Ok(());
+    }
+
+    anyhow::bail!("unsupported session status: {value}");
 }
 
 fn map_transcript(row: &rusqlite::Row<'_>) -> rusqlite::Result<Transcript> {

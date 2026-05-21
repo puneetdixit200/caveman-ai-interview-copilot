@@ -37,6 +37,17 @@ export interface NewSessionInput {
   notes?: string;
 }
 
+export interface UpdateSessionInput {
+  id: string;
+  title: string;
+  company?: string;
+  role?: string;
+  interviewType: InterviewType;
+  tags: string[];
+  status: SessionStatus;
+  notes?: string;
+}
+
 export interface TranscriptSegment {
   id: number;
   sessionId: string;

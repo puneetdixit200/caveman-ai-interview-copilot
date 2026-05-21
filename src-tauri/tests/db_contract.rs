@@ -1,4 +1,4 @@
-use caveman_lib::db::{Database, NewAiResponse, NewSession, TranscriptCursor};
+use caveman_lib::db::{Database, NewAiResponse, NewSession, TranscriptCursor, UpdateSession};
 use rusqlite::Connection;
 
 #[test]
@@ -33,6 +33,52 @@ fn session_and_transcript_records_round_trip_through_sqlite() {
     assert_eq!(transcripts.len(), 1);
     assert_eq!(transcripts[0].speaker, "interviewer");
     assert_eq!(transcripts[0].content, "Explain HashMap internals");
+}
+
+#[test]
+fn session_metadata_can_be_updated_after_an_interview() {
+    let db = Database::in_memory().expect("in-memory database");
+    let session = db
+        .create_session(NewSession {
+            title: "Untitled interview".to_string(),
+            company: None,
+            role: None,
+            interview_type: "mixed".to_string(),
+            tags: vec![],
+            notes: None,
+        })
+        .expect("create session");
+
+    let updated = db
+        .update_session(UpdateSession {
+            id: session.id.clone(),
+            title: "Stripe Final Round".to_string(),
+            company: Some(" Stripe ".to_string()),
+            role: Some(" Staff Backend Engineer ".to_string()),
+            interview_type: "backend".to_string(),
+            tags: vec![
+                "onsite".to_string(),
+                " backend ".to_string(),
+                "onsite".to_string(),
+                " ".to_string(),
+            ],
+            status: "completed".to_string(),
+            notes: Some(" Follow up on cache invalidation examples. ".to_string()),
+        })
+        .expect("update session metadata");
+
+    assert_eq!(updated.id, session.id);
+    assert_eq!(updated.title, "Stripe Final Round");
+    assert_eq!(updated.company.as_deref(), Some("Stripe"));
+    assert_eq!(updated.role.as_deref(), Some("Staff Backend Engineer"));
+    assert_eq!(updated.interview_type, "backend");
+    assert_eq!(updated.status, "completed");
+    assert_eq!(updated.tags, vec!["onsite", "backend"]);
+    assert_eq!(
+        updated.notes.as_deref(),
+        Some("Follow up on cache invalidation examples.")
+    );
+    assert!(updated.ended_at.is_some());
 }
 
 #[test]

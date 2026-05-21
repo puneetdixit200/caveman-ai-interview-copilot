@@ -90,6 +90,20 @@ vi.mock("../lib/tauri", () => ({
     createdAt: "2026-05-20T00:00:01.000Z"
   })),
   deleteTranscript: vi.fn(async () => undefined),
+  updateSession: vi.fn(async (input) => ({
+    id: input.id,
+    title: input.title,
+    company: input.company,
+    role: input.role,
+    interviewType: input.interviewType,
+    tags: input.tags,
+    status: input.status,
+    totalTokens: 100,
+    durationSeconds: 120,
+    notes: input.notes,
+    createdAt: "2026-05-20T00:00:00.000Z",
+    endedAt: input.status === "active" ? undefined : "2026-05-20T00:05:00.000Z"
+  })),
   getSetting: vi.fn(async () => undefined)
 }));
 
@@ -170,6 +184,51 @@ describe("Sessions", () => {
       direction: "before",
       limit: 100
     });
+  });
+
+  it("edits saved session metadata for search, replay, and export", async () => {
+    const user = userEvent.setup();
+    render(<Sessions />);
+
+    expect((await screen.findAllByText("Stripe Interview")).length).toBeGreaterThan(0);
+
+    await user.click(screen.getByRole("button", { name: "Edit session details" }));
+    const title = screen.getByRole("textbox", { name: "Session title" });
+    fireEvent.change(title, { target: { value: "Stripe Final Round" } });
+    const company = screen.getByRole("textbox", { name: "Company" });
+    fireEvent.change(company, { target: { value: "Stripe" } });
+    const role = screen.getByRole("textbox", { name: "Role" });
+    fireEvent.change(role, { target: { value: "Staff Backend Engineer" } });
+    await user.selectOptions(screen.getByRole("combobox", { name: "Interview type" }), "backend");
+    await user.selectOptions(screen.getByRole("combobox", { name: "Session status" }), "completed");
+    const tags = screen.getByRole("textbox", { name: "Tags" });
+    fireEvent.change(tags, { target: { value: "onsite, backend, onsite" } });
+    const notes = screen.getByRole("textbox", { name: "Notes" });
+    fireEvent.change(notes, { target: { value: "Follow up on cache invalidation examples." } });
+
+    await user.click(screen.getByRole("button", { name: "Save session details" }));
+
+    await waitFor(() =>
+      expect(tauri.updateSession).toHaveBeenCalledWith({
+        id: "s1",
+        title: "Stripe Final Round",
+        company: "Stripe",
+        role: "Staff Backend Engineer",
+        interviewType: "backend",
+        status: "completed",
+        tags: ["onsite", "backend"],
+        notes: "Follow up on cache invalidation examples."
+      })
+    );
+    expect(await screen.findByText("Session details saved")).toBeInTheDocument();
+    expect((await screen.findAllByText("Stripe Final Round")).length).toBeGreaterThan(0);
+    expect(screen.getByText("Stripe - Staff Backend Engineer")).toBeInTheDocument();
+
+    fireEvent.change(screen.getByRole("textbox", { name: "Search sessions" }), {
+      target: { value: "cache invalidation" }
+    });
+
+    expect((await screen.findAllByText("Stripe Final Round")).length).toBeGreaterThan(0);
   });
 
   it("copies plugin-defined session exports from the archive", async () => {

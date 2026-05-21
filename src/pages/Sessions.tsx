@@ -19,9 +19,19 @@ import {
   listSessions,
   listTranscriptPage,
   listTranscripts,
+  updateSession,
   updateTranscript
 } from "../lib/tauri";
-import type { AIResponseRecord, SessionRecord, Speaker, TranscriptCursor, TranscriptPage, TranscriptSegment } from "../types/session";
+import type {
+  AIResponseRecord,
+  InterviewType,
+  SessionRecord,
+  SessionStatus,
+  Speaker,
+  TranscriptCursor,
+  TranscriptPage,
+  TranscriptSegment
+} from "../types/session";
 
 const TRANSCRIPT_PAGE_LIMIT = 100;
 
@@ -30,6 +40,16 @@ interface TranscriptCorrectionDraft {
   content: string;
   timestampMs: string;
   confidence: string;
+}
+
+interface SessionMetadataDraft {
+  title: string;
+  company: string;
+  role: string;
+  interviewType: InterviewType;
+  status: SessionStatus;
+  tags: string;
+  notes: string;
 }
 
 export function Sessions() {
@@ -45,6 +65,8 @@ export function Sessions() {
   const [status, setStatus] = useState("Loading sessions...");
   const [editingTranscriptId, setEditingTranscriptId] = useState<number | null>(null);
   const [transcriptDraft, setTranscriptDraft] = useState<TranscriptCorrectionDraft | null>(null);
+  const [editingSessionDetails, setEditingSessionDetails] = useState(false);
+  const [sessionDraft, setSessionDraft] = useState<SessionMetadataDraft | null>(null);
   const [transcriptPage, setTranscriptPage] = useState<TranscriptPage | null>(null);
   const [pluginCatalog, setPluginCatalog] = useState<PluginCatalog>(createEmptyPluginCatalog());
 
@@ -179,6 +201,8 @@ export function Sessions() {
         setResponses(sessionResponses);
         setEditingTranscriptId(null);
         setTranscriptDraft(null);
+        setEditingSessionDetails(false);
+        setSessionDraft(null);
       }
     }
 
@@ -270,6 +294,56 @@ export function Sessions() {
 
   function patchTranscriptDraft(patch: Partial<TranscriptCorrectionDraft>) {
     setTranscriptDraft((current) => (current ? { ...current, ...patch } : current));
+  }
+
+  function startSessionDetailsEdit() {
+    if (!selectedSession) {
+      return;
+    }
+
+    setSessionDraft({
+      title: selectedSession.title,
+      company: selectedSession.company ?? "",
+      role: selectedSession.role ?? "",
+      interviewType: selectedSession.interviewType,
+      status: selectedSession.status,
+      tags: selectedSession.tags.join(", "),
+      notes: selectedSession.notes ?? ""
+    });
+    setEditingSessionDetails(true);
+  }
+
+  function patchSessionDraft(patch: Partial<SessionMetadataDraft>) {
+    setSessionDraft((current) => (current ? { ...current, ...patch } : current));
+  }
+
+  async function saveSessionDetails() {
+    if (!selectedSession || !sessionDraft) {
+      return;
+    }
+
+    const title = sessionDraft.title.trim();
+    if (!title) {
+      setStatus("Session title cannot be empty");
+      return;
+    }
+
+    const updated = await updateSession({
+      id: selectedSession.id,
+      title,
+      company: normalizeOptionalText(sessionDraft.company),
+      role: normalizeOptionalText(sessionDraft.role),
+      interviewType: sessionDraft.interviewType,
+      status: sessionDraft.status,
+      tags: parseTagDraft(sessionDraft.tags),
+      notes: normalizeOptionalText(sessionDraft.notes)
+    });
+
+    setSessions((current) => current.map((session) => (session.id === updated.id ? updated : session)));
+    setSelectedSessionId(updated.id);
+    setEditingSessionDetails(false);
+    setSessionDraft(null);
+    setStatus("Session details saved");
   }
 
   async function saveTranscriptCorrection(segment: TranscriptSegment) {
@@ -435,7 +509,109 @@ export function Sessions() {
             <p className="eyebrow">Replay</p>
             <h2>{selectedSession?.title ?? "No session selected"}</h2>
           </div>
+          <div className="button-row">
+            {editingSessionDetails ? (
+              <Button
+                aria-label="Cancel session details"
+                icon={<X size={16} />}
+                onClick={() => {
+                  setEditingSessionDetails(false);
+                  setSessionDraft(null);
+                }}
+                disabled={!selectedSession}
+              >
+                Cancel
+              </Button>
+            ) : (
+              <Button
+                aria-label="Edit session details"
+                icon={<Pencil size={16} />}
+                onClick={startSessionDetailsEdit}
+                disabled={!selectedSession}
+              >
+                Edit Details
+              </Button>
+            )}
+          </div>
         </div>
+        {editingSessionDetails && sessionDraft ? (
+          <div className="session-metadata-editor">
+            <div className="transcript-editor-grid">
+              <label className="settings-field">
+                <span>Session title</span>
+                <input
+                  value={sessionDraft.title}
+                  onChange={(event) => patchSessionDraft({ title: event.currentTarget.value })}
+                />
+              </label>
+              <label className="settings-field">
+                <span>Company</span>
+                <input
+                  value={sessionDraft.company}
+                  onChange={(event) => patchSessionDraft({ company: event.currentTarget.value })}
+                />
+              </label>
+              <label className="settings-field">
+                <span>Role</span>
+                <input
+                  value={sessionDraft.role}
+                  onChange={(event) => patchSessionDraft({ role: event.currentTarget.value })}
+                />
+              </label>
+              <label className="settings-field">
+                <span>Interview type</span>
+                <select
+                  value={sessionDraft.interviewType}
+                  onChange={(event) => patchSessionDraft({ interviewType: event.currentTarget.value as InterviewType })}
+                >
+                  <option value="dsa">DSA</option>
+                  <option value="system_design">System design</option>
+                  <option value="frontend">Frontend</option>
+                  <option value="backend">Backend</option>
+                  <option value="devops_cloud">DevOps / cloud</option>
+                  <option value="behavioral">Behavioral</option>
+                  <option value="hr">HR</option>
+                  <option value="mixed">Mixed</option>
+                </select>
+              </label>
+              <label className="settings-field">
+                <span>Session status</span>
+                <select
+                  value={sessionDraft.status}
+                  onChange={(event) => patchSessionDraft({ status: event.currentTarget.value as SessionStatus })}
+                >
+                  <option value="active">Active</option>
+                  <option value="completed">Completed</option>
+                  <option value="archived">Archived</option>
+                </select>
+              </label>
+              <label className="settings-field">
+                <span>Tags</span>
+                <input
+                  value={sessionDraft.tags}
+                  onChange={(event) => patchSessionDraft({ tags: event.currentTarget.value })}
+                />
+              </label>
+            </div>
+            <label className="settings-field">
+              <span>Notes</span>
+              <textarea
+                value={sessionDraft.notes}
+                onChange={(event) => patchSessionDraft({ notes: event.currentTarget.value })}
+              />
+            </label>
+            <div className="button-row settings-actions">
+              <Button
+                aria-label="Save session details"
+                icon={<Check size={16} />}
+                variant="primary"
+                onClick={() => void saveSessionDetails()}
+              >
+                Save Details
+              </Button>
+            </div>
+          </div>
+        ) : null}
         <div className="replay-grid">
           <div className="replay-column">
             <h3>Transcript</h3>
@@ -659,4 +835,16 @@ function readOptionalConfidence(value: string): number | undefined | null {
   }
 
   return confidence;
+}
+
+function normalizeOptionalText(value: string): string | undefined {
+  const trimmed = value.trim();
+  return trimmed ? trimmed : undefined;
+}
+
+function parseTagDraft(value: string): string[] {
+  return value
+    .split(",")
+    .map((tag) => tag.trim())
+    .filter((tag, index, all) => tag && all.indexOf(tag) === index);
 }
