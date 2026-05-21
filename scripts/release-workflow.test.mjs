@@ -95,6 +95,12 @@ test("release workflow fails fast when updater signing secrets are missing", asy
   assert.match(workflow, /npm run tauri signer generate/);
 });
 
+test("release workflow opts GitHub actions into the Node 24 runtime", async () => {
+  const workflow = await readFile(workflowPath, "utf8");
+
+  assert.match(workflow, /FORCE_JAVASCRIPT_ACTIONS_TO_NODE24:\s*true/);
+});
+
 test("release workflow contract is part of the release test suite", async () => {
   const packageJson = JSON.parse(await readFile("package.json", "utf8"));
 

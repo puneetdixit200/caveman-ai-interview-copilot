@@ -20,6 +20,7 @@ permissions:
   contents: write
 
 env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
   RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
   RELEASE_NOTES: ${{ inputs.release_notes || format('Caveman {0} signed desktop update.', github.ref_name) }}
 
