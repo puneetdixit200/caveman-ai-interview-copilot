@@ -34,7 +34,7 @@ Implemented now:
 - Dashboard session setup for company, role, interview type, tags, and notes, plus archive search, cursor-paged replay, transcript correction, Markdown, JSON, and PDF export
 - Settings real-use preflight checker for audio, STT, provider, automation, overlay, and privacy readiness before a live interview
 - Trusted collaborative helper link with token-gated live transcript/answer snapshot sharing and inbound helper hints
-- Resume, job description, OCR, and local knowledge-base context injection
+- Resume, job description, OCR, and local knowledge-base context injection with stale-document cleanup controls
 - Syntax-highlighted code answer extraction with clipboard copy and active-window typing for code/editor/chat handoff
 - Practice interview mode with local scoring and AI follow-up question generation
 - Analytics, TTS queue/playback, plugin manifests for prompt templates, practice packs, and custom session export templates, OS keychain API key storage, signed-update configuration, and GitHub `latest.json` release manifest generation

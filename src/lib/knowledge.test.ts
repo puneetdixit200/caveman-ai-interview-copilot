@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
   createKnowledgeBase,
+  clearKnowledgeBase,
   parseKnowledgeBase,
+  removeKnowledgeDocument,
   searchKnowledgeBase,
   serializeKnowledgeBase,
   upsertKnowledgeDocument,
@@ -57,5 +59,31 @@ describe("knowledge", () => {
       documentId: "payments",
       sourceLabel: "project: Payments Project"
     });
+  });
+
+  it("removes stale documents and their chunks from persisted context", () => {
+    const base = upsertKnowledgeDocument(
+      upsertKnowledgeDocument(createKnowledgeBase(), {
+        id: "payments",
+        title: "Payments Project",
+        sourceType: "project",
+        text: "Built Stripe webhook retries with queue backoff.",
+        createdAtMs: 500
+      }),
+      {
+        id: "legacy",
+        title: "Legacy AngularJS Migration",
+        sourceType: "project",
+        text: "Migrated AngularJS templates into React routes.",
+        createdAtMs: 700
+      }
+    );
+
+    const withoutLegacy = removeKnowledgeDocument(base, "legacy");
+
+    expect(withoutLegacy.documents.map((document) => document.id)).toEqual(["payments"]);
+    expect(withoutLegacy.chunks.every((chunk) => chunk.documentId !== "legacy")).toBe(true);
+    expect(searchKnowledgeBase(withoutLegacy, "AngularJS migration", 1)).toHaveLength(0);
+    expect(clearKnowledgeBase()).toEqual(createKnowledgeBase());
   });
 });

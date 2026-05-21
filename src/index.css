@@ -1088,6 +1088,17 @@ input[type="checkbox"] {
   gap: 10px;
 }
 
+.knowledge-document-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.knowledge-document-row > div {
+  min-width: 0;
+}
+
 .provider-editor em {
   display: block;
   color: var(--muted);

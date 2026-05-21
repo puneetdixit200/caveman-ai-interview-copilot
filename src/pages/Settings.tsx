@@ -29,8 +29,10 @@ import {
 import { runAudioCaptureRehearsal, type AudioRehearsalResult } from "../lib/audioRehearsal";
 import {
   KNOWLEDGE_BASE_SETTING_KEY,
+  clearKnowledgeBase,
   createKnowledgeBase,
   parseKnowledgeBase,
+  removeKnowledgeDocument,
   searchKnowledgeBase,
   serializeKnowledgeBase,
   upsertKnowledgeDocument,
@@ -718,6 +720,20 @@ export function Settings() {
     setKnowledgeBase(nextKnowledgeBase);
     await saveSetting(KNOWLEDGE_BASE_SETTING_KEY, serializeKnowledgeBase(nextKnowledgeBase));
     setStatus(`Imported ${importedCount} knowledge file${importedCount === 1 ? "" : "s"}`);
+  }
+
+  async function deleteKnowledgeDocument(documentId: string, title: string) {
+    const nextKnowledgeBase = removeKnowledgeDocument(knowledgeBase, documentId);
+    setKnowledgeBase(nextKnowledgeBase);
+    await saveSetting(KNOWLEDGE_BASE_SETTING_KEY, serializeKnowledgeBase(nextKnowledgeBase));
+    setStatus(`Deleted ${title} from the knowledge base`);
+  }
+
+  async function clearStoredKnowledgeBase() {
+    const nextKnowledgeBase = clearKnowledgeBase();
+    setKnowledgeBase(nextKnowledgeBase);
+    await saveSetting(KNOWLEDGE_BASE_SETTING_KEY, serializeKnowledgeBase(nextKnowledgeBase));
+    setStatus("Cleared knowledge base");
   }
 
   async function importPromptContextFiles(
@@ -1464,6 +1480,14 @@ export function Settings() {
           <Button variant="primary" icon={<FilePlus2 size={16} />} onClick={addKnowledgeDocument}>
             Add Knowledge Document
           </Button>
+          <Button
+            variant="danger"
+            icon={<Trash2 size={16} />}
+            onClick={clearStoredKnowledgeBase}
+            disabled={knowledgeBase.documents.length === 0}
+          >
+            Clear Knowledge Base
+          </Button>
           <label className="settings-field">
             <span>Search knowledge</span>
             <input
@@ -1473,6 +1497,31 @@ export function Settings() {
             />
           </label>
         </div>
+        {knowledgeBase.documents.length > 0 ? (
+          <div className="provider-editor-list knowledge-document-list">
+            {knowledgeBase.documents.map((document) => (
+              <article className="prompt-row knowledge-document-row" key={document.id}>
+                <div>
+                  <strong>{document.title}</strong>
+                  <p>
+                    {document.sourceType} / {document.characterCount} character
+                    {document.characterCount === 1 ? "" : "s"}
+                  </p>
+                </div>
+                <Button
+                  variant="danger"
+                  icon={<Trash2 size={16} />}
+                  aria-label={`Delete knowledge document ${document.title}`}
+                  onClick={() => {
+                    void deleteKnowledgeDocument(document.id, document.title);
+                  }}
+                >
+                  Delete
+                </Button>
+              </article>
+            ))}
+          </div>
+        ) : null}
         {knowledgeResults.length > 0 ? (
           <div className="provider-editor-list">
             {knowledgeResults.map((chunk) => (

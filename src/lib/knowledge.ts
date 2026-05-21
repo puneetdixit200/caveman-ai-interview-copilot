@@ -55,6 +55,17 @@ export function upsertKnowledgeDocument(base: KnowledgeBase, input: KnowledgeDoc
   };
 }
 
+export function removeKnowledgeDocument(base: KnowledgeBase, documentId: string): KnowledgeBase {
+  return {
+    documents: base.documents.filter((item) => item.id !== documentId),
+    chunks: base.chunks.filter((chunk) => chunk.documentId !== documentId)
+  };
+}
+
+export function clearKnowledgeBase(): KnowledgeBase {
+  return createKnowledgeBase();
+}
+
 export function searchKnowledgeBase(base: KnowledgeBase, query: string, limit = 5): KnowledgeChunk[] {
   return rankKnowledgeChunks(query, base.chunks, limit);
 }
@@ -111,10 +122,15 @@ export function chunkKnowledgeDocument(input: KnowledgeDocumentInput): Knowledge
 export function rankKnowledgeChunks(query: string, chunks: KnowledgeChunk[], limit = 5): KnowledgeChunk[] {
   const queryTerms = tokenize(query);
   return [...chunks]
-    .map((chunk) => ({
-      chunk,
-      score: overlapScore(queryTerms, tokenize(chunk.text)) + (chunk.createdAtMs ?? 0) / 1_000_000_000
-    }))
+    .map((chunk) => {
+      const overlap = overlapScore(queryTerms, tokenize(chunk.text));
+      return {
+        chunk,
+        overlap,
+        score: overlap + (chunk.createdAtMs ?? 0) / 1_000_000_000
+      };
+    })
+    .filter((entry) => entry.overlap > 0)
     .sort((left, right) => right.score - left.score)
     .slice(0, limit)
     .map((entry) => entry.chunk);

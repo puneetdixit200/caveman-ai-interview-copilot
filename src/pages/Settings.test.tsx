@@ -1,8 +1,9 @@
-import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { APP_CONFIG_SETTING_KEY, DEFAULT_APP_CONFIG, serializeAppConfig, type AppConfig } from "../lib/appConfig";
 import { runAudioCaptureRehearsal } from "../lib/audioRehearsal";
+import { KNOWLEDGE_BASE_SETTING_KEY, parseKnowledgeBase } from "../lib/knowledge";
 import { runScreenOcr } from "../lib/ocr";
 import { createConfiguredProvider } from "../lib/providerClients";
 import { checkForSignedUpdate, downloadInstallAndRelaunchSignedUpdate } from "../lib/updater";
@@ -199,6 +200,49 @@ describe("Settings", () => {
     expect(screen.getByRole("textbox", { name: "Knowledge text" })).toBeInTheDocument();
     expect(screen.getByLabelText("Knowledge files")).toBeInTheDocument();
   });
+
+  it("deletes stale knowledge documents and clears the knowledge base", async () => {
+    render(<Settings />);
+
+    await screen.findByRole("button", { name: "Add Knowledge Document" });
+    fireEvent.change(screen.getByLabelText("Knowledge title"), { target: { value: "Payments Project" } });
+    fireEvent.change(screen.getByRole("textbox", { name: "Knowledge text" }), {
+      target: { value: "Built Stripe webhook retries with queue backoff." }
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Add Knowledge Document" }));
+    expect(await screen.findByText("Added Payments Project to the knowledge base")).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText("Knowledge title"), { target: { value: "Legacy AngularJS Migration" } });
+    fireEvent.change(screen.getByRole("textbox", { name: "Knowledge text" }), {
+      target: { value: "Migrated AngularJS templates into React routes." }
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Add Knowledge Document" }));
+    expect(await screen.findByText("Added Legacy AngularJS Migration to the knowledge base")).toBeInTheDocument();
+
+    fireEvent.change(screen.getByRole("textbox", { name: "Search knowledge" }), {
+      target: { value: "AngularJS migration" }
+    });
+    expect(await screen.findByText("project: Legacy AngularJS Migration")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Delete knowledge document Legacy AngularJS Migration" }));
+
+    await waitFor(() =>
+      expect(parseKnowledgeBase(localStorage.getItem(KNOWLEDGE_BASE_SETTING_KEY)).documents.map((document) => document.id)).toEqual([
+        "payments-project"
+      ])
+    );
+    expect(screen.queryByText("project: Legacy AngularJS Migration")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Clear Knowledge Base" }));
+
+    await waitFor(() =>
+      expect(parseKnowledgeBase(localStorage.getItem(KNOWLEDGE_BASE_SETTING_KEY))).toEqual({
+        documents: [],
+        chunks: []
+      })
+    );
+    expect(screen.getByText("0 documents / 0 chunks")).toBeInTheDocument();
+  }, 10_000);
 
   it("shows context window token budget controls", async () => {
     render(<Settings />);
