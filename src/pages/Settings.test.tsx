@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { APP_CONFIG_SETTING_KEY, DEFAULT_APP_CONFIG, serializeAppConfig, type AppConfig } from "../lib/appConfig";
 import { runScreenOcr } from "../lib/ocr";
 import { createConfiguredProvider } from "../lib/providerClients";
+import { checkForSignedUpdate, downloadInstallAndRelaunchSignedUpdate } from "../lib/updater";
 import { Settings } from "./Settings";
 
 vi.mock("../lib/providerClients", () => ({
@@ -20,6 +21,11 @@ vi.mock("../lib/ocr", async (importOriginal) => ({
     text: "captured text",
     capturedAtMs: 1234
   }))
+}));
+
+vi.mock("../lib/updater", () => ({
+  checkForSignedUpdate: vi.fn(async () => ({ available: false })),
+  downloadInstallAndRelaunchSignedUpdate: vi.fn(async () => ({ available: false }))
 }));
 
 describe("Settings", () => {
@@ -246,6 +252,27 @@ describe("Settings", () => {
 
     expect(runScreenOcr).not.toHaveBeenCalled();
     expect(screen.getByText("Cloud OCR is blocked by local-only mode.")).toBeInTheDocument();
+  });
+
+  it("blocks signed update network checks in local-only mode", async () => {
+    const user = userEvent.setup();
+    storeConfig({
+      security: {
+        ...DEFAULT_APP_CONFIG.security,
+        localOnlyMode: true,
+        blockCloudWhenLocalOnly: true
+      }
+    });
+
+    render(<Settings />);
+
+    await user.click(await screen.findByRole("button", { name: "Check Signed Updates" }));
+    expect(checkForSignedUpdate).not.toHaveBeenCalled();
+    expect(screen.getByText("Signed update checks are blocked by local-only mode.")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Install Signed Update" }));
+    expect(downloadInstallAndRelaunchSignedUpdate).not.toHaveBeenCalled();
+    expect(screen.getByText("Signed update checks are blocked by local-only mode.")).toBeInTheDocument();
   });
 });
 

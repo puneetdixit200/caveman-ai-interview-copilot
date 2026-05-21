@@ -761,6 +761,11 @@ export function Settings() {
   }
 
   async function checkForUpdates() {
+    if (isCloudBlocked(config)) {
+      setStatus("Signed update checks are blocked by local-only mode.");
+      return;
+    }
+
     setCheckingUpdate(true);
     setStatus("Checking signed update endpoint...");
     setUpdateProgress("");
@@ -776,6 +781,11 @@ export function Settings() {
   }
 
   async function installSignedUpdate() {
+    if (isCloudBlocked(config)) {
+      setStatus("Signed update checks are blocked by local-only mode.");
+      return;
+    }
+
     setInstallingUpdate(true);
     setStatus("Installing signed update...");
 
