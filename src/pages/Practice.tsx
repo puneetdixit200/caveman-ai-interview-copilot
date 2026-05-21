@@ -1,6 +1,12 @@
-import { BrainCircuit, CheckCircle2, Clipboard, RotateCcw } from "lucide-react";
+import { Bot, BrainCircuit, CheckCircle2, Clipboard, RotateCcw } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Button } from "../components/common/Button";
+import {
+  APP_CONFIG_SETTING_KEY,
+  DEFAULT_APP_CONFIG,
+  parseAppConfig,
+  type AppConfig
+} from "../lib/appConfig";
 import {
   PLUGIN_CATALOG_SETTING_KEY,
   createEmptyPluginCatalog,
@@ -8,6 +14,7 @@ import {
   type PluginCatalog
 } from "../lib/pluginLoader";
 import {
+  buildPracticeFollowUpMessages,
   buildPracticeScoringPrompt,
   listPluginPracticeQuestions,
   listPracticeQuestions,
@@ -16,6 +23,10 @@ import {
   type PracticeQuestion,
   type PracticeState
 } from "../lib/practice";
+import { createConfiguredProvider } from "../lib/providerClients";
+import { ProviderRouter } from "../lib/providerRouter";
+import { hydrateProviderApiKeys } from "../lib/providerSecrets";
+import { selectRunnableProviders } from "../lib/providerSelection";
 import { getSetting } from "../lib/tauri";
 import type { InterviewType } from "../types/session";
 
@@ -30,6 +41,7 @@ const interviewTypes: Array<{ id: InterviewType; label: string }> = [
 export function Practice() {
   const [interviewType, setInterviewType] = useState<InterviewType>("system_design");
   const [pluginCatalog, setPluginCatalog] = useState<PluginCatalog>(createEmptyPluginCatalog());
+  const [appConfig, setAppConfig] = useState<AppConfig>(DEFAULT_APP_CONFIG);
   const [practicePackId, setPracticePackId] = useState("built-in");
   const pluginPracticePacks = useMemo(
     () =>
@@ -50,17 +62,27 @@ export function Practice() {
   const activeQuestion = questions[questionIndex % questions.length];
   const [state, setState] = useState<PracticeState>(() => createState(activeQuestion));
   const [draftAnswer, setDraftAnswer] = useState("");
+  const [aiFollowUp, setAiFollowUp] = useState("");
+  const [aiFollowUpBusy, setAiFollowUpBusy] = useState(false);
   const [status, setStatus] = useState("Ready for practice");
   const feedback = state.status === "scored" ? scorePracticeAnswer({ question: activeQuestion, answer: state.answer }) : null;
 
   useEffect(() => {
     let cancelled = false;
 
-    getSetting(PLUGIN_CATALOG_SETTING_KEY).then((rawCatalog) => {
+    async function loadPracticeSettings() {
+      const [rawCatalog, rawConfig] = await Promise.all([
+        getSetting(PLUGIN_CATALOG_SETTING_KEY),
+        getSetting(APP_CONFIG_SETTING_KEY)
+      ]);
+      const hydratedConfig = await hydrateProviderApiKeys(parseAppConfig(rawConfig));
       if (!cancelled) {
         setPluginCatalog(parsePluginCatalog(rawCatalog));
+        setAppConfig(hydratedConfig);
       }
-    });
+    }
+
+    void loadPracticeSettings();
 
     return () => {
       cancelled = true;
@@ -74,6 +96,7 @@ export function Practice() {
     setQuestionIndex(0);
     setState(createState(nextQuestions[0]));
     setDraftAnswer("");
+    setAiFollowUp("");
     setStatus("Practice pack loaded");
   }
 
@@ -86,6 +109,7 @@ export function Practice() {
     setQuestionIndex(0);
     setState(createState(nextQuestions[0] ?? listPracticeQuestions(interviewType)[0]));
     setDraftAnswer("");
+    setAiFollowUp("");
     setStatus(nextPackId === "built-in" ? "Built-in practice pack loaded" : "Plugin practice pack loaded");
   }
 
@@ -102,6 +126,7 @@ export function Practice() {
       score: scorePracticeAnswer({ question: activeQuestion, answer }).score
     });
     setState(scored);
+    setAiFollowUp("");
     setStatus("Answer scored locally");
   }
 
@@ -111,7 +136,55 @@ export function Practice() {
     setQuestionIndex(nextIndex);
     setState(nextPracticeState(state, { type: "next_question", question: next.question }));
     setDraftAnswer("");
+    setAiFollowUp("");
     setStatus("Next interviewer question ready");
+  }
+
+  async function generateAiFollowUp() {
+    const answer = (state.answer || draftAnswer).trim();
+    if (!answer) {
+      setStatus("Write or score an answer before asking for an AI follow-up.");
+      return;
+    }
+
+    const providerConfigs = selectRunnableProviders(appConfig);
+    if (providerConfigs.length === 0) {
+      setStatus(
+        appConfig.security.localOnlyMode
+          ? "Enable a local AI provider before generating a practice follow-up."
+          : "Enable an AI provider in Settings before generating a practice follow-up."
+      );
+      return;
+    }
+
+    setAiFollowUp("");
+    setAiFollowUpBusy(true);
+    setStatus(`Generating practice follow-up with ${providerConfigs[0].label}...`);
+
+    try {
+      const router = new ProviderRouter(providerConfigs.map((provider) => createConfiguredProvider(provider)));
+      let response = "";
+      for await (const chunk of router.chatStream({
+        messages: buildPracticeFollowUpMessages({
+          interviewType,
+          question: activeQuestion.question,
+          answer,
+          score: state.score
+        }),
+        model: providerConfigs[0].model,
+        temperature: 0.7,
+        maxTokens: 160
+      })) {
+        response += chunk;
+        setAiFollowUp(response);
+      }
+
+      setStatus(response.trim() ? "AI follow-up ready" : "AI provider returned an empty follow-up");
+    } catch (error) {
+      setStatus(`AI follow-up failed: ${error instanceof Error ? error.message : String(error)}`);
+    } finally {
+      setAiFollowUpBusy(false);
+    }
   }
 
   async function copyScoringPrompt() {
@@ -187,6 +260,9 @@ export function Practice() {
           <Button variant="secondary" icon={<Clipboard size={16} />} onClick={copyScoringPrompt}>
             Copy LLM Rubric
           </Button>
+          <Button variant="primary" icon={<Bot size={16} />} onClick={generateAiFollowUp} disabled={aiFollowUpBusy}>
+            {aiFollowUpBusy ? "Generating Follow-Up" : "Generate AI Follow-Up"}
+          </Button>
         </div>
       </section>
 
@@ -210,6 +286,12 @@ export function Practice() {
         ) : (
           <p className="empty-copy">Submit an answer to get local scoring and next-step feedback.</p>
         )}
+        {aiFollowUp ? (
+          <div className="practice-feedback">
+            <strong>AI Follow-Up</strong>
+            <p>{aiFollowUp}</p>
+          </div>
+        ) : null}
       </section>
     </main>
   );

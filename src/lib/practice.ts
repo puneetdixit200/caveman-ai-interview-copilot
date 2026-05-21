@@ -1,4 +1,4 @@
-import type { InterviewType } from "../types/session";
+import type { ChatMessage, InterviewType } from "../types/session";
 import type { PluginPracticePack } from "./pluginManifest";
 
 export interface PracticeQuestion {
@@ -45,6 +45,34 @@ export function buildPracticeScoringPrompt(input: {
     `Question: ${input.question}`,
     `Answer: ${input.answer}`
   ].join("\n");
+}
+
+export function buildPracticeFollowUpMessages(input: {
+  interviewType: InterviewType;
+  question: string;
+  answer: string;
+  score?: number | null;
+}): ChatMessage[] {
+  return [
+    {
+      role: "system",
+      content: [
+        "You are a senior technical interviewer running a realistic practice interview.",
+        "Ask exactly one concise follow-up question that probes the weakest missing detail.",
+        "Do not answer the question yourself."
+      ].join(" ")
+    },
+    {
+      role: "user",
+      content: [
+        `Interview type: ${input.interviewType}`,
+        `Original question: ${input.question}`,
+        input.score ? `Score: ${input.score}/5` : "Score: not available",
+        `Candidate answer: ${input.answer}`,
+        "Generate the next interviewer follow-up question."
+      ].join("\n")
+    }
+  ];
 }
 
 export const practiceQuestions: PracticeQuestion[] = [

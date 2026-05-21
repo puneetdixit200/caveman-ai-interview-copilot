@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   buildPracticeScoringPrompt,
+  buildPracticeFollowUpMessages,
   listPluginPracticeQuestions,
   listPracticeQuestions,
   nextPracticeState,
@@ -32,6 +33,28 @@ describe("practice", () => {
     expect(prompt).toContain("Score the candidate from 1-5");
     expect(prompt).toContain("clarity");
     expect(prompt).toContain("Design a notification system");
+  });
+
+  it("builds AI interviewer follow-up messages from the candidate answer", () => {
+    const messages = buildPracticeFollowUpMessages({
+      interviewType: "system_design",
+      question: "Design a notification system",
+      answer: "I would use queues and fanout workers with retries.",
+      score: 4
+    });
+
+    expect(messages).toEqual([
+      expect.objectContaining({
+        role: "system",
+        content: expect.stringContaining("senior technical interviewer")
+      }),
+      expect.objectContaining({
+        role: "user",
+        content: expect.stringContaining("Design a notification system")
+      })
+    ]);
+    expect(messages[1].content).toContain("queues and fanout workers");
+    expect(messages[1].content).toContain("Score: 4/5");
   });
 
   it("serves a typed practice question bank", () => {
