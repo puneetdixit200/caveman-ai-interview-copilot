@@ -104,6 +104,42 @@ export const DEFAULT_APP_CONFIG: AppConfig = {
       model: "llama-3.1-8b-instant",
       enabled: false,
       apiKeyStored: false
+    },
+    {
+      id: "google",
+      label: "Google Gemini",
+      kind: "cloud",
+      endpoint: "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:streamGenerateContent",
+      model: "gemini-2.5-flash",
+      enabled: false,
+      apiKeyStored: false
+    },
+    {
+      id: "mistral",
+      label: "Mistral",
+      kind: "cloud",
+      endpoint: "https://api.mistral.ai/v1/chat/completions",
+      model: "mistral-large-latest",
+      enabled: false,
+      apiKeyStored: false
+    },
+    {
+      id: "together",
+      label: "Together AI",
+      kind: "cloud",
+      endpoint: "https://api.together.ai/v1/chat/completions",
+      model: "meta-llama/Llama-3.3-70B-Instruct-Turbo",
+      enabled: false,
+      apiKeyStored: false
+    },
+    {
+      id: "fireworks",
+      label: "Fireworks AI",
+      kind: "cloud",
+      endpoint: "https://api.fireworks.ai/inference/v1/chat/completions",
+      model: "accounts/fireworks/models/llama-v3p1-8b-instruct",
+      enabled: false,
+      apiKeyStored: false
     }
   ],
   audio: {

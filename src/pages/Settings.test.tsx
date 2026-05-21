@@ -28,8 +28,12 @@ describe("Settings", () => {
     expect(screen.getByRole("option", { name: "OpenAI" })).toBeInTheDocument();
     expect(screen.getByRole("option", { name: "Anthropic" })).toBeInTheDocument();
     expect(screen.getByRole("option", { name: "Groq" })).toBeInTheDocument();
-    expect(screen.getAllByRole("button", { name: "Save Key" }).length).toBeGreaterThanOrEqual(4);
-    expect(screen.getAllByRole("button", { name: "Delete Key" }).length).toBeGreaterThanOrEqual(4);
+    expect(screen.getByRole("option", { name: "Google Gemini" })).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: "Mistral" })).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: "Together AI" })).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: "Fireworks AI" })).toBeInTheDocument();
+    expect(screen.getAllByRole("button", { name: "Save Key" }).length).toBeGreaterThanOrEqual(8);
+    expect(screen.getAllByRole("button", { name: "Delete Key" }).length).toBeGreaterThanOrEqual(8);
     expect(screen.getByText(/OS keychain/i)).toBeInTheDocument();
   });
 

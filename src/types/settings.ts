@@ -1,7 +1,17 @@
 import type { InterviewType, Speaker } from "./session";
 
 export type ProviderKind = "local" | "cloud";
-export type ProviderId = "ollama" | "lmstudio" | "openrouter" | "openai" | "anthropic" | "groq";
+export type ProviderId =
+  | "ollama"
+  | "lmstudio"
+  | "openrouter"
+  | "openai"
+  | "anthropic"
+  | "groq"
+  | "google"
+  | "mistral"
+  | "together"
+  | "fireworks";
 export type AudioCaptureMode = "manual" | "microphone" | "system" | "dual";
 export type SttMode = "manual" | "local_whisper" | "deepgram" | "assemblyai" | "google";
 export type AutoTriggerMode = "manual" | "suggest_on_question" | "continuous_coach";

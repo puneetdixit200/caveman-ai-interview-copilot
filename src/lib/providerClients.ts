@@ -64,7 +64,7 @@ async function* chatStream(
     throw new Error(secretError);
   }
 
-  const response = await fetchImpl(config.endpoint, {
+  const response = await fetchImpl(requestEndpoint(config, params), {
     method: "POST",
     headers: requestHeaders(config),
     body: JSON.stringify(requestBody(config, params)),
@@ -89,6 +89,11 @@ async function* chatStream(
     return;
   }
 
+  if (config.id === "google") {
+    yield* parseGeminiStream(response.body);
+    return;
+  }
+
   yield* parseSseStream(response.body);
 }
 
@@ -102,7 +107,7 @@ function requestHeaders(config: ModelProviderConfig): Record<string, string> {
     if (config.id === "anthropic") {
       headers["x-api-key"] = config.apiKey.trim();
       headers["anthropic-version"] = "2023-06-01";
-    } else {
+    } else if (config.id !== "google") {
       headers.Authorization = `Bearer ${config.apiKey.trim()}`;
     }
   }
@@ -115,6 +120,19 @@ function requestHeaders(config: ModelProviderConfig): Record<string, string> {
   return headers;
 }
 
+function requestEndpoint(config: ModelProviderConfig, params: ChatStreamParams): string {
+  if (config.id !== "google") {
+    return config.endpoint;
+  }
+
+  const model = params.model ?? config.model;
+  const endpoint = config.endpoint.replace(/models\/[^/:]+:streamGenerateContent/, `models/${encodeURIComponent(model)}:streamGenerateContent`);
+  const url = new URL(endpoint);
+  url.searchParams.set("alt", "sse");
+  url.searchParams.set("key", config.apiKey?.trim() ?? "");
+  return url.toString();
+}
+
 function requestBody(config: ModelProviderConfig, params: ChatStreamParams): Record<string, unknown> {
   if (config.id === "ollama") {
     return {
@@ -124,6 +142,32 @@ function requestBody(config: ModelProviderConfig, params: ChatStreamParams): Rec
       options: {
         temperature: params.temperature,
         num_predict: params.maxTokens
+      }
+    };
+  }
+
+  if (config.id === "google") {
+    const systemMessages = params.messages
+      .filter((message) => message.role === "system")
+      .map((message) => message.content.trim())
+      .filter(Boolean);
+    return {
+      ...(systemMessages.length > 0
+        ? {
+            systemInstruction: {
+              parts: [{ text: systemMessages.join("\n\n") }]
+            }
+          }
+        : {}),
+      contents: params.messages
+        .filter((message) => message.role !== "system")
+        .map((message) => ({
+          role: message.role === "assistant" ? "model" : "user",
+          parts: [{ text: message.content }]
+        })),
+      generationConfig: {
+        temperature: params.temperature,
+        maxOutputTokens: params.maxTokens
       }
     };
   }
@@ -157,11 +201,7 @@ function requestBody(config: ModelProviderConfig, params: ChatStreamParams): Rec
 }
 
 function validateSecret(config: ModelProviderConfig): string | undefined {
-  if (config.id === "openrouter" && !config.apiKey?.trim()) {
-    return "OpenRouter API key is required";
-  }
-
-  if (["openai", "anthropic", "groq"].includes(config.id) && !config.apiKey?.trim()) {
+  if (config.kind === "cloud" && !config.apiKey?.trim()) {
     return `${config.label} API key is required`;
   }
 
@@ -295,6 +335,54 @@ function parseAnthropicEvent(event: string): string {
 
     const parsed = JSON.parse(payload) as { delta?: { text?: string } };
     content += parsed.delta?.text ?? "";
+  }
+
+  return content;
+}
+
+async function* parseGeminiStream(body: ReadableStream<Uint8Array>): AsyncGenerator<string> {
+  let buffer = "";
+
+  for await (const chunk of decodeBody(body)) {
+    buffer += chunk;
+    const events = buffer.split(/\r?\n\r?\n/);
+    buffer = events.pop() ?? "";
+
+    for (const event of events) {
+      const content = parseGeminiEvent(event);
+      if (content) {
+        yield content;
+      }
+    }
+  }
+
+  const finalContent = parseGeminiEvent(buffer);
+  if (finalContent) {
+    yield finalContent;
+  }
+}
+
+function parseGeminiEvent(event: string): string {
+  const lines = event
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter((line) => line.startsWith("data:"));
+
+  let content = "";
+  for (const line of lines) {
+    const payload = line.slice("data:".length).trim();
+    if (!payload || payload === "[DONE]") {
+      continue;
+    }
+
+    const parsed = JSON.parse(payload) as {
+      candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
+    };
+    content +=
+      parsed.candidates
+        ?.flatMap((candidate) => candidate.content?.parts ?? [])
+        .map((part) => part.text ?? "")
+        .join("") ?? "";
   }
 
   return content;

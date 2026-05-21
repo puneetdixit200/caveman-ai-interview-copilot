@@ -9,6 +9,10 @@ describe("appConfig", () => {
     const openai = DEFAULT_APP_CONFIG.providers.find((provider) => provider.id === "openai");
     const anthropic = DEFAULT_APP_CONFIG.providers.find((provider) => provider.id === "anthropic");
     const groq = DEFAULT_APP_CONFIG.providers.find((provider) => provider.id === "groq");
+    const google = DEFAULT_APP_CONFIG.providers.find((provider) => provider.id === "google");
+    const mistral = DEFAULT_APP_CONFIG.providers.find((provider) => provider.id === "mistral");
+    const together = DEFAULT_APP_CONFIG.providers.find((provider) => provider.id === "together");
+    const fireworks = DEFAULT_APP_CONFIG.providers.find((provider) => provider.id === "fireworks");
 
     expect(ollama).toMatchObject({
       enabled: true,
@@ -38,6 +42,26 @@ describe("appConfig", () => {
       enabled: false,
       endpoint: "https://api.groq.com/openai/v1/chat/completions",
       model: "llama-3.1-8b-instant"
+    });
+    expect(google).toMatchObject({
+      enabled: false,
+      endpoint: "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:streamGenerateContent",
+      model: "gemini-2.5-flash"
+    });
+    expect(mistral).toMatchObject({
+      enabled: false,
+      endpoint: "https://api.mistral.ai/v1/chat/completions",
+      model: "mistral-large-latest"
+    });
+    expect(together).toMatchObject({
+      enabled: false,
+      endpoint: "https://api.together.ai/v1/chat/completions",
+      model: "meta-llama/Llama-3.3-70B-Instruct-Turbo"
+    });
+    expect(fireworks).toMatchObject({
+      enabled: false,
+      endpoint: "https://api.fireworks.ai/inference/v1/chat/completions",
+      model: "accounts/fireworks/models/llama-v3p1-8b-instruct"
     });
   });
 

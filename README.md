@@ -1,6 +1,6 @@
 # Caveman AI Interview Copilot
 
-Caveman AI Interview Copilot is a desktop app for real-time interview assistance. It combines live transcription, AI answer generation, a stealth overlay, local-first session history, and provider support for tools such as Whisper, Ollama, LM Studio, and OpenRouter.
+Caveman AI Interview Copilot is a desktop app for real-time interview assistance. It combines live transcription, AI answer generation, a stealth overlay, local-first session history, and provider support for tools such as Whisper, Ollama, LM Studio, OpenRouter, Google Gemini, Mistral, Together AI, and Fireworks AI.
 
 The app targets technical interviews, coding rounds, system design interviews, behavioral interviews, sales calls, and oral exam practice. It is built with Tauri, React, TypeScript, Rust, SQLite, and a local-first architecture.
 
@@ -25,7 +25,7 @@ Implemented now:
 - Speaker diarization calibration for microphone, system audio, and provider speaker slots from Whisper, Deepgram, AssemblyAI, and Google STT
 - Local Whisper setup helpers that scan for `whisper-cli`/`main` binaries, detect local `ggml` models, and download the official `base.en` model with SHA-1 verification
 - Automatic interviewer question detection and answer triggering from live transcript updates
-- Ollama, LM Studio, OpenRouter, OpenAI, Anthropic, and Groq provider routing with streaming fallback
+- Ollama, LM Studio, OpenRouter, OpenAI, Anthropic, Groq, Google Gemini, Mistral, Together AI, and Fireworks AI provider routing with streaming fallback
 - Stealth overlay window with opacity, font controls, global hotkeys, click-through mode, position persistence, and Windows capture exclusion
 - Session archive with search, cursor-paged replay for long histories, transcript correction, Markdown, JSON, and PDF export
 - Trusted collaborative helper link with token-gated live transcript/answer snapshot sharing and inbound helper hints
@@ -88,7 +88,7 @@ Frontend state lives in React and Zustand. Native audio, persistence, hotkeys, o
 - Database: SQLite with `rusqlite`
 - State: Zustand
 - Testing: Vitest and Cargo tests
-- AI provider targets: Ollama, LM Studio, OpenRouter, OpenAI-compatible APIs
+- AI provider targets: Ollama, LM Studio, OpenRouter, OpenAI, Anthropic, Groq, Google Gemini, Mistral, Together AI, Fireworks AI, and OpenAI-compatible APIs
 - STT targets: whisper.cpp local sidecar and cloud STT providers
 
 ## Development

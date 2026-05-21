@@ -142,6 +142,37 @@ describe("createConfiguredProvider", () => {
     );
   });
 
+  it("requires API keys for every direct cloud provider before making requests", async () => {
+    const fetchImpl = vi.fn();
+
+    for (const directProvider of [
+      { id: "google", label: "Google Gemini" },
+      { id: "mistral", label: "Mistral" },
+      { id: "together", label: "Together AI" },
+      { id: "fireworks", label: "Fireworks AI" }
+    ] as const) {
+      const configured = createConfiguredProvider(
+        provider({
+          id: directProvider.id,
+          label: directProvider.label,
+          kind: "cloud",
+          endpoint: "https://example.com/v1/chat/completions",
+          model: "provider-model",
+          apiKeyStored: false,
+          apiKey: ""
+        }),
+        fetchImpl
+      );
+
+      await expect(configured.healthCheck()).resolves.toMatchObject({
+        ok: false,
+        error: `${directProvider.label} API key is required`
+      });
+    }
+
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
   it("uses Anthropic message format, headers, and streaming parser", async () => {
     const fetchImpl = vi.fn(async () =>
       streamingResponse(
@@ -193,5 +224,110 @@ describe("createConfiguredProvider", () => {
         })
       })
     );
+  });
+
+  it("streams Google Gemini SSE text with Gemini request format and API-key query auth", async () => {
+    const fetchImpl = vi.fn(async () =>
+      streamingResponse(
+        [
+          'data: {"candidates":[{"content":{"parts":[{"text":"Use "}]}}]}',
+          'data: {"candidates":[{"content":{"parts":[{"text":"queues"}]}}]}'
+        ].join("\n\n")
+      )
+    );
+    const configured = createConfiguredProvider(
+      provider({
+        id: "google",
+        label: "Google Gemini",
+        kind: "cloud",
+        endpoint: "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:streamGenerateContent",
+        model: "gemini-2.5-flash",
+        apiKeyStored: true,
+        apiKey: "gemini-key"
+      }),
+      fetchImpl
+    );
+
+    const chunks: string[] = [];
+    for await (const chunk of configured.chatStream({
+      messages: [
+        { role: "system", content: "Use concise interview answers." },
+        { role: "user", content: "How do I design async jobs?" },
+        { role: "assistant", content: "Start with requirements." },
+        { role: "user", content: "What should I say next?" }
+      ],
+      temperature: 0.2,
+      maxTokens: 512
+    })) {
+      chunks.push(chunk);
+    }
+
+    expect(chunks).toEqual(["Use ", "queues"]);
+    expect(fetchImpl).toHaveBeenCalledWith(
+      "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:streamGenerateContent?alt=sse&key=gemini-key",
+      expect.objectContaining({
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          systemInstruction: {
+            parts: [{ text: "Use concise interview answers." }]
+          },
+          contents: [
+            { role: "user", parts: [{ text: "How do I design async jobs?" }] },
+            { role: "model", parts: [{ text: "Start with requirements." }] },
+            { role: "user", parts: [{ text: "What should I say next?" }] }
+          ],
+          generationConfig: {
+            temperature: 0.2,
+            maxOutputTokens: 512
+          }
+        })
+      })
+    );
+  });
+
+  it("uses OpenAI-compatible streaming for Mistral, Together, and Fireworks direct providers", async () => {
+    for (const directProvider of [
+      ["mistral", "Mistral", "https://api.mistral.ai/v1/chat/completions"],
+      ["together", "Together AI", "https://api.together.ai/v1/chat/completions"],
+      ["fireworks", "Fireworks AI", "https://api.fireworks.ai/inference/v1/chat/completions"]
+    ] as const) {
+      const fetchImpl = vi.fn(async () => streamingResponse('data: {"choices":[{"delta":{"content":"ok"}}]}'));
+      const configured = createConfiguredProvider(
+        provider({
+          id: directProvider[0],
+          label: directProvider[1],
+          kind: "cloud",
+          endpoint: directProvider[2],
+          model: "provider-model",
+          apiKeyStored: true,
+          apiKey: "provider-key"
+        }),
+        fetchImpl
+      );
+
+      const chunks: string[] = [];
+      for await (const chunk of configured.chatStream({
+        messages: [{ role: "user", content: "Answer" }],
+        maxTokens: 256
+      })) {
+        chunks.push(chunk);
+      }
+
+      expect(chunks).toEqual(["ok"]);
+      expect(fetchImpl).toHaveBeenCalledWith(
+        directProvider[2],
+        expect.objectContaining({
+          headers: expect.objectContaining({ Authorization: "Bearer provider-key" }),
+          body: JSON.stringify({
+            model: "provider-model",
+            messages: [{ role: "user", content: "Answer" }],
+            stream: true,
+            temperature: undefined,
+            max_tokens: 256
+          })
+        })
+      );
+    }
   });
 });
