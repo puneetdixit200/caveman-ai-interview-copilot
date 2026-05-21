@@ -29,6 +29,28 @@ test("signed build script can use CI-provided Tauri signing secrets", async () =
   assert.match(script, /npm run tauri build -- --ci --config src-tauri\/tauri\.release\.conf\.json/);
 });
 
+test("signed build script can inject optional Windows Authenticode signing config", async () => {
+  const script = await readFile("scripts/build-signed-update.ps1", "utf8");
+
+  assert.match(script, /WINDOWS_CODESIGN_CERTIFICATE_THUMBPRINT/);
+  assert.match(script, /WINDOWS_CODESIGN_SIGN_COMMAND/);
+  assert.match(script, /certificateThumbprint/);
+  assert.match(script, /digestAlgorithm/);
+  assert.match(script, /timestampUrl/);
+  assert.match(script, /tauri\.release\.generated\.conf\.json/);
+});
+
+test("release workflow imports optional Windows code-signing certificates before building", async () => {
+  const workflow = await readFile(workflowPath, "utf8");
+
+  assert.match(workflow, /WINDOWS_CODESIGN_CERTIFICATE_BASE64:\s*\$\{\{\s*secrets\.WINDOWS_CODESIGN_CERTIFICATE_BASE64\s*\}\}/);
+  assert.match(workflow, /WINDOWS_CODESIGN_CERTIFICATE_PASSWORD:\s*\$\{\{\s*secrets\.WINDOWS_CODESIGN_CERTIFICATE_PASSWORD\s*\}\}/);
+  assert.match(workflow, /Import Windows code-signing certificate/);
+  assert.match(workflow, /Import-PfxCertificate/);
+  assert.match(workflow, /WINDOWS_CODESIGN_CERTIFICATE_THUMBPRINT=\$\(\$cert\.Thumbprint\)/);
+  assert.match(workflow, /GITHUB_ENV/);
+});
+
 test("release workflow contract is part of the release test suite", async () => {
   const packageJson = JSON.parse(await readFile("package.json", "utf8"));
 

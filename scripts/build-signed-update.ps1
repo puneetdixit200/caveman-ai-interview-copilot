@@ -8,6 +8,7 @@ param(
 
 $ErrorActionPreference = "Stop"
 $RepoRoot = Resolve-Path (Join-Path $PSScriptRoot "..")
+$BuildConfigPath = "src-tauri/tauri.release.conf.json"
 
 if ([string]::IsNullOrWhiteSpace($env:TAURI_SIGNING_PRIVATE_KEY)) {
   if (-not (Test-Path -LiteralPath $SigningKeyPath)) {
@@ -23,7 +24,45 @@ if ($SigningKeyPassword) {
 
 Push-Location $RepoRoot
 try {
-  npm run tauri build -- --ci --config src-tauri/tauri.release.conf.json
+  $WindowsCodeSignThumbprint = $env:WINDOWS_CODESIGN_CERTIFICATE_THUMBPRINT
+  $WindowsCodeSignCommand = $env:WINDOWS_CODESIGN_SIGN_COMMAND
+  if (-not [string]::IsNullOrWhiteSpace($WindowsCodeSignThumbprint) -or -not [string]::IsNullOrWhiteSpace($WindowsCodeSignCommand)) {
+    $WindowsBundleConfig = @{
+      digestAlgorithm = "sha256"
+      timestampUrl = if ([string]::IsNullOrWhiteSpace($env:WINDOWS_CODESIGN_TIMESTAMP_URL)) {
+        "http://timestamp.digicert.com"
+      }
+      else {
+        $env:WINDOWS_CODESIGN_TIMESTAMP_URL
+      }
+    }
+
+    if (-not [string]::IsNullOrWhiteSpace($WindowsCodeSignThumbprint)) {
+      $WindowsBundleConfig.certificateThumbprint = $WindowsCodeSignThumbprint
+    }
+
+    if (-not [string]::IsNullOrWhiteSpace($WindowsCodeSignCommand)) {
+      $WindowsBundleConfig.signCommand = $WindowsCodeSignCommand
+    }
+
+    $GeneratedReleaseConfig = @{
+      bundle = @{
+        createUpdaterArtifacts = $true
+        windows = $WindowsBundleConfig
+      }
+    }
+    $GeneratedConfigPath = Join-Path $RepoRoot "src-tauri\target\tauri.release.generated.conf.json"
+    New-Item -ItemType Directory -Force -Path (Split-Path $GeneratedConfigPath) | Out-Null
+    $GeneratedReleaseConfig | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $GeneratedConfigPath -Encoding UTF8
+    $BuildConfigPath = $GeneratedConfigPath
+  }
+
+  if ($BuildConfigPath -eq "src-tauri/tauri.release.conf.json") {
+    npm run tauri build -- --ci --config src-tauri/tauri.release.conf.json
+  }
+  else {
+    npm run tauri build -- --ci --config $BuildConfigPath
+  }
 
   $ManifestArgs = @(
     "scripts/generate-latest-json.mjs",

@@ -22,6 +22,9 @@ jobs:
     env:
       TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
       TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+      WINDOWS_CODESIGN_CERTIFICATE_BASE64: ${{ secrets.WINDOWS_CODESIGN_CERTIFICATE_BASE64 }}
+      WINDOWS_CODESIGN_CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_CODESIGN_CERTIFICATE_PASSWORD }}
+      WINDOWS_CODESIGN_TIMESTAMP_URL: http://timestamp.digicert.com
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -40,6 +43,19 @@ jobs:
 
       - name: Verify release metadata scripts
         run: npm run test:release
+
+      - name: Import Windows code-signing certificate
+        if: ${{ env.WINDOWS_CODESIGN_CERTIFICATE_BASE64 != '' }}
+        shell: powershell
+        run: |
+          $certPath = Join-Path $env:RUNNER_TEMP "caveman-codesign.pfx"
+          [IO.File]::WriteAllBytes($certPath, [Convert]::FromBase64String($env:WINDOWS_CODESIGN_CERTIFICATE_BASE64))
+          $securePassword = ConvertTo-SecureString $env:WINDOWS_CODESIGN_CERTIFICATE_PASSWORD -AsPlainText -Force
+          $cert = Import-PfxCertificate -FilePath $certPath -CertStoreLocation Cert:\CurrentUser\My -Password $securePassword | Where-Object { $_.HasPrivateKey } | Select-Object -First 1
+          if (-not $cert) {
+            throw "Imported PFX did not contain a certificate with a private key."
+          }
+          "WINDOWS_CODESIGN_CERTIFICATE_THUMBPRINT=$($cert.Thumbprint)" >> $env:GITHUB_ENV
 
       - name: Build signed updater assets
         shell: powershell
