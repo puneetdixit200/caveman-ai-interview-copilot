@@ -22,6 +22,7 @@ Implemented now:
 - Dashboard for active interview sessions
 - Native CPAL microphone, system audio, and dual-stream capture with device selection, app-aware target selection, gain, noise gate, meters, STT-ready 16 kHz mono snapshots, and 250 ms PCM chunk events for streaming STT clients
 - Audio rehearsal in Settings that briefly runs native capture and reports live microphone/system peaks before a real interview
+- Raw audio cache cleanup that purges stale live-capture and local Whisper temporary artifacts on startup
 - Local Whisper chunk-driven streaming from 250 ms PCM audio, Deepgram live WebSocket streaming with interim word preview, AssemblyAI and Google STT fallback commands, and first-class STT auto language detection
 - Speaker diarization calibration for microphone, system audio, and provider speaker slots from Whisper, Deepgram, AssemblyAI, and Google STT
 - Local Whisper setup helpers that scan for `whisper-cli`/`main` binaries, detect local `ggml` models, and download the official `base.en` model with SHA-1 verification
@@ -58,6 +59,8 @@ The overlay is designed for interview use: always on top, adjustable opacity, ad
 ### Local-First AI Workflow
 
 The architecture supports offline-first use with local Whisper and local LLM providers such as Ollama or LM Studio. Cloud providers such as OpenRouter can be enabled when the user chooses to send context to a cloud model.
+
+Raw audio is treated as temporary cache data. Live-capture WAV snapshots and local Whisper chunk files are removed after use, and stale cache artifacts are purged automatically during desktop startup.
 
 ### Real-Use Preflight
 

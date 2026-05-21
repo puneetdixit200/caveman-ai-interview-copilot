@@ -256,6 +256,13 @@ pub struct CaptureSnapshot {
     pub sample_count: usize,
 }
 
+#[derive(Debug, Clone, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AudioCacheCleanupReport {
+    pub deleted_files: usize,
+    pub skipped_files: usize,
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct AudioSampleSnapshot {
     pub samples: Vec<f32>,
@@ -581,6 +588,77 @@ pub fn delete_capture_snapshot_file(
     Ok(true)
 }
 
+pub fn cleanup_stale_audio_cache_files(
+    app_cache_dir: &Path,
+    max_age: Duration,
+) -> anyhow::Result<AudioCacheCleanupReport> {
+    let mut report = AudioCacheCleanupReport {
+        deleted_files: 0,
+        skipped_files: 0,
+    };
+    let now = std::time::SystemTime::now();
+
+    for cache_dir in ["live-capture", "local-whisper"] {
+        let directory = app_cache_dir.join(cache_dir);
+        if !directory.exists() {
+            continue;
+        }
+
+        for entry in std::fs::read_dir(&directory)? {
+            let entry = entry?;
+            let path = entry.path();
+            if !entry.file_type()?.is_file() || !is_known_raw_audio_cache_file(cache_dir, &path) {
+                report.skipped_files += 1;
+                continue;
+            }
+
+            if is_stale_cache_file(&path, now, max_age) {
+                std::fs::remove_file(&path)?;
+                report.deleted_files += 1;
+            } else {
+                report.skipped_files += 1;
+            }
+        }
+    }
+
+    Ok(report)
+}
+
+fn is_known_raw_audio_cache_file(cache_dir: &str, path: &Path) -> bool {
+    let extension = path
+        .extension()
+        .and_then(|extension| extension.to_str())
+        .unwrap_or_default()
+        .to_ascii_lowercase();
+    let stem = path
+        .file_stem()
+        .and_then(|stem| stem.to_str())
+        .unwrap_or_default()
+        .to_ascii_lowercase();
+
+    match cache_dir {
+        "live-capture" => {
+            extension == "wav" && (stem.starts_with("microphone-") || stem.starts_with("system-"))
+        }
+        "local-whisper" => {
+            (extension == "wav" || extension == "json") && stem.starts_with("chunk-")
+        }
+        _ => false,
+    }
+}
+
+fn is_stale_cache_file(path: &Path, now: std::time::SystemTime, max_age: Duration) -> bool {
+    if max_age == Duration::ZERO {
+        return true;
+    }
+
+    path.metadata()
+        .and_then(|metadata| metadata.modified())
+        .ok()
+        .and_then(|modified| now.duration_since(modified).ok())
+        .is_none_or(|age| age >= max_age)
+}
+
 fn enumerate_audio_devices() -> anyhow::Result<Vec<AudioDevice>> {
     let host = cpal::default_host();
     let default_input = host
@@ -707,10 +785,10 @@ mod tests {
 
     use super::{
         apply_audio_level_to_state, apply_audio_processing, classify_device_kind,
-        delete_capture_snapshot_file, prepare_stt_samples, stable_device_id, AudioCaptureManager,
-        AudioCaptureState, AudioChunkAccumulator, AudioChunkEvent, AudioLevelEvent,
-        AudioProcessingSettings, CaptureSourceSelection, RollingAudioBuffer, TARGET_CHANNELS,
-        TARGET_SAMPLE_RATE_HZ,
+        cleanup_stale_audio_cache_files, delete_capture_snapshot_file, prepare_stt_samples,
+        stable_device_id, AudioCaptureManager, AudioCaptureState, AudioChunkAccumulator,
+        AudioChunkEvent, AudioLevelEvent, AudioProcessingSettings, CaptureSourceSelection,
+        RollingAudioBuffer, TARGET_CHANNELS, TARGET_SAMPLE_RATE_HZ,
     };
 
     #[test]
@@ -959,6 +1037,40 @@ mod tests {
         );
         assert!(delete_capture_snapshot_file(&cache_dir, &outside.display().to_string()).is_err());
         assert!(outside.exists());
+
+        std::fs::remove_dir_all(cache_dir).expect("clean temp dir");
+    }
+
+    #[test]
+    fn cleans_only_known_stale_raw_audio_cache_files() {
+        let cache_dir = std::env::temp_dir().join(format!(
+            "caveman-audio-cache-cleanup-{}",
+            uuid::Uuid::new_v4()
+        ));
+        let live_capture_dir = cache_dir.join("live-capture");
+        let local_whisper_dir = cache_dir.join("local-whisper");
+        std::fs::create_dir_all(&live_capture_dir).expect("create live capture dir");
+        std::fs::create_dir_all(&local_whisper_dir).expect("create local whisper dir");
+        let live_snapshot = live_capture_dir.join("microphone-123.wav");
+        let whisper_chunk = local_whisper_dir.join("chunk-abc.wav");
+        let whisper_json = local_whisper_dir.join("chunk-abc.json");
+        let unrelated_live_file = live_capture_dir.join("notes.txt");
+        let unrelated_cache_file = cache_dir.join("keep.wav");
+        std::fs::write(&live_snapshot, b"wav").expect("write live snapshot");
+        std::fs::write(&whisper_chunk, b"wav").expect("write whisper chunk");
+        std::fs::write(&whisper_json, b"json").expect("write whisper json");
+        std::fs::write(&unrelated_live_file, b"notes").expect("write notes");
+        std::fs::write(&unrelated_cache_file, b"keep").expect("write keep");
+
+        let report = cleanup_stale_audio_cache_files(&cache_dir, std::time::Duration::ZERO)
+            .expect("clean stale cache files");
+
+        assert_eq!(report.deleted_files, 3);
+        assert!(!live_snapshot.exists());
+        assert!(!whisper_chunk.exists());
+        assert!(!whisper_json.exists());
+        assert!(unrelated_live_file.exists());
+        assert!(unrelated_cache_file.exists());
 
         std::fs::remove_dir_all(cache_dir).expect("clean temp dir");
     }

@@ -23,6 +23,12 @@ pub fn run() {
             use tauri::Manager;
 
             let app_data_dir = app.path().app_data_dir()?;
+            if let Ok(app_cache_dir) = app.path().app_cache_dir() {
+                let _ = audio::cleanup_stale_audio_cache_files(
+                    &app_cache_dir,
+                    std::time::Duration::from_secs(60 * 60),
+                );
+            }
             std::fs::create_dir_all(&app_data_dir)?;
             let database = db::Database::open(app_data_dir.join("caveman.sqlite3"))?;
             app.manage(database);
