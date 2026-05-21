@@ -47,6 +47,13 @@ describe("Settings", () => {
     expect(screen.getByRole("button", { name: "Delete STT Key" })).toBeInTheDocument();
   });
 
+  it("shows local Whisper setup helper controls", async () => {
+    render(<Settings />);
+
+    expect(await screen.findByRole("button", { name: "Auto Detect Whisper" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Download Base.en Model" })).toBeInTheDocument();
+  });
+
   it("shows screen OCR capture and review controls", async () => {
     render(<Settings />);
 

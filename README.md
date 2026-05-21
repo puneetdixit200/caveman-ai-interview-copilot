@@ -22,6 +22,7 @@ Implemented now:
 - Dashboard for active interview sessions
 - Native CPAL microphone, system audio, and dual-stream capture with device selection, gain, noise gate, meters, STT-ready 16 kHz mono snapshots, and 250 ms PCM chunk events for streaming STT clients
 - Local Whisper chunk-driven streaming from 250 ms PCM audio, Deepgram live WebSocket streaming with interim word preview, plus AssemblyAI and Google STT fallback commands
+- Local Whisper setup helpers that scan for `whisper-cli`/`main` binaries, detect local `ggml` models, and download the official `base.en` model with SHA-1 verification
 - Automatic interviewer question detection and answer triggering from live transcript updates
 - Ollama, LM Studio, OpenRouter, OpenAI, Anthropic, and Groq provider routing with streaming fallback
 - Stealth overlay window with opacity, font controls, global hotkeys, click-through mode, position persistence, and Windows capture exclusion
@@ -35,7 +36,7 @@ Implemented now:
 
 Planned full build:
 
-- Whisper binary auto-discovery, model download helpers, and richer speaker diarization calibration
+- Richer speaker diarization calibration
 - Long-session transcript cursoring and correction workflow
 - Collaborative helper mode for trusted remote observers
 - Production release signing, hosted update manifest publishing, and broader platform packaging

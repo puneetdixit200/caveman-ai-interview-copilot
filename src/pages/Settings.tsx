@@ -48,6 +48,8 @@ import { createConfiguredProvider } from "../lib/providerClients";
 import { hydrateProviderApiKeys } from "../lib/providerSecrets";
 import {
   deleteProviderApiKey,
+  detectLocalWhisperSetup,
+  downloadWhisperModel,
   getProviderApiKey,
   getSetting,
   getOverlayWindowBounds,
@@ -84,6 +86,8 @@ export function Settings() {
   const [testingProviderId, setTestingProviderId] = useState<ProviderId | null>(null);
   const [sttSampleAudioPath, setSttSampleAudioPath] = useState("");
   const [testingStt, setTestingStt] = useState(false);
+  const [detectingWhisper, setDetectingWhisper] = useState(false);
+  const [downloadingWhisper, setDownloadingWhisper] = useState(false);
   const [providerSecretInputs, setProviderSecretInputs] = useState<Partial<Record<ProviderId, string>>>({});
   const [sttSecretInput, setSttSecretInput] = useState("");
   const [audioDevices, setAudioDevices] = useState<AudioDevice[]>([]);
@@ -216,6 +220,55 @@ export function Settings() {
       setStatus(`${config.stt.selectedMode} failed: ${error instanceof Error ? error.message : String(error)}`);
     } finally {
       setTestingStt(false);
+    }
+  }
+
+  async function autoDetectWhisperSetup() {
+    setDetectingWhisper(true);
+    setStatus("Scanning for local Whisper binary and ggml model...");
+
+    try {
+      const setup = await detectLocalWhisperSetup();
+      setConfig((current) => ({
+        ...current,
+        stt: {
+          ...current.stt,
+          selectedMode: setup.ready ? "local_whisper" : current.stt.selectedMode,
+          localWhisperBinaryPath: setup.binaryPath ?? current.stt.localWhisperBinaryPath,
+          localWhisperModelPath: setup.modelPath ?? current.stt.localWhisperModelPath
+        }
+      }));
+      setStatus(
+        setup.ready
+          ? "Local Whisper setup detected"
+          : setup.messages.join(" ")
+      );
+    } catch (error) {
+      setStatus(`Whisper setup detection failed: ${error instanceof Error ? error.message : String(error)}`);
+    } finally {
+      setDetectingWhisper(false);
+    }
+  }
+
+  async function downloadBaseWhisperModel() {
+    setDownloadingWhisper(true);
+    setStatus("Downloading Whisper base.en model...");
+
+    try {
+      const modelsDir = parentDirectory(config.stt.localWhisperModelPath);
+      const downloaded = await downloadWhisperModel({
+        model: "base.en",
+        modelsDir: modelsDir || undefined
+      });
+      updateStt({
+        selectedMode: "local_whisper",
+        localWhisperModelPath: downloaded.modelPath
+      });
+      setStatus(`Downloaded ${downloaded.model} Whisper model (${downloaded.bytes} bytes)`);
+    } catch (error) {
+      setStatus(`Whisper model download failed: ${error instanceof Error ? error.message : String(error)}`);
+    } finally {
+      setDownloadingWhisper(false);
     }
   }
 
@@ -1261,6 +1314,18 @@ export function Settings() {
               onChange={(event) => updateStt({ localWhisperModelPath: event.currentTarget.value })}
             />
           </label>
+          <div className="button-row settings-actions">
+            <Button icon={<RefreshCw size={16} />} onClick={autoDetectWhisperSetup} disabled={detectingWhisper}>
+              {detectingWhisper ? "Detecting Whisper" : "Auto Detect Whisper"}
+            </Button>
+            <Button
+              icon={<DownloadCloud size={16} />}
+              onClick={downloadBaseWhisperModel}
+              disabled={downloadingWhisper}
+            >
+              {downloadingWhisper ? "Downloading Model" : "Download Base.en Model"}
+            </Button>
+          </div>
           <label className="settings-field">
             <span>Sample audio file</span>
             <input
@@ -1656,6 +1721,16 @@ function sttSecretProviderId(mode: "deepgram" | "assemblyai" | "google"): string
 
 function normalizeSttLanguage(language: string): string {
   return language.trim() || "auto";
+}
+
+function parentDirectory(path: string): string {
+  const trimmed = path.trim();
+  if (!trimmed) {
+    return "";
+  }
+
+  const separatorIndex = Math.max(trimmed.lastIndexOf("\\"), trimmed.lastIndexOf("/"));
+  return separatorIndex > 0 ? trimmed.slice(0, separatorIndex) : "";
 }
 
 function appendPromptContext(existing: string, imported: string): string {

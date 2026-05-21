@@ -2,6 +2,8 @@ use base64::Engine;
 use reqwest::blocking::Client;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
+use sha1::{Digest, Sha1};
+use std::env;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -37,6 +39,44 @@ pub struct LocalWhisperPcmRequest {
     pub channels: u16,
     pub language: Option<String>,
     pub diarization_enabled: Option<bool>,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct LocalWhisperSetupStatus {
+    pub binary_path: Option<String>,
+    pub model_path: Option<String>,
+    pub models_dir: String,
+    pub ready: bool,
+    pub messages: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct WhisperModelInfo {
+    pub id: String,
+    pub filename: String,
+    pub sha1: String,
+    pub size_label: String,
+    pub download_url: String,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct WhisperModelDownloadRequest {
+    pub model: String,
+    pub models_dir: String,
+    pub source_url: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct WhisperModelDownloadResult {
+    pub model: String,
+    pub model_path: String,
+    pub bytes: u64,
+    pub sha1: String,
+    pub source_url: String,
 }
 
 #[derive(Debug, Clone, Serialize, PartialEq)]
@@ -201,6 +241,26 @@ struct PcmAudioSnapshot {
     channels: u16,
 }
 
+const WHISPER_MODEL_BASE_URL: &str = "https://huggingface.co/ggerganov/whisper.cpp/resolve/main";
+const WHISPER_BINARY_NAMES: [&str; 8] = [
+    "whisper-cli.exe",
+    "whisper-cli",
+    "main.exe",
+    "main",
+    "whisper.exe",
+    "whisper",
+    "stream.exe",
+    "stream",
+];
+
+const WHISPER_MODEL_PRIORITY: [&str; 5] = [
+    "ggml-base.en.bin",
+    "ggml-small.en-tdrz.bin",
+    "ggml-small.en.bin",
+    "ggml-tiny.en.bin",
+    "ggml-base.bin",
+];
+
 pub fn list_stt_providers() -> Vec<SttProviderStatus> {
     vec![
         SttProviderStatus {
@@ -232,6 +292,188 @@ pub fn list_stt_providers() -> Vec<SttProviderStatus> {
             latency_target_ms: 1000,
         },
     ]
+}
+
+pub fn whisper_model_catalog() -> Vec<WhisperModelInfo> {
+    [
+        (
+            "tiny.en",
+            "ggml-tiny.en.bin",
+            "c78c86eb1a8faa21b369bcd33207cc90d64ae9df",
+            "75 MiB",
+        ),
+        (
+            "base.en",
+            "ggml-base.en.bin",
+            "137c40403d78fd54d454da0f9bd998f78703390c",
+            "142 MiB",
+        ),
+        (
+            "small.en",
+            "ggml-small.en.bin",
+            "db8a495a91d927739e50b3fc1cc4c6b8f6c2d022",
+            "466 MiB",
+        ),
+        (
+            "small.en-tdrz",
+            "ggml-small.en-tdrz.bin",
+            "b6c6e7e89af1a35c08e6de56b66ca6a02a2fdfa1",
+            "465 MiB",
+        ),
+    ]
+    .into_iter()
+    .map(|(id, filename, sha1, size_label)| WhisperModelInfo {
+        id: id.to_string(),
+        filename: filename.to_string(),
+        sha1: sha1.to_string(),
+        size_label: size_label.to_string(),
+        download_url: format!("{WHISPER_MODEL_BASE_URL}/{filename}?download=true"),
+    })
+    .collect()
+}
+
+pub fn default_whisper_search_roots(default_models_dir: PathBuf) -> Vec<PathBuf> {
+    let mut roots = vec![default_models_dir.clone()];
+
+    if let Ok(current_dir) = env::current_dir() {
+        roots.push(current_dir.join("models"));
+        roots.push(current_dir.join("sidecar"));
+        roots.push(current_dir);
+    }
+
+    if let Ok(exe) = env::current_exe() {
+        if let Some(parent) = exe.parent() {
+            roots.push(parent.to_path_buf());
+            roots.push(parent.join("models"));
+        }
+    }
+
+    for env_key in ["CAVEMAN_WHISPER_HOME", "WHISPER_CPP_HOME"] {
+        if let Some(value) = env::var_os(env_key) {
+            roots.push(PathBuf::from(value));
+        }
+    }
+
+    if let Some(path) = env::var_os("PATH") {
+        roots.extend(env::split_paths(&path));
+    }
+
+    if let Some(user_profile) = env::var_os("USERPROFILE") {
+        let user_profile = PathBuf::from(user_profile);
+        roots.push(user_profile.join("models"));
+        roots.push(user_profile.join(".cache").join("whisper.cpp"));
+        roots.push(user_profile.join("Desktop").join("whisper.cpp"));
+        roots.push(
+            user_profile
+                .join("OneDrive")
+                .join("Desktop")
+                .join("whisper.cpp"),
+        );
+    }
+
+    roots.push(PathBuf::from("C:\\tools\\whisper.cpp"));
+    roots.push(PathBuf::from("C:\\models"));
+    dedupe_paths(roots)
+}
+
+pub fn detect_local_whisper_setup_in_roots(
+    search_roots: Vec<PathBuf>,
+    default_models_dir: PathBuf,
+) -> LocalWhisperSetupStatus {
+    let roots = dedupe_paths(search_roots);
+    let mut binary_candidates = Vec::new();
+    let mut model_candidates = Vec::new();
+
+    for root in &roots {
+        collect_matching_files(root, 4, &mut |path| {
+            if is_whisper_binary_path(path) {
+                binary_candidates.push(path.to_path_buf());
+            }
+            if is_whisper_model_path(path) {
+                model_candidates.push(path.to_path_buf());
+            }
+        });
+    }
+
+    binary_candidates.sort_by_key(|path| path.display().to_string().len());
+    model_candidates.sort_by_key(|path| model_priority(path));
+
+    let binary_path = binary_candidates.first().map(display_path);
+    let model_path = model_candidates.first().map(display_path);
+    let models_dir = model_candidates
+        .first()
+        .and_then(|path| path.parent())
+        .unwrap_or(default_models_dir.as_path())
+        .to_path_buf();
+    let mut messages = Vec::new();
+
+    if binary_path.is_some() {
+        messages.push("Found whisper.cpp binary".to_string());
+    } else {
+        messages.push(
+            "Whisper binary not found. Install whisper.cpp and use whisper-cli.exe.".to_string(),
+        );
+    }
+
+    if model_path.is_some() {
+        messages.push("Found local Whisper ggml model".to_string());
+    } else {
+        messages.push(
+            "Whisper ggml model not found. Download base.en or select an existing ggml model."
+                .to_string(),
+        );
+    }
+
+    LocalWhisperSetupStatus {
+        ready: binary_path.is_some() && model_path.is_some(),
+        binary_path,
+        model_path,
+        models_dir: models_dir.display().to_string(),
+        messages,
+    }
+}
+
+pub fn download_whisper_model_to_dir(
+    request: WhisperModelDownloadRequest,
+) -> anyhow::Result<WhisperModelDownloadResult> {
+    let model = whisper_model_catalog()
+        .into_iter()
+        .find(|model| model.id == request.model)
+        .ok_or_else(|| anyhow::anyhow!("Unsupported Whisper model: {}", request.model))?;
+    let models_dir = PathBuf::from(request.models_dir.trim());
+    if request.models_dir.trim().is_empty() {
+        return Err(anyhow::anyhow!("Whisper models directory is required"));
+    }
+
+    std::fs::create_dir_all(&models_dir)?;
+    let source_url = request
+        .source_url
+        .clone()
+        .filter(|value| !value.trim().is_empty())
+        .unwrap_or_else(|| model.download_url.clone());
+    let bytes = read_model_source(&source_url)?;
+    let sha1 = sha1_hex(&bytes);
+    if request.source_url.is_none() && sha1 != model.sha1 {
+        return Err(anyhow::anyhow!(
+            "Downloaded Whisper model checksum did not match official metadata"
+        ));
+    }
+
+    let target = models_dir.join(&model.filename);
+    let temp_target = target.with_extension("download");
+    std::fs::write(&temp_target, &bytes)?;
+    if target.exists() {
+        std::fs::remove_file(&target)?;
+    }
+    std::fs::rename(&temp_target, &target)?;
+
+    Ok(WhisperModelDownloadResult {
+        model: model.id,
+        model_path: target.display().to_string(),
+        bytes: bytes.len() as u64,
+        sha1,
+        source_url,
+    })
 }
 
 pub fn transcribe_with_local_whisper(
@@ -788,6 +1030,99 @@ fn validate_required_file(
     Ok(())
 }
 
+fn read_model_source(source_url: &str) -> anyhow::Result<Vec<u8>> {
+    let source = source_url.trim();
+    if source.starts_with("https://") || source.starts_with("http://") {
+        return Ok(Client::builder()
+            .timeout(Duration::from_secs(900))
+            .build()?
+            .get(source)
+            .send()?
+            .error_for_status()?
+            .bytes()?
+            .to_vec());
+    }
+
+    let path = source.strip_prefix("file://").unwrap_or(source);
+    Ok(std::fs::read(path)?)
+}
+
+fn sha1_hex(bytes: &[u8]) -> String {
+    let mut hasher = Sha1::new();
+    hasher.update(bytes);
+    format!("{:x}", hasher.finalize())
+}
+
+fn collect_matching_files(root: &Path, max_depth: usize, visit: &mut impl FnMut(&Path)) {
+    if max_depth == 0 || !root.exists() {
+        return;
+    }
+
+    if root.is_file() {
+        visit(root);
+        return;
+    }
+
+    let Ok(entries) = std::fs::read_dir(root) else {
+        return;
+    };
+
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if path.is_file() {
+            visit(&path);
+        } else if path.is_dir() {
+            collect_matching_files(&path, max_depth - 1, visit);
+        }
+    }
+}
+
+fn is_whisper_binary_path(path: &Path) -> bool {
+    path.file_name()
+        .and_then(|value| value.to_str())
+        .map(|filename| {
+            let filename = filename.to_ascii_lowercase();
+            WHISPER_BINARY_NAMES
+                .iter()
+                .any(|candidate| filename == *candidate)
+        })
+        .unwrap_or(false)
+}
+
+fn is_whisper_model_path(path: &Path) -> bool {
+    path.file_name()
+        .and_then(|value| value.to_str())
+        .map(|filename| {
+            let filename = filename.to_ascii_lowercase();
+            filename.starts_with("ggml-") && filename.ends_with(".bin")
+        })
+        .unwrap_or(false)
+}
+
+fn model_priority(path: &Path) -> usize {
+    let filename = path
+        .file_name()
+        .and_then(|value| value.to_str())
+        .unwrap_or("")
+        .to_ascii_lowercase();
+    WHISPER_MODEL_PRIORITY
+        .iter()
+        .position(|candidate| filename == *candidate)
+        .unwrap_or(WHISPER_MODEL_PRIORITY.len())
+}
+
+fn display_path(path: &PathBuf) -> String {
+    path.display().to_string()
+}
+
+fn dedupe_paths(paths: Vec<PathBuf>) -> Vec<PathBuf> {
+    let mut seen = std::collections::HashSet::new();
+    paths
+        .into_iter()
+        .filter(|path| seen.insert(path.display().to_string().to_ascii_lowercase()))
+        .collect()
+}
+
 fn parse_language_selection(language: Option<&str>) -> LanguageSelection {
     let Some(language) = language
         .map(str::trim)
@@ -1011,10 +1346,11 @@ mod tests {
     use base64::Engine;
 
     use super::{
-        decode_local_whisper_pcm_audio, deepgram_language_params, google_language_config,
+        decode_local_whisper_pcm_audio, deepgram_language_params,
+        detect_local_whisper_setup_in_roots, download_whisper_model_to_dir, google_language_config,
         parse_assemblyai_json, parse_deepgram_json, parse_google_json, parse_whisper_json,
-        validate_local_whisper_request, GoogleLanguageConfig, LocalWhisperPcmRequest,
-        LocalWhisperRequest, TranscriptEvent,
+        validate_local_whisper_request, whisper_model_catalog, GoogleLanguageConfig,
+        LocalWhisperPcmRequest, LocalWhisperRequest, TranscriptEvent, WhisperModelDownloadRequest,
     };
 
     #[test]
@@ -1117,6 +1453,75 @@ mod tests {
                 .to_string(),
             "PCM16 audio must contain whole samples"
         );
+    }
+
+    #[test]
+    fn detects_whisper_binary_and_model_under_search_roots() {
+        let root =
+            std::env::temp_dir().join(format!("caveman-whisper-detect-{}", uuid::Uuid::new_v4()));
+        let bin_dir = root.join("bin");
+        let model_dir = root.join("models");
+        std::fs::create_dir_all(&bin_dir).expect("create bin dir");
+        std::fs::create_dir_all(&model_dir).expect("create model dir");
+        std::fs::write(bin_dir.join("whisper-cli.exe"), b"fake binary").expect("write binary");
+        std::fs::write(model_dir.join("ggml-base.en.bin"), b"fake model").expect("write model");
+
+        let status = detect_local_whisper_setup_in_roots(vec![root.clone()], root.join("models"));
+
+        assert!(status.ready);
+        assert!(status
+            .binary_path
+            .as_deref()
+            .unwrap()
+            .ends_with("whisper-cli.exe"));
+        assert!(status
+            .model_path
+            .as_deref()
+            .unwrap()
+            .ends_with("ggml-base.en.bin"));
+        assert_eq!(status.models_dir, root.join("models").display().to_string());
+
+        std::fs::remove_dir_all(root).expect("clean temp dir");
+    }
+
+    #[test]
+    fn downloads_whisper_model_from_custom_source_to_models_dir() {
+        let root =
+            std::env::temp_dir().join(format!("caveman-whisper-download-{}", uuid::Uuid::new_v4()));
+        let source = root.join("source.bin");
+        let models_dir = root.join("models");
+        std::fs::create_dir_all(&root).expect("create temp dir");
+        std::fs::write(&source, b"fake ggml model").expect("write source model");
+
+        let result = download_whisper_model_to_dir(WhisperModelDownloadRequest {
+            model: "base.en".to_string(),
+            models_dir: models_dir.display().to_string(),
+            source_url: Some(source.display().to_string()),
+        })
+        .expect("download model");
+
+        assert_eq!(result.model, "base.en");
+        assert!(result.model_path.ends_with("ggml-base.en.bin"));
+        assert_eq!(
+            std::fs::read(models_dir.join("ggml-base.en.bin")).expect("read downloaded model"),
+            b"fake ggml model"
+        );
+
+        std::fs::remove_dir_all(root).expect("clean temp dir");
+    }
+
+    #[test]
+    fn includes_official_base_en_whisper_model_metadata() {
+        let base_en = whisper_model_catalog()
+            .into_iter()
+            .find(|model| model.id == "base.en")
+            .expect("base.en model");
+
+        assert_eq!(base_en.filename, "ggml-base.en.bin");
+        assert_eq!(base_en.sha1, "137c40403d78fd54d454da0f9bd998f78703390c");
+        assert!(base_en
+            .download_url
+            .contains("huggingface.co/ggerganov/whisper.cpp"));
     }
 
     #[test]

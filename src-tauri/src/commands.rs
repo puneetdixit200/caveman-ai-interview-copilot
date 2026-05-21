@@ -147,6 +147,57 @@ pub fn list_stt_providers() -> Vec<stt::SttProviderStatus> {
 }
 
 #[tauri::command]
+pub fn detect_local_whisper_setup(
+    app_handle: AppHandle,
+    search_roots: Option<Vec<String>>,
+) -> Result<stt::LocalWhisperSetupStatus, String> {
+    let default_models_dir = app_handle
+        .path()
+        .app_data_dir()
+        .map_err(|error| error.to_string())?
+        .join("whisper-models");
+    let roots = search_roots
+        .unwrap_or_else(|| {
+            stt::default_whisper_search_roots(default_models_dir.clone())
+                .into_iter()
+                .map(|path| path.display().to_string())
+                .collect()
+        })
+        .into_iter()
+        .map(std::path::PathBuf::from)
+        .collect();
+
+    Ok(stt::detect_local_whisper_setup_in_roots(
+        roots,
+        default_models_dir,
+    ))
+}
+
+#[tauri::command]
+pub fn download_whisper_model(
+    app_handle: AppHandle,
+    model: String,
+    models_dir: Option<String>,
+    source_url: Option<String>,
+) -> Result<stt::WhisperModelDownloadResult, String> {
+    let default_models_dir = app_handle
+        .path()
+        .app_data_dir()
+        .map_err(|error| error.to_string())?
+        .join("whisper-models")
+        .display()
+        .to_string();
+    stt::download_whisper_model_to_dir(stt::WhisperModelDownloadRequest {
+        model,
+        models_dir: models_dir
+            .filter(|value| !value.trim().is_empty())
+            .unwrap_or(default_models_dir),
+        source_url,
+    })
+    .map_err(to_command_error)
+}
+
+#[tauri::command]
 pub fn transcribe_with_local_whisper(
     input: stt::LocalWhisperRequest,
 ) -> Result<Vec<stt::TranscriptEvent>, String> {

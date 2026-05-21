@@ -35,6 +35,22 @@ export interface CaptureSnapshot {
   sampleCount: number;
 }
 
+export interface LocalWhisperSetupStatus {
+  binaryPath?: string | null;
+  modelPath?: string | null;
+  modelsDir: string;
+  ready: boolean;
+  messages: string[];
+}
+
+export interface WhisperModelDownloadResult {
+  model: string;
+  modelPath: string;
+  bytes: number;
+  sha1: string;
+  sourceUrl: string;
+}
+
 export interface TypingResult {
   characterCount: number;
   inputEventCount: number;
@@ -293,6 +309,30 @@ export async function onAudioChunk(callback: (event: AudioChunkEvent) => void): 
   }
 
   return listen<AudioChunkEvent>("audio-chunk", (event) => callback(event.payload));
+}
+
+export async function detectLocalWhisperSetup(searchRoots?: string[]): Promise<LocalWhisperSetupStatus> {
+  return invokeStrictOrFallback<LocalWhisperSetupStatus>(
+    "detect_local_whisper_setup",
+    { searchRoots },
+    () => ({
+      binaryPath: undefined,
+      modelPath: undefined,
+      modelsDir: "",
+      ready: false,
+      messages: ["Native Whisper setup detection is available only inside the Caveman desktop app."]
+    })
+  );
+}
+
+export async function downloadWhisperModel(input: {
+  model: string;
+  modelsDir?: string;
+  sourceUrl?: string;
+}): Promise<WhisperModelDownloadResult> {
+  return invokeStrictOrFallback<WhisperModelDownloadResult>("download_whisper_model", input, async () => {
+    throw new Error("Native Whisper model download is available only inside the Caveman desktop app.");
+  });
 }
 
 export async function transcribeWithLocalWhisper(input: {
