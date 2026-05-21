@@ -12,28 +12,39 @@ export async function buildLatestJson(options = {}) {
   const baseUrl = normalizeBaseUrl(options.baseUrl ?? DEFAULT_RELEASE_BASE_URL);
   const config = JSON.parse(await readFile(configPath, "utf8"));
   const version = options.version ?? config.version;
-  const artifactPath = options.artifactPath ?? (await findWindowsUpdateArtifact(bundleDir));
-  const signaturePath = options.signaturePath ?? `${artifactPath}.sig`;
-  const signature = (await readFile(signaturePath, "utf8")).trim();
 
   if (!version || typeof version !== "string") {
     throw new Error("Could not determine release version from tauri.conf.json.");
   }
 
-  if (!signature) {
-    throw new Error(`Signature file is empty: ${signaturePath}`);
+  const artifacts = options.artifactPath
+    ? [
+        {
+          platform: options.platform ?? "windows-x86_64",
+          artifactPath: options.artifactPath,
+          signaturePath: options.signaturePath ?? `${options.artifactPath}.sig`
+        }
+      ]
+    : await findUpdateArtifacts(bundleDir);
+  const platforms = {};
+
+  for (const artifact of artifacts) {
+    const signature = (await readFile(artifact.signaturePath, "utf8")).trim();
+    if (!signature) {
+      throw new Error(`Signature file is empty: ${artifact.signaturePath}`);
+    }
+
+    platforms[artifact.platform] = {
+      signature,
+      url: `${baseUrl}/${path.basename(artifact.artifactPath)}`
+    };
   }
 
   return {
     version,
     notes: await readReleaseNotes(options),
     pub_date: options.pubDate ?? new Date().toISOString(),
-    platforms: {
-      "windows-x86_64": {
-        signature,
-        url: `${baseUrl}/${path.basename(artifactPath)}`
-      }
-    }
+    platforms
   };
 }
 
@@ -49,10 +60,7 @@ export async function writeLatestJson(options = {}) {
 
 export async function findWindowsUpdateArtifact(bundleDir) {
   const files = await listFilesRecursive(bundleDir);
-  const signedArtifacts = files.filter((file) => {
-    const lower = file.toLowerCase();
-    return (lower.endsWith(".exe") || lower.endsWith(".msi")) && files.includes(`${file}.sig`);
-  });
+  const signedArtifacts = signedArtifactPaths(files).filter((file) => isWindowsArtifact(file));
 
   if (signedArtifacts.length === 0) {
     throw new Error(
@@ -61,6 +69,22 @@ export async function findWindowsUpdateArtifact(bundleDir) {
   }
 
   return selectPreferredWindowsArtifact(signedArtifacts);
+}
+
+export async function findUpdateArtifacts(bundleDir) {
+  const files = await listFilesRecursive(bundleDir);
+  const signedArtifacts = signedArtifactPaths(files);
+  const platformArtifacts = [
+    selectPlatformArtifact("windows-x86_64", signedArtifacts, isWindowsArtifact, artifactScore),
+    selectPlatformArtifact("darwin-x86_64", signedArtifacts, isMacosArtifact, artifactScore),
+    selectPlatformArtifact("linux-x86_64", signedArtifacts, isLinuxArtifact, artifactScore)
+  ].filter(Boolean);
+
+  if (platformArtifacts.length === 0) {
+    throw new Error(`No signed updater artifact found under ${bundleDir}. Run the signed Tauri build first.`);
+  }
+
+  return platformArtifacts;
 }
 
 export function selectPreferredWindowsArtifact(files) {
@@ -96,9 +120,48 @@ async function listFilesRecursive(directory) {
   return files.flat();
 }
 
+function signedArtifactPaths(files) {
+  const fileSet = new Set(files);
+  return files.filter((file) => !file.toLowerCase().endsWith(".sig") && fileSet.has(`${file}.sig`));
+}
+
+function selectPlatformArtifact(platform, files, matcher, scorer) {
+  const candidates = files.filter(matcher);
+  if (candidates.length === 0) {
+    return undefined;
+  }
+
+  const artifactPath = [...candidates].sort((left, right) => scorer(right) - scorer(left))[0];
+  return {
+    platform,
+    artifactPath,
+    signaturePath: `${artifactPath}.sig`
+  };
+}
+
+function isWindowsArtifact(file) {
+  const normalized = normalizeArtifactPath(file);
+  return normalized.endsWith(".exe") || normalized.endsWith(".msi");
+}
+
+function isMacosArtifact(file) {
+  return normalizeArtifactPath(file).endsWith(".app.tar.gz");
+}
+
+function isLinuxArtifact(file) {
+  const normalized = normalizeArtifactPath(file);
+  return normalized.endsWith(".appimage") || normalized.endsWith(".deb");
+}
+
 function artifactScore(file) {
-  const normalized = file.replace(/\\/g, "/").toLowerCase();
+  const normalized = normalizeArtifactPath(file);
   if (normalized.includes("/nsis/") && normalized.endsWith("-setup.exe")) {
+    return 400;
+  }
+  if (normalized.includes("/macos/") && normalized.endsWith(".app.tar.gz")) {
+    return 400;
+  }
+  if (normalized.includes("/appimage/") && normalized.endsWith(".appimage")) {
     return 400;
   }
   if (normalized.endsWith("-setup.exe")) {
@@ -110,7 +173,14 @@ function artifactScore(file) {
   if (normalized.endsWith(".msi")) {
     return 100;
   }
+  if (normalized.endsWith(".deb")) {
+    return 100;
+  }
   return 0;
+}
+
+function normalizeArtifactPath(file) {
+  return file.replace(/\\/g, "/").toLowerCase();
 }
 
 function parseArgs(argv) {

@@ -42,6 +42,51 @@ test("builds a Tauri v2 latest.json manifest from signed Windows artifacts", asy
   }
 });
 
+test("adds macOS and Linux platforms when signed updater artifacts exist", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "caveman-release-"));
+  try {
+    const bundleDir = path.join(root, "src-tauri", "target", "release", "bundle");
+    const nsisDir = path.join(bundleDir, "nsis");
+    const macosDir = path.join(bundleDir, "macos");
+    const appImageDir = path.join(bundleDir, "appimage");
+    await mkdir(nsisDir, { recursive: true });
+    await mkdir(macosDir, { recursive: true });
+    await mkdir(appImageDir, { recursive: true });
+    await mkdir(path.join(root, "src-tauri"), { recursive: true });
+    await writeFile(path.join(root, "src-tauri", "tauri.conf.json"), JSON.stringify({ version: "0.2.0" }));
+    await writeFile(path.join(nsisDir, "Caveman_0.2.0_x64-setup.exe"), "installer");
+    await writeFile(path.join(nsisDir, "Caveman_0.2.0_x64-setup.exe.sig"), "windows-signature\n");
+    await writeFile(path.join(macosDir, "Caveman.app.tar.gz"), "mac updater");
+    await writeFile(path.join(macosDir, "Caveman.app.tar.gz.sig"), "macos-signature\n");
+    await writeFile(path.join(appImageDir, "Caveman_0.2.0_amd64.AppImage"), "linux updater");
+    await writeFile(path.join(appImageDir, "Caveman_0.2.0_amd64.AppImage.sig"), "linux-signature\n");
+
+    const manifest = await buildLatestJson({
+      projectRoot: root,
+      bundleDir,
+      baseUrl: "https://github.com/puneetdixit200/caveman-ai-interview-copilot/releases/download/v0.2.0",
+      pubDate: "2026-05-21T00:00:00.000Z",
+      notes: "Release notes"
+    });
+
+    assert.deepEqual(Object.keys(manifest.platforms).sort(), [
+      "darwin-x86_64",
+      "linux-x86_64",
+      "windows-x86_64"
+    ]);
+    assert.deepEqual(manifest.platforms["darwin-x86_64"], {
+      signature: "macos-signature",
+      url: "https://github.com/puneetdixit200/caveman-ai-interview-copilot/releases/download/v0.2.0/Caveman.app.tar.gz"
+    });
+    assert.deepEqual(manifest.platforms["linux-x86_64"], {
+      signature: "linux-signature",
+      url: "https://github.com/puneetdixit200/caveman-ai-interview-copilot/releases/download/v0.2.0/Caveman_0.2.0_amd64.AppImage"
+    });
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test("requires signatures before writing a release manifest", async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "caveman-release-"));
   try {

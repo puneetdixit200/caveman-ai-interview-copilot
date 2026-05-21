@@ -51,6 +51,26 @@ test("release workflow imports optional Windows code-signing certificates before
   assert.match(workflow, /GITHUB_ENV/);
 });
 
+test("release workflow builds macOS and Linux packages before publishing one release", async () => {
+  const workflow = await readFile(workflowPath, "utf8");
+
+  assert.match(workflow, /build-macos:/);
+  assert.match(workflow, /runs-on:\s*macos-13/);
+  assert.match(workflow, /src-tauri\/target\/release\/bundle\/macos\/\*\.app\.tar\.gz/);
+  assert.match(workflow, /src-tauri\/target\/release\/bundle\/macos\/\*\.app\.tar\.gz\.sig/);
+  assert.match(workflow, /build-linux:/);
+  assert.match(workflow, /runs-on:\s*ubuntu-24\.04/);
+  assert.match(workflow, /libwebkit2gtk-4\.1-dev/);
+  assert.match(workflow, /src-tauri\/target\/release\/bundle\/appimage\/\*\.AppImage/);
+  assert.match(workflow, /src-tauri\/target\/release\/bundle\/appimage\/\*\.AppImage\.sig/);
+  assert.match(workflow, /publish-release:/);
+  assert.match(workflow, /needs:\s*\[build-windows,\s*build-macos,\s*build-linux\]/);
+  assert.match(workflow, /actions\/download-artifact@v4/);
+  assert.match(workflow, /node scripts\/generate-latest-json\.mjs/);
+  assert.match(workflow, /--bundle-dir release-assets/);
+  assert.match(workflow, /release-assets\/latest\.json/);
+});
+
 test("release workflow contract is part of the release test suite", async () => {
   const packageJson = JSON.parse(await readFile("package.json", "utf8"));
 
