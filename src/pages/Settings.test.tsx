@@ -127,6 +127,14 @@ describe("Settings", () => {
     expect(screen.getByLabelText("Prefer provider diarization labels")).toBeInTheDocument();
   });
 
+  it("shows guarded auto-answer typing controls", async () => {
+    render(<Settings />);
+
+    expect(await screen.findByLabelText("Enable auto-answer typing")).toBeInTheDocument();
+    expect(screen.getByLabelText("Type generated answers into active window")).toBeInTheDocument();
+    expect(screen.getByRole("spinbutton", { name: "Auto-answer typing delay" })).toHaveValue(1500);
+  });
+
   it("shows screen OCR capture and review controls", async () => {
     render(<Settings />);
 
@@ -336,6 +344,7 @@ function storeConfig(patch: Partial<AppConfig>) {
     shortcuts: { ...DEFAULT_APP_CONFIG.shortcuts, ...patch.shortcuts },
     security: { ...DEFAULT_APP_CONFIG.security, ...patch.security },
     plugins: { ...DEFAULT_APP_CONFIG.plugins, ...patch.plugins },
+    autoAnswer: { ...DEFAULT_APP_CONFIG.autoAnswer, ...patch.autoAnswer },
     profiles: patch.profiles ?? []
   };
 

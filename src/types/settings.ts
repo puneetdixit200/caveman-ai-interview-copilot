@@ -86,6 +86,12 @@ export interface AutoTriggerSettings {
   requireInterviewerSpeaker: boolean;
 }
 
+export interface AutoAnswerSettings {
+  enabled: boolean;
+  typeIntoActiveWindow: boolean;
+  delayMs: number;
+}
+
 export interface ContextWindowSettings {
   maxPromptTokens: number;
   reservedResponseTokens: number;

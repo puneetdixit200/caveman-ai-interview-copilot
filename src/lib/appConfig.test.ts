@@ -223,6 +223,11 @@ describe("appConfig", () => {
       duplicateWindowMs: 30000,
       requireInterviewerSpeaker: true
     });
+    expect(config.autoAnswer).toMatchObject({
+      enabled: false,
+      typeIntoActiveWindow: false,
+      delayMs: 1500
+    });
     expect(config.contextWindow).toMatchObject({
       maxPromptTokens: 1800,
       reservedResponseTokens: 700,
@@ -291,6 +296,11 @@ describe("appConfig", () => {
           duplicateWindowMs: -1,
           requireInterviewerSpeaker: false
         },
+        autoAnswer: {
+          enabled: true,
+          typeIntoActiveWindow: true,
+          delayMs: 120_000
+        },
         contextWindow: {
           maxPromptTokens: 120,
           reservedResponseTokens: 20_000,
@@ -352,6 +362,11 @@ describe("appConfig", () => {
       silenceTimeoutMs: 500,
       duplicateWindowMs: 30000,
       requireInterviewerSpeaker: false
+    });
+    expect(parsed.autoAnswer).toMatchObject({
+      enabled: true,
+      typeIntoActiveWindow: true,
+      delayMs: 10000
     });
     expect(parsed.contextWindow).toMatchObject({
       maxPromptTokens: 500,

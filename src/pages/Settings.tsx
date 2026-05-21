@@ -70,6 +70,7 @@ import type {
   AudioApplication,
   AudioDevice,
   AppProfile,
+  AutoAnswerSettings,
   AutoTriggerSettings,
   ContextWindowSettings,
   ModelProviderConfig,
@@ -584,6 +585,10 @@ export function Settings() {
 
   function updateAutoTrigger(patch: Partial<AutoTriggerSettings>) {
     setConfig((current) => ({ ...current, autoTrigger: { ...current.autoTrigger, ...patch } }));
+  }
+
+  function updateAutoAnswer(patch: Partial<AutoAnswerSettings>) {
+    setConfig((current) => ({ ...current, autoAnswer: { ...current.autoAnswer, ...patch } }));
   }
 
   function updateContextWindow(patch: Partial<ContextWindowSettings>) {
@@ -1707,6 +1712,34 @@ export function Settings() {
               type="checkbox"
               checked={config.autoTrigger.requireInterviewerSpeaker}
               onChange={(event) => updateAutoTrigger({ requireInterviewerSpeaker: event.currentTarget.checked })}
+            />
+          </label>
+          <label className="toggle-row">
+            <span>Enable auto-answer typing</span>
+            <input
+              type="checkbox"
+              checked={config.autoAnswer.enabled}
+              onChange={(event) => updateAutoAnswer({ enabled: event.currentTarget.checked })}
+            />
+          </label>
+          <label className="toggle-row">
+            <span>Type generated answers into active window</span>
+            <input
+              type="checkbox"
+              checked={config.autoAnswer.typeIntoActiveWindow}
+              onChange={(event) => updateAutoAnswer({ typeIntoActiveWindow: event.currentTarget.checked })}
+            />
+          </label>
+          <label className="settings-field">
+            <span>Auto-answer typing delay</span>
+            <input
+              aria-label="Auto-answer typing delay"
+              type="number"
+              min="0"
+              max="10000"
+              step="250"
+              value={config.autoAnswer.delayMs}
+              onChange={(event) => updateAutoAnswer({ delayMs: Number(event.currentTarget.value) })}
             />
           </label>
         </div>

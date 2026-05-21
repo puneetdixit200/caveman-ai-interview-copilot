@@ -13,6 +13,19 @@ vi.mock("../lib/globalHotkeys", () => ({
   }))
 }));
 
+vi.mock("../lib/providerClients", () => ({
+  createConfiguredProvider: vi.fn(() => ({
+    id: "ollama",
+    label: "Ollama",
+    kind: "local",
+    healthCheck: vi.fn(async () => ({ ok: true, latencyMs: 1 })),
+    async *chatStream() {
+      yield "Use exponential ";
+      yield "backoff.";
+    }
+  }))
+}));
+
 vi.mock("../lib/tauri", () => ({
   addAiResponse: vi.fn(),
   addTranscript: vi.fn(),
@@ -340,5 +353,46 @@ describe("Dashboard collaboration helper", () => {
 
     expect(await screen.findByText("Cloud STT is blocked by local-only mode.")).toBeInTheDocument();
     expect(tauri.onAudioChunk).not.toHaveBeenCalled();
+  });
+
+  it("auto-types the saved AI response when auto-answer typing is enabled", async () => {
+    vi.mocked(tauri.getSetting)
+      .mockResolvedValueOnce(
+        serializeAppConfig({
+          ...DEFAULT_APP_CONFIG,
+          autoAnswer: {
+            enabled: true,
+            typeIntoActiveWindow: true,
+            delayMs: 0
+          }
+        })
+      )
+      .mockResolvedValueOnce(undefined)
+      .mockResolvedValueOnce(undefined);
+    vi.mocked(tauri.addAiResponse).mockResolvedValueOnce({
+      id: 2,
+      sessionId: "s1",
+      triggerTranscriptId: 1,
+      promptMessages: "[]",
+      response: "Use exponential backoff.",
+      model: "llama3.1:8b",
+      provider: "ollama",
+      inputTokens: 10,
+      outputTokens: 4,
+      latencyMs: 25,
+      createdAt: "2026-05-21T00:00:03.000Z"
+    });
+    vi.mocked(tauri.typeTextIntoActiveWindow).mockResolvedValueOnce({
+      characterCount: 24,
+      inputEventCount: 48
+    });
+    const user = userEvent.setup();
+    render(<Dashboard />);
+
+    expect(await screen.findByText("Live Interview Session")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Generate" }));
+
+    await waitFor(() => expect(tauri.typeTextIntoActiveWindow).toHaveBeenCalledWith("Use exponential backoff."));
+    expect(await screen.findByText("AI response saved and auto-typed into the active window")).toBeInTheDocument();
   });
 });

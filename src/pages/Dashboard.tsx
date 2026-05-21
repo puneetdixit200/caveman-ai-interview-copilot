@@ -98,6 +98,8 @@ const DEFAULT_COLLABORATION_STATUS: CollaborationServerStatus = {
   hintCount: 0
 };
 
+type AutoTypeResult = "disabled" | "typed" | "failed";
+
 const INTERVIEW_TYPE_OPTIONS: Array<{ id: InterviewType; label: string }> = [
   { id: "system_design", label: "System Design" },
   { id: "dsa", label: "DSA / Coding" },
@@ -1102,15 +1104,46 @@ export function Dashboard() {
       });
 
       setResponses((current) => [saved, ...current.filter((item) => item.id !== TEMP_STREAM_ID)]);
+      const autoTypeResult = await autoTypeGeneratedAnswer(saved.response);
       const ttsQueue = config.tts.autoPlay ? enqueueTtsResponse([], response, config.tts, visible) : [];
       const played = ttsQueue[0] ? playTtsItem(ttsQueue[0]) : false;
-      setStatusMessage(played ? "AI response saved and spoken" : "AI response saved to this session");
+      if (autoTypeResult === "typed") {
+        setStatusMessage("AI response saved and auto-typed into the active window");
+      } else if (autoTypeResult === "disabled") {
+        setStatusMessage(played ? "AI response saved and spoken" : "AI response saved to this session");
+      }
     } catch (error) {
       setResponses((current) => current.filter((item) => item.id !== TEMP_STREAM_ID));
       setErrorMessage(error instanceof Error ? error.message : String(error));
       setStatusMessage("Provider request failed");
     } finally {
       setStreaming(false);
+    }
+  }
+
+  async function autoTypeGeneratedAnswer(response: string): Promise<AutoTypeResult> {
+    if (!config.autoAnswer.enabled || !config.autoAnswer.typeIntoActiveWindow) {
+      return "disabled";
+    }
+
+    const text = response.trim();
+    if (!text) {
+      return "disabled";
+    }
+
+    if (config.autoAnswer.delayMs > 0) {
+      setStatusMessage(`AI response saved; auto-typing in ${Math.ceil(config.autoAnswer.delayMs / 1000)}s`);
+      await wait(config.autoAnswer.delayMs);
+    }
+
+    try {
+      await typeTextIntoActiveWindow(text);
+      setErrorMessage(null);
+      return "typed";
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : String(error));
+      setStatusMessage("AI response saved, but auto-typing failed");
+      return "failed";
     }
   }
 
@@ -1454,6 +1487,10 @@ function buildPromptMessages(
     maxStaticContextTokens: config.contextWindow.maxStaticContextTokens,
     maxHistoryTurns: config.contextWindow.maxHistoryTurns
   });
+}
+
+function wait(delayMs: number): Promise<void> {
+  return new Promise((resolve) => window.setTimeout(resolve, Math.max(0, Math.min(10000, delayMs))));
 }
 
 function isCloudBlocked(config: AppConfig): boolean {

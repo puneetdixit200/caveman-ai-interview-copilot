@@ -1,6 +1,7 @@
 import type {
   AudioCaptureMode,
   AudioSettings,
+  AutoAnswerSettings,
   AutoTriggerMode,
   AutoTriggerSettings,
   AppProfile,
@@ -36,6 +37,7 @@ export interface AppConfig {
   audio: AudioSettings;
   stt: SttSettings;
   autoTrigger: AutoTriggerSettings;
+  autoAnswer: AutoAnswerSettings;
   contextWindow: ContextWindowSettings;
   ocr: OcrSettings;
   tts: TtsSettings;
@@ -174,6 +176,11 @@ export const DEFAULT_APP_CONFIG: AppConfig = {
     minQuestionCharacters: 12,
     requireInterviewerSpeaker: true
   },
+  autoAnswer: {
+    enabled: false,
+    typeIntoActiveWindow: false,
+    delayMs: 1500
+  },
   contextWindow: {
     maxPromptTokens: 1800,
     reservedResponseTokens: 700,
@@ -256,6 +263,7 @@ export function parseAppConfig(raw: string | null | undefined): AppConfig {
       audio: mergeAudioSettings(parsed.audio),
       stt: mergeSttSettings(parsed.stt),
       autoTrigger: mergeAutoTriggerSettings(parsed.autoTrigger),
+      autoAnswer: mergeAutoAnswerSettings(parsed.autoAnswer),
       contextWindow: mergeContextWindowSettings(parsed.contextWindow),
       ocr: mergeOcrSettings(parsed.ocr),
       tts: mergeTtsSettings(parsed.tts),
@@ -323,6 +331,7 @@ function cloneConfig(config: AppConfig): AppConfig {
     audio: { ...config.audio },
     stt: { ...config.stt, speakerCalibration: { ...config.stt.speakerCalibration } },
     autoTrigger: { ...config.autoTrigger },
+    autoAnswer: { ...config.autoAnswer },
     contextWindow: { ...config.contextWindow },
     ocr: { ...config.ocr },
     tts: { ...config.tts },
@@ -446,6 +455,19 @@ function mergeAutoTriggerSettings(raw: unknown): AutoTriggerSettings {
       typeof value.requireInterviewerSpeaker === "boolean"
         ? value.requireInterviewerSpeaker
         : DEFAULT_APP_CONFIG.autoTrigger.requireInterviewerSpeaker
+  };
+}
+
+function mergeAutoAnswerSettings(raw: unknown): AutoAnswerSettings {
+  const value = isObject(raw) ? raw : {};
+  return {
+    ...DEFAULT_APP_CONFIG.autoAnswer,
+    enabled: typeof value.enabled === "boolean" ? value.enabled : DEFAULT_APP_CONFIG.autoAnswer.enabled,
+    typeIntoActiveWindow:
+      typeof value.typeIntoActiveWindow === "boolean"
+        ? value.typeIntoActiveWindow
+        : DEFAULT_APP_CONFIG.autoAnswer.typeIntoActiveWindow,
+    delayMs: Math.round(clampNumber(value.delayMs, 0, 10000, DEFAULT_APP_CONFIG.autoAnswer.delayMs))
   };
 }
 
