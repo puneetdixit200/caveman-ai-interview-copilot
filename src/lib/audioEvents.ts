@@ -11,6 +11,18 @@ export interface AudioLevelEvent {
   timestampMs: number;
 }
 
+export interface AudioChunkEvent {
+  source: AudioDevice["kind"];
+  deviceId: string;
+  sequence: number;
+  sampleRateHz: number;
+  channels: number;
+  durationMs: number;
+  sampleCount: number;
+  pcm16Base64: string;
+  timestampMs: number;
+}
+
 export interface AudioCaptureState {
   running: boolean;
   systemDeviceId: string;

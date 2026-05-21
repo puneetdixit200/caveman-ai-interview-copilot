@@ -1,3 +1,4 @@
+use base64::Engine;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::io::Write;
@@ -11,6 +12,7 @@ use tauri::{AppHandle, Emitter, Manager};
 
 const TARGET_SAMPLE_RATE_HZ: u32 = 16_000;
 const TARGET_CHANNELS: u16 = 1;
+const AUDIO_CHUNK_TARGET_MS: u32 = 250;
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -113,10 +115,48 @@ impl AudioLevelEvent {
     }
 }
 
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AudioChunkEvent {
+    pub source: String,
+    pub device_id: String,
+    pub sequence: u64,
+    pub sample_rate_hz: u32,
+    pub channels: u16,
+    pub duration_ms: u64,
+    pub sample_count: usize,
+    pub pcm16_base64: String,
+    pub timestamp_ms: i64,
+}
+
+impl AudioChunkEvent {
+    fn from_samples(
+        source: &str,
+        device_id: &str,
+        sequence: u64,
+        samples: &[f32],
+        sample_rate_hz: u32,
+        channels: u16,
+    ) -> Self {
+        Self {
+            source: source.to_string(),
+            device_id: device_id.to_string(),
+            sequence,
+            sample_rate_hz,
+            channels,
+            duration_ms: samples_duration_ms(samples.len(), sample_rate_hz, channels),
+            sample_count: samples.len(),
+            pcm16_base64: encode_pcm16_base64(samples),
+            timestamp_ms: chrono::Utc::now().timestamp_millis(),
+        }
+    }
+}
+
 pub struct AudioCaptureManager {
     runtime: Mutex<CaptureRuntime>,
     state: Arc<Mutex<AudioCaptureState>>,
     samples: Arc<Mutex<RollingAudioBuffer>>,
+    chunks: Arc<Mutex<AudioChunkAccumulator>>,
 }
 
 #[derive(Default)]
@@ -131,6 +171,9 @@ impl Default for AudioCaptureManager {
             runtime: Mutex::new(CaptureRuntime::default()),
             state: Arc::new(Mutex::new(stopped_state())),
             samples: Arc::new(Mutex::new(RollingAudioBuffer::new(48_000 * 2 * 12))),
+            chunks: Arc::new(Mutex::new(AudioChunkAccumulator::new(
+                AUDIO_CHUNK_TARGET_MS,
+            ))),
         }
     }
 }
@@ -157,6 +200,86 @@ pub struct AudioSampleSnapshot {
 pub struct RollingAudioBuffer {
     capacity_samples_per_source: usize,
     sources: HashMap<String, BufferedAudioSource>,
+}
+
+#[derive(Debug)]
+struct AudioChunkAccumulator {
+    target_duration_ms: u32,
+    sources: HashMap<String, BufferedAudioChunkSource>,
+}
+
+#[derive(Debug)]
+struct BufferedAudioChunkSource {
+    samples: VecDeque<f32>,
+    sample_rate_hz: u32,
+    channels: u16,
+    sequence: u64,
+}
+
+impl AudioChunkAccumulator {
+    fn new(target_duration_ms: u32) -> Self {
+        Self {
+            target_duration_ms: target_duration_ms.max(1),
+            sources: HashMap::new(),
+        }
+    }
+
+    fn clear(&mut self) {
+        self.sources.clear();
+    }
+
+    fn push(
+        &mut self,
+        source: &str,
+        device_id: &str,
+        snapshot: &AudioSampleSnapshot,
+    ) -> Vec<AudioChunkEvent> {
+        let entry =
+            self.sources
+                .entry(source.to_string())
+                .or_insert_with(|| BufferedAudioChunkSource {
+                    samples: VecDeque::new(),
+                    sample_rate_hz: snapshot.sample_rate_hz,
+                    channels: snapshot.channels,
+                    sequence: 0,
+                });
+
+        if entry.sample_rate_hz != snapshot.sample_rate_hz || entry.channels != snapshot.channels {
+            entry.samples.clear();
+            entry.sample_rate_hz = snapshot.sample_rate_hz;
+            entry.channels = snapshot.channels;
+            entry.sequence = 0;
+        }
+
+        entry.samples.extend(
+            snapshot
+                .samples
+                .iter()
+                .map(|sample| sample.clamp(-1.0, 1.0)),
+        );
+
+        let target_samples = chunk_target_sample_count(
+            self.target_duration_ms,
+            entry.sample_rate_hz,
+            entry.channels,
+        );
+        let mut events = Vec::new();
+
+        while entry.samples.len() >= target_samples {
+            let samples = entry.samples.drain(..target_samples).collect::<Vec<_>>();
+            entry.sequence += 1;
+            events.push(AudioChunkEvent::from_samples(
+                source,
+                device_id,
+                entry.sequence,
+                &samples,
+                entry.sample_rate_hz,
+                entry.channels,
+            ));
+        }
+
+        events
+    }
 }
 
 #[derive(Debug)]
@@ -230,8 +353,12 @@ impl AudioCaptureManager {
         let (ready_tx, ready_rx) = mpsc::channel();
         let shared_state = self.state.clone();
         let shared_samples = self.samples.clone();
+        let shared_chunks = self.chunks.clone();
         if let Ok(mut samples) = shared_samples.lock() {
             samples.clear();
+        }
+        if let Ok(mut chunks) = shared_chunks.lock() {
+            chunks.clear();
         }
         let system_device_id = system_device_id.to_string();
         let microphone_device_id = microphone_device_id.to_string();
@@ -243,6 +370,7 @@ impl AudioCaptureManager {
                 processing_settings,
                 shared_state,
                 shared_samples,
+                shared_chunks,
                 stop_rx,
                 ready_tx,
             );
@@ -456,11 +584,13 @@ fn stable_device_id(kind: &str, label: &str, index: usize) -> String {
 
 #[cfg(test)]
 mod tests {
+    use base64::Engine;
+
     use super::{
         apply_audio_level_to_state, apply_audio_processing, classify_device_kind,
         prepare_stt_samples, stable_device_id, AudioCaptureManager, AudioCaptureState,
-        AudioLevelEvent, AudioProcessingSettings, RollingAudioBuffer, TARGET_CHANNELS,
-        TARGET_SAMPLE_RATE_HZ,
+        AudioChunkAccumulator, AudioChunkEvent, AudioLevelEvent, AudioProcessingSettings,
+        RollingAudioBuffer, TARGET_CHANNELS, TARGET_SAMPLE_RATE_HZ,
     };
 
     #[test]
@@ -604,6 +734,66 @@ mod tests {
         assert!((snapshot.samples[1] - 0.3).abs() < 0.001);
         assert!((snapshot.samples[2] - 0.6).abs() < 0.001);
     }
+
+    #[test]
+    fn builds_streaming_audio_chunk_events_as_pcm16_base64() {
+        let event = AudioChunkEvent::from_samples(
+            "microphone",
+            "mic-1",
+            7,
+            &vec![0.25; 1_600],
+            TARGET_SAMPLE_RATE_HZ,
+            TARGET_CHANNELS,
+        );
+
+        let decoded = base64::engine::general_purpose::STANDARD
+            .decode(event.pcm16_base64.as_bytes())
+            .expect("valid base64 PCM");
+
+        assert_eq!(event.source, "microphone");
+        assert_eq!(event.device_id, "mic-1");
+        assert_eq!(event.sequence, 7);
+        assert_eq!(event.sample_rate_hz, TARGET_SAMPLE_RATE_HZ);
+        assert_eq!(event.channels, TARGET_CHANNELS);
+        assert_eq!(event.duration_ms, 100);
+        assert_eq!(event.sample_count, 1_600);
+        assert_eq!(decoded.len(), 3_200);
+    }
+
+    #[test]
+    fn accumulates_low_latency_audio_chunks_per_source() {
+        let mut accumulator = AudioChunkAccumulator::new(250);
+        let first_half = super::AudioSampleSnapshot {
+            samples: vec![0.1; 2_000],
+            sample_rate_hz: TARGET_SAMPLE_RATE_HZ,
+            channels: TARGET_CHANNELS,
+        };
+        let second_half = super::AudioSampleSnapshot {
+            samples: vec![0.2; 2_000],
+            sample_rate_hz: TARGET_SAMPLE_RATE_HZ,
+            channels: TARGET_CHANNELS,
+        };
+        let system_chunk = super::AudioSampleSnapshot {
+            samples: vec![0.3; 4_000],
+            sample_rate_hz: TARGET_SAMPLE_RATE_HZ,
+            channels: TARGET_CHANNELS,
+        };
+
+        assert!(accumulator
+            .push("microphone", "mic-1", &first_half)
+            .is_empty());
+
+        let microphone_events = accumulator.push("microphone", "mic-1", &second_half);
+        let system_events = accumulator.push("system", "system-1", &system_chunk);
+
+        assert_eq!(microphone_events.len(), 1);
+        assert_eq!(microphone_events[0].sequence, 1);
+        assert_eq!(microphone_events[0].sample_count, 4_000);
+        assert_eq!(microphone_events[0].duration_ms, 250);
+        assert_eq!(system_events.len(), 1);
+        assert_eq!(system_events[0].sequence, 1);
+        assert_eq!(system_events[0].source, "system");
+    }
 }
 
 fn build_input_stream(
@@ -617,6 +807,7 @@ fn build_input_stream(
     processing_settings: AudioProcessingSettings,
     shared_state: Arc<Mutex<AudioCaptureState>>,
     shared_samples: Arc<Mutex<RollingAudioBuffer>>,
+    shared_chunks: Arc<Mutex<AudioChunkAccumulator>>,
     app_handle: AppHandle,
 ) -> anyhow::Result<cpal::Stream> {
     match sample_format {
@@ -624,6 +815,7 @@ fn build_input_stream(
             let error_state = shared_state.clone();
             let callback_device_id = device_id.clone();
             let callback_samples = shared_samples.clone();
+            let callback_chunks = shared_chunks.clone();
             Ok(device.build_input_stream(
                 config,
                 move |data: &[f32], _| {
@@ -636,6 +828,7 @@ fn build_input_stream(
                         processing_settings,
                         &shared_state,
                         &callback_samples,
+                        &callback_chunks,
                         &app_handle,
                     );
                 },
@@ -647,6 +840,7 @@ fn build_input_stream(
             let error_state = shared_state.clone();
             let callback_device_id = device_id.clone();
             let callback_samples = shared_samples.clone();
+            let callback_chunks = shared_chunks.clone();
             Ok(device.build_input_stream(
                 config,
                 move |data: &[i16], _| {
@@ -659,6 +853,7 @@ fn build_input_stream(
                         processing_settings,
                         &shared_state,
                         &callback_samples,
+                        &callback_chunks,
                         &app_handle,
                     );
                 },
@@ -670,6 +865,7 @@ fn build_input_stream(
             let error_state = shared_state.clone();
             let callback_device_id = device_id.clone();
             let callback_samples = shared_samples.clone();
+            let callback_chunks = shared_chunks.clone();
             Ok(device.build_input_stream(
                 config,
                 move |data: &[u16], _| {
@@ -683,6 +879,7 @@ fn build_input_stream(
                         processing_settings,
                         &shared_state,
                         &callback_samples,
+                        &callback_chunks,
                         &app_handle,
                     );
                 },
@@ -703,6 +900,7 @@ fn run_audio_capture_thread(
     processing_settings: AudioProcessingSettings,
     shared_state: Arc<Mutex<AudioCaptureState>>,
     shared_samples: Arc<Mutex<RollingAudioBuffer>>,
+    shared_chunks: Arc<Mutex<AudioChunkAccumulator>>,
     stop_rx: mpsc::Receiver<()>,
     ready_tx: mpsc::Sender<Result<AudioCaptureState, String>>,
 ) {
@@ -730,6 +928,7 @@ fn run_audio_capture_thread(
             processing_settings,
             shared_state.clone(),
             shared_samples.clone(),
+            shared_chunks.clone(),
             app_handle.clone(),
         ) {
             Ok(spec) => {
@@ -745,6 +944,7 @@ fn run_audio_capture_thread(
             processing_settings,
             shared_state.clone(),
             shared_samples,
+            shared_chunks,
             app_handle,
         ) {
             Ok(spec) => {
@@ -813,6 +1013,7 @@ fn build_microphone_stream(
     processing_settings: AudioProcessingSettings,
     shared_state: Arc<Mutex<AudioCaptureState>>,
     shared_samples: Arc<Mutex<RollingAudioBuffer>>,
+    shared_chunks: Arc<Mutex<AudioChunkAccumulator>>,
     app_handle: AppHandle,
 ) -> anyhow::Result<CaptureStreamSpec> {
     let device = resolve_input_device(host, microphone_device_id)
@@ -833,6 +1034,7 @@ fn build_microphone_stream(
         processing_settings,
         shared_state,
         shared_samples,
+        shared_chunks,
         app_handle,
     )?;
 
@@ -848,6 +1050,7 @@ fn build_system_loopback_stream(
     processing_settings: AudioProcessingSettings,
     shared_state: Arc<Mutex<AudioCaptureState>>,
     shared_samples: Arc<Mutex<RollingAudioBuffer>>,
+    shared_chunks: Arc<Mutex<AudioChunkAccumulator>>,
     app_handle: AppHandle,
 ) -> anyhow::Result<CaptureStreamSpec> {
     // CPAL's WASAPI backend enables loopback when an output device is opened as an input stream.
@@ -869,6 +1072,7 @@ fn build_system_loopback_stream(
         processing_settings,
         shared_state,
         shared_samples,
+        shared_chunks,
         app_handle,
     )?;
 
@@ -893,6 +1097,7 @@ fn process_capture_samples(
     processing_settings: AudioProcessingSettings,
     shared_state: &Arc<Mutex<AudioCaptureState>>,
     shared_samples: &Arc<Mutex<RollingAudioBuffer>>,
+    shared_chunks: &Arc<Mutex<AudioChunkAccumulator>>,
     app_handle: &AppHandle,
 ) {
     let samples = samples
@@ -921,6 +1126,14 @@ fn process_capture_samples(
     }
 
     let _ = app_handle.emit("audio-level", event);
+
+    let chunk_events = shared_chunks
+        .lock()
+        .map(|mut chunks| chunks.push(source, device_id, &snapshot))
+        .unwrap_or_default();
+    for chunk_event in chunk_events {
+        let _ = app_handle.emit("audio-chunk", chunk_event);
+    }
 }
 
 fn prepare_stt_samples(
@@ -973,6 +1186,29 @@ fn resample_mono_linear(samples: &[f32], input_rate_hz: u32, output_rate_hz: u32
             left + (right - left) * fraction
         })
         .collect()
+}
+
+fn chunk_target_sample_count(target_duration_ms: u32, sample_rate_hz: u32, channels: u16) -> usize {
+    let samples = sample_rate_hz as u64 * channels.max(1) as u64 * target_duration_ms.max(1) as u64;
+    ((samples + 999) / 1000).max(1) as usize
+}
+
+fn samples_duration_ms(sample_count: usize, sample_rate_hz: u32, channels: u16) -> u64 {
+    if sample_rate_hz == 0 || channels == 0 {
+        return 0;
+    }
+
+    ((sample_count as f64 / channels as f64 / sample_rate_hz as f64) * 1000.0).round() as u64
+}
+
+fn encode_pcm16_base64(samples: &[f32]) -> String {
+    let mut bytes = Vec::with_capacity(samples.len() * 2);
+    for sample in samples {
+        let pcm = (sample.clamp(-1.0, 1.0) * i16::MAX as f32) as i16;
+        bytes.extend_from_slice(&pcm.to_le_bytes());
+    }
+
+    base64::engine::general_purpose::STANDARD.encode(bytes)
 }
 
 pub fn apply_audio_processing(

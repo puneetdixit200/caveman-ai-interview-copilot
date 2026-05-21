@@ -1,6 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import type { AudioCaptureState, AudioLevelEvent } from "./audioEvents";
+import type { AudioCaptureState, AudioChunkEvent, AudioLevelEvent } from "./audioEvents";
 import type {
   AIResponseRecord,
   NewAIResponseInput,
@@ -285,6 +285,14 @@ export async function onAudioLevel(callback: (event: AudioLevelEvent) => void): 
   }
 
   return listen<AudioLevelEvent>("audio-level", (event) => callback(event.payload));
+}
+
+export async function onAudioChunk(callback: (event: AudioChunkEvent) => void): Promise<() => void> {
+  if (!isRunningInTauri()) {
+    return () => undefined;
+  }
+
+  return listen<AudioChunkEvent>("audio-chunk", (event) => callback(event.payload));
 }
 
 export async function transcribeWithLocalWhisper(input: {
