@@ -7,7 +7,7 @@ use rusqlite::{params, Connection, OptionalExtension};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use crate::models::{AiResponse, Session, Transcript};
+use crate::models::{AiResponse, SecurityEvent, Session, Transcript};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -45,6 +45,15 @@ pub struct NewAiResponse {
     pub input_tokens: Option<i64>,
     pub output_tokens: Option<i64>,
     pub latency_ms: Option<i64>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct NewSecurityEvent {
+    pub category: String,
+    pub action: String,
+    pub target: Option<String>,
+    pub details: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -418,6 +427,46 @@ impl Database {
         }
     }
 
+    pub fn record_security_event(&self, input: NewSecurityEvent) -> Result<SecurityEvent> {
+        let category = input.category.trim().to_string();
+        if category.is_empty() {
+            anyhow::bail!("security event category cannot be empty");
+        }
+
+        let action = input.action.trim().to_string();
+        if action.is_empty() {
+            anyhow::bail!("security event action cannot be empty");
+        }
+
+        let now = Utc::now().to_rfc3339();
+        let target = normalize_optional_text(input.target);
+        let details = normalize_optional_text(input.details);
+        let connection = self.lock()?;
+        connection.execute(
+            "INSERT INTO security_events (category, action, target, details, created_at)
+             VALUES (?1, ?2, ?3, ?4, ?5)",
+            params![category, action, target, details, now],
+        )?;
+        let id = connection.last_insert_rowid();
+        drop(connection);
+
+        self.get_security_event(id)
+    }
+
+    pub fn list_security_events(&self, limit: i64) -> Result<Vec<SecurityEvent>> {
+        let limit = limit.clamp(1, 200);
+        let connection = self.lock()?;
+        let mut statement = connection.prepare(
+            "SELECT id, category, action, target, details, created_at
+             FROM security_events
+             ORDER BY id DESC
+             LIMIT ?1",
+        )?;
+        let rows = statement.query_map(params![limit], map_security_event)?;
+        rows.collect::<rusqlite::Result<Vec<_>>>()
+            .map_err(Into::into)
+    }
+
     fn get_session(&self, id: &str) -> Result<Session> {
         let connection = self.lock()?;
         connection
@@ -452,6 +501,18 @@ impl Database {
                  FROM ai_responses WHERE id = ?1",
                 params![id],
                 map_ai_response,
+            )
+            .map_err(Into::into)
+    }
+
+    fn get_security_event(&self, id: i64) -> Result<SecurityEvent> {
+        let connection = self.lock()?;
+        connection
+            .query_row(
+                "SELECT id, category, action, target, details, created_at
+                 FROM security_events WHERE id = ?1",
+                params![id],
+                map_security_event,
             )
             .map_err(Into::into)
     }
@@ -519,6 +580,15 @@ impl Database {
                 updated_at TEXT NOT NULL
             );
 
+            CREATE TABLE IF NOT EXISTS security_events (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                category TEXT NOT NULL,
+                action TEXT NOT NULL,
+                target TEXT,
+                details TEXT,
+                created_at TEXT NOT NULL
+            );
+
             CREATE TABLE IF NOT EXISTS prompt_templates (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 name TEXT NOT NULL,
@@ -530,6 +600,7 @@ impl Database {
 
             CREATE INDEX IF NOT EXISTS idx_transcripts_session ON transcripts(session_id, timestamp_ms);
             CREATE INDEX IF NOT EXISTS idx_responses_session ON ai_responses(session_id, created_at);
+            CREATE INDEX IF NOT EXISTS idx_security_events_created ON security_events(created_at);
             ",
         )?;
         Self::migrate_session_interview_types(&connection)?;
@@ -742,5 +813,16 @@ fn map_ai_response(row: &rusqlite::Row<'_>) -> rusqlite::Result<AiResponse> {
         output_tokens: row.get(8)?,
         latency_ms: row.get(9)?,
         created_at: row.get(10)?,
+    })
+}
+
+fn map_security_event(row: &rusqlite::Row<'_>) -> rusqlite::Result<SecurityEvent> {
+    Ok(SecurityEvent {
+        id: row.get(0)?,
+        category: row.get(1)?,
+        action: row.get(2)?,
+        target: row.get(3)?,
+        details: row.get(4)?,
+        created_at: row.get(5)?,
     })
 }

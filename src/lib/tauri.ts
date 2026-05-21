@@ -41,6 +41,15 @@ export interface SecretStatus {
   stored: boolean;
 }
 
+export interface SecurityEvent {
+  id: number;
+  category: string;
+  action: string;
+  target?: string | null;
+  details?: string | null;
+  createdAt: string;
+}
+
 export interface CaptureSnapshot {
   source: "microphone" | "system" | string;
   audioPath: string;
@@ -134,9 +143,17 @@ function providerSecretStorageKey(providerId: string): string {
   return `caveman.provider-secret.${providerId}`;
 }
 
+const SECURITY_EVENTS_FALLBACK_KEY = "caveman.security-events";
+
 export async function saveProviderApiKey(providerId: string, secret: string): Promise<SecretStatus> {
   return invokeStrictOrFallback<SecretStatus>("save_provider_api_key", { providerId, secret }, () => {
     sessionStorage.setItem(providerSecretStorageKey(providerId), secret.trim());
+    recordFallbackSecurityEvent({
+      category: "secret",
+      action: "provider_key_saved",
+      target: providerId,
+      details: "Stored provider key in session fallback storage"
+    });
     return { providerId, stored: true };
   });
 }
@@ -150,8 +167,20 @@ export async function getProviderApiKey(providerId: string): Promise<string | un
 export async function deleteProviderApiKey(providerId: string): Promise<SecretStatus> {
   return invokeStrictOrFallback<SecretStatus>("delete_provider_api_key", { providerId }, () => {
     sessionStorage.removeItem(providerSecretStorageKey(providerId));
+    recordFallbackSecurityEvent({
+      category: "secret",
+      action: "provider_key_deleted",
+      target: providerId,
+      details: "Removed provider key from session fallback storage"
+    });
     return { providerId, stored: false };
   });
+}
+
+export async function listSecurityEvents(limit = 25): Promise<SecurityEvent[]> {
+  return invokeOrFallback<SecurityEvent[]>("list_security_events", { limit }, () =>
+    readFallbackSecurityEvents().slice(0, clampSecurityEventLimit(limit))
+  );
 }
 
 export async function listSessions(): Promise<SessionRecord[]> {
@@ -382,26 +411,34 @@ export async function startCapture(input: {
       gainDb: input.gainDb,
       noiseGateDb: input.noiseGateDb
     },
-    () => ({
-      running: true,
-      systemDeviceId: shouldCaptureSystem(input.captureMode, input.dualStreamEnabled) ? input.systemDeviceId : "",
-      microphoneDeviceId: shouldCaptureMicrophone(input.captureMode, input.dualStreamEnabled)
-        ? input.microphoneDeviceId
-        : "",
-      applicationTargetId: shouldCaptureSystem(input.captureMode, input.dualStreamEnabled)
-        ? input.applicationTargetId
-        : "all-system-audio",
-      applicationTargetLabel: shouldCaptureSystem(input.captureMode, input.dualStreamEnabled)
-        ? input.applicationTargetLabel
-        : "All system audio",
-      sampleRateHz: 16000,
-      channels: 1,
-      microphoneLevel: 0,
-      systemLevel: 0,
-      gainDb: input.gainDb,
-      noiseGateDb: input.noiseGateDb,
-      systemCaptureSupported: shouldCaptureSystem(input.captureMode, input.dualStreamEnabled)
-    })
+    () => {
+      recordFallbackSecurityEvent({
+        category: "audio",
+        action: "audio_capture_started",
+        target: input.captureMode,
+        details: "Native audio capture stream started"
+      });
+      return {
+        running: true,
+        systemDeviceId: shouldCaptureSystem(input.captureMode, input.dualStreamEnabled) ? input.systemDeviceId : "",
+        microphoneDeviceId: shouldCaptureMicrophone(input.captureMode, input.dualStreamEnabled)
+          ? input.microphoneDeviceId
+          : "",
+        applicationTargetId: shouldCaptureSystem(input.captureMode, input.dualStreamEnabled)
+          ? input.applicationTargetId
+          : "all-system-audio",
+        applicationTargetLabel: shouldCaptureSystem(input.captureMode, input.dualStreamEnabled)
+          ? input.applicationTargetLabel
+          : "All system audio",
+        sampleRateHz: 16000,
+        channels: 1,
+        microphoneLevel: 0,
+        systemLevel: 0,
+        gainDb: input.gainDb,
+        noiseGateDb: input.noiseGateDb,
+        systemCaptureSupported: shouldCaptureSystem(input.captureMode, input.dualStreamEnabled)
+      };
+    }
   );
 }
 
@@ -414,20 +451,27 @@ function shouldCaptureSystem(captureMode: AudioCaptureMode, dualStreamEnabled: b
 }
 
 export async function stopCapture(): Promise<AudioCaptureState> {
-  return invokeOrFallback<AudioCaptureState>("stop_capture", {}, () => ({
-    running: false,
-    systemDeviceId: "default",
-    microphoneDeviceId: "default",
-    applicationTargetId: "all-system-audio",
-    applicationTargetLabel: "All system audio",
-    sampleRateHz: 16000,
-    channels: 1,
-    microphoneLevel: 0,
-    systemLevel: 0,
-    gainDb: 0,
-    noiseGateDb: -80,
-    systemCaptureSupported: false
-  }));
+  return invokeOrFallback<AudioCaptureState>("stop_capture", {}, () => {
+    recordFallbackSecurityEvent({
+      category: "audio",
+      action: "audio_capture_stopped",
+      details: "Native audio capture stream stopped"
+    });
+    return {
+      running: false,
+      systemDeviceId: "default",
+      microphoneDeviceId: "default",
+      applicationTargetId: "all-system-audio",
+      applicationTargetLabel: "All system audio",
+      sampleRateHz: 16000,
+      channels: 1,
+      microphoneLevel: 0,
+      systemLevel: 0,
+      gainDb: 0,
+      noiseGateDb: -80,
+      systemCaptureSupported: false
+    };
+  });
 }
 
 export async function getCaptureStatus(): Promise<AudioCaptureState> {
@@ -619,10 +663,18 @@ export async function captureNativeScreenFrame(): Promise<NativeScreenFrame> {
 }
 
 export async function typeTextIntoActiveWindow(text: string): Promise<TypingResult> {
-  return invokeStrictOrFallback<TypingResult>("type_text_into_active_window", { text }, () => ({
-    characterCount: Array.from(text).length,
-    inputEventCount: text.length * 2
-  }));
+  return invokeStrictOrFallback<TypingResult>("type_text_into_active_window", { text }, () => {
+    const result = {
+      characterCount: Array.from(text).length,
+      inputEventCount: text.length * 2
+    };
+    recordFallbackSecurityEvent({
+      category: "automation",
+      action: "active_window_typing",
+      details: `Typed ${result.characterCount} characters into active window`
+    });
+    return result;
+  });
 }
 
 export async function startCollaborationServer(
@@ -635,20 +687,34 @@ export async function startCollaborationServer(
       port: input.port,
       token: input.token
     },
-    () => ({
-      running: false,
-      hintCount: 0,
-      message: "Collaboration helper links are available only inside the Caveman desktop app."
-    })
+    () => {
+      recordFallbackSecurityEvent({
+        category: "collaboration",
+        action: "collaboration_start_attempted",
+        details: "Collaboration helper link requested outside the desktop app"
+      });
+      return {
+        running: false,
+        hintCount: 0,
+        message: "Collaboration helper links are available only inside the Caveman desktop app."
+      };
+    }
   );
 }
 
 export async function stopCollaborationServer(): Promise<CollaborationServerStatus> {
-  return invokeOrFallback<CollaborationServerStatus>("stop_collaboration_server", {}, () => ({
-    running: false,
-    hintCount: 0,
-    message: "Collaboration helper stopped"
-  }));
+  return invokeOrFallback<CollaborationServerStatus>("stop_collaboration_server", {}, () => {
+    recordFallbackSecurityEvent({
+      category: "collaboration",
+      action: "collaboration_stopped",
+      details: "Trusted helper link stopped"
+    });
+    return {
+      running: false,
+      hintCount: 0,
+      message: "Collaboration helper stopped"
+    };
+  });
 }
 
 export async function getCollaborationStatus(): Promise<CollaborationServerStatus> {
@@ -668,4 +734,46 @@ export async function listCollaborationHints(): Promise<CollaborationHint[]> {
 
 export async function clearCollaborationHint(id: string): Promise<void> {
   return invokeOrFallback<void>("clear_collaboration_hint", { id }, () => undefined);
+}
+
+function recordFallbackSecurityEvent(input: {
+  category: string;
+  action: string;
+  target?: string;
+  details?: string;
+}) {
+  const events = readFallbackSecurityEvents();
+  const nextEvent: SecurityEvent = {
+    id: Date.now(),
+    category: input.category,
+    action: input.action,
+    target: input.target,
+    details: input.details,
+    createdAt: new Date().toISOString()
+  };
+  localStorage.setItem(SECURITY_EVENTS_FALLBACK_KEY, JSON.stringify([nextEvent, ...events].slice(0, 200)));
+}
+
+function readFallbackSecurityEvents(): SecurityEvent[] {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(SECURITY_EVENTS_FALLBACK_KEY) ?? "[]") as SecurityEvent[];
+    return Array.isArray(parsed) ? parsed.filter(isSecurityEvent) : [];
+  } catch {
+    return [];
+  }
+}
+
+function isSecurityEvent(value: unknown): value is SecurityEvent {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    typeof (value as SecurityEvent).id === "number" &&
+    typeof (value as SecurityEvent).category === "string" &&
+    typeof (value as SecurityEvent).action === "string" &&
+    typeof (value as SecurityEvent).createdAt === "string"
+  );
+}
+
+function clampSecurityEventLimit(limit: number): number {
+  return Math.max(1, Math.min(200, Math.trunc(limit)));
 }

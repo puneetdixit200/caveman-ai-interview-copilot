@@ -49,6 +49,17 @@ pub struct AiResponse {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
+pub struct SecurityEvent {
+    pub id: i64,
+    pub category: String,
+    pub action: String,
+    pub target: Option<String>,
+    pub details: Option<String>,
+    pub created_at: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
 pub struct PromptTemplate {
     pub id: String,
     pub name: String,

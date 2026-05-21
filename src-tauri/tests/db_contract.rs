@@ -1,4 +1,6 @@
-use caveman_lib::db::{Database, NewAiResponse, NewSession, TranscriptCursor, UpdateSession};
+use caveman_lib::db::{
+    Database, NewAiResponse, NewSecurityEvent, NewSession, TranscriptCursor, UpdateSession,
+};
 use rusqlite::Connection;
 
 #[test]
@@ -202,6 +204,37 @@ fn settings_round_trip_by_key() {
         db.get_setting("overlay.opacity").expect("get setting"),
         Some("0.64".to_string())
     );
+}
+
+#[test]
+fn security_events_round_trip_without_storing_secrets() {
+    let db = Database::in_memory().expect("in-memory database");
+
+    db.record_security_event(NewSecurityEvent {
+        category: " secret ".to_string(),
+        action: " provider_key_saved ".to_string(),
+        target: Some(" openai ".to_string()),
+        details: Some("Stored provider key in OS keychain".to_string()),
+    })
+    .expect("record provider key event");
+    db.record_security_event(NewSecurityEvent {
+        category: "automation".to_string(),
+        action: "active_window_typing".to_string(),
+        target: None,
+        details: Some("Typed 42 characters".to_string()),
+    })
+    .expect("record typing event");
+
+    let events = db.list_security_events(10).expect("list security events");
+
+    assert_eq!(events.len(), 2);
+    assert_eq!(events[0].category, "automation");
+    assert_eq!(events[0].action, "active_window_typing");
+    assert_eq!(events[1].category, "secret");
+    assert_eq!(events[1].target.as_deref(), Some("openai"));
+    assert!(!serde_json::to_string(&events)
+        .expect("serialize events")
+        .contains("sk-"));
 }
 
 #[test]

@@ -1137,6 +1137,12 @@ input[type="checkbox"] {
   background: var(--panel-soft);
 }
 
+.security-activity {
+  display: grid;
+  gap: 10px;
+  margin-top: 14px;
+}
+
 .audio-rehearsal-metrics {
   display: flex;
   flex-wrap: wrap;

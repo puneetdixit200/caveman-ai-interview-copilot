@@ -37,7 +37,7 @@ Implemented now:
 - Resume, job description, OCR, and local knowledge-base context injection with stale-document cleanup controls
 - Syntax-highlighted code answer extraction with clipboard copy and active-window typing for code/editor/chat handoff
 - Practice interview mode with local scoring and AI follow-up question generation
-- Analytics, TTS queue/playback, plugin manifests for prompt templates, practice packs, and custom session export templates, OS keychain API key storage, signed-update configuration, and GitHub `latest.json` release manifest generation
+- Analytics, TTS queue/playback, plugin manifests for prompt templates, practice packs, and custom session export templates, OS keychain API key storage, sensitive-action event logging, signed-update configuration, and GitHub `latest.json` release manifest generation
 - SQLite-backed Rust command layer for sessions, transcripts, responses, settings, screenshots, secrets, and native actions
 - Unit tests for audio, STT parsing, provider fallback, overlay safety, exports, analytics, plugins, hotkeys, OCR, practice, RAG, TTS, collaboration, and persistence
 

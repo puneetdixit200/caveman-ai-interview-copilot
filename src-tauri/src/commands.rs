@@ -7,9 +7,10 @@ use crate::collaboration::{
     CollaborationHint, CollaborationManager, CollaborationServerStatus, CollaborationSnapshot,
 };
 use crate::db::{
-    Database, NewAiResponse, NewSession, TranscriptCursor, TranscriptPage, UpdateSession,
+    Database, NewAiResponse, NewSecurityEvent, NewSession, TranscriptCursor, TranscriptPage,
+    UpdateSession,
 };
-use crate::models::{AiResponse, PromptTemplate, Session, Transcript};
+use crate::models::{AiResponse, PromptTemplate, SecurityEvent, Session, Transcript};
 use crate::ocr;
 use crate::ocr::ScreenFrame;
 use crate::overlay::{OverlayProtectionStatus, OverlayWindowBounds};
@@ -133,8 +134,21 @@ pub fn get_setting(database: State<'_, Database>, key: String) -> Result<Option<
 }
 
 #[tauri::command]
-pub fn save_provider_api_key(provider_id: String, secret: String) -> Result<SecretStatus, String> {
-    crate::secrets::save_provider_api_key(&provider_id, &secret).map_err(to_command_error)
+pub fn save_provider_api_key(
+    database: State<'_, Database>,
+    provider_id: String,
+    secret: String,
+) -> Result<SecretStatus, String> {
+    let status =
+        crate::secrets::save_provider_api_key(&provider_id, &secret).map_err(to_command_error)?;
+    record_security_event(
+        &database,
+        "secret",
+        "provider_key_saved",
+        Some(status.provider_id.as_str()),
+        Some("Stored provider key in OS keychain"),
+    );
+    Ok(status)
 }
 
 #[tauri::command]
@@ -143,8 +157,29 @@ pub fn get_provider_api_key(provider_id: String) -> Result<Option<String>, Strin
 }
 
 #[tauri::command]
-pub fn delete_provider_api_key(provider_id: String) -> Result<SecretStatus, String> {
-    crate::secrets::delete_provider_api_key(&provider_id).map_err(to_command_error)
+pub fn delete_provider_api_key(
+    database: State<'_, Database>,
+    provider_id: String,
+) -> Result<SecretStatus, String> {
+    let status = crate::secrets::delete_provider_api_key(&provider_id).map_err(to_command_error)?;
+    record_security_event(
+        &database,
+        "secret",
+        "provider_key_deleted",
+        Some(status.provider_id.as_str()),
+        Some("Removed provider key from OS keychain"),
+    );
+    Ok(status)
+}
+
+#[tauri::command]
+pub fn list_security_events(
+    database: State<'_, Database>,
+    limit: Option<i64>,
+) -> Result<Vec<SecurityEvent>, String> {
+    database
+        .list_security_events(limit.unwrap_or(25))
+        .map_err(to_command_error)
 }
 
 #[tauri::command]
@@ -160,6 +195,7 @@ pub fn list_audio_applications() -> Result<Vec<audio_apps::AudioApplication>, St
 #[tauri::command]
 pub fn start_capture(
     app_handle: AppHandle,
+    database: State<'_, Database>,
     capture_manager: State<'_, AudioCaptureManager>,
     capture_mode: Option<String>,
     dual_stream_enabled: Option<bool>,
@@ -172,7 +208,7 @@ pub fn start_capture(
 ) -> Result<AudioCaptureState, String> {
     let source_selection =
         audio::CaptureSourceSelection::from_mode(capture_mode.as_deref(), dual_stream_enabled);
-    capture_manager
+    let state = capture_manager
         .start(
             app_handle,
             &system_device_id,
@@ -181,12 +217,35 @@ pub fn start_capture(
             source_selection,
             AudioProcessingSettings::from_optional(gain_db, noise_gate_db),
         )
-        .map_err(to_command_error)
+        .map_err(to_command_error)?;
+    record_security_event(
+        &database,
+        "audio",
+        "audio_capture_started",
+        Some(if state.system_capture_supported {
+            "system_or_dual"
+        } else {
+            "microphone"
+        }),
+        Some("Native audio capture stream started"),
+    );
+    Ok(state)
 }
 
 #[tauri::command]
-pub fn stop_capture(capture_manager: State<'_, AudioCaptureManager>) -> AudioCaptureState {
-    capture_manager.stop()
+pub fn stop_capture(
+    database: State<'_, Database>,
+    capture_manager: State<'_, AudioCaptureManager>,
+) -> AudioCaptureState {
+    let state = capture_manager.stop();
+    record_security_event(
+        &database,
+        "audio",
+        "audio_capture_stopped",
+        None,
+        Some("Native audio capture stream stopped"),
+    );
+    state
 }
 
 #[tauri::command]
@@ -359,27 +418,61 @@ pub fn capture_screen_frame() -> Result<ScreenFrame, String> {
 }
 
 #[tauri::command]
-pub fn type_text_into_active_window(text: String) -> Result<typing::TypingResult, String> {
-    typing::type_text_into_active_window(&text).map_err(to_command_error)
+pub fn type_text_into_active_window(
+    database: State<'_, Database>,
+    text: String,
+) -> Result<typing::TypingResult, String> {
+    let result = typing::type_text_into_active_window(&text).map_err(to_command_error)?;
+    record_security_event(
+        &database,
+        "automation",
+        "active_window_typing",
+        None,
+        Some(&format!(
+            "Typed {} characters into active window",
+            result.character_count
+        )),
+    );
+    Ok(result)
 }
 
 #[tauri::command]
 pub fn start_collaboration_server(
+    database: State<'_, Database>,
     collaboration_manager: State<'_, CollaborationManager>,
     bind_host: Option<String>,
     port: Option<u16>,
     token: Option<String>,
 ) -> Result<CollaborationServerStatus, String> {
-    collaboration_manager
+    let status = collaboration_manager
         .start_server(bind_host, port, token)
-        .map_err(to_command_error)
+        .map_err(to_command_error)?;
+    if status.running {
+        record_security_event(
+            &database,
+            "collaboration",
+            "collaboration_started",
+            status.url.as_deref(),
+            Some("Trusted helper link started"),
+        );
+    }
+    Ok(status)
 }
 
 #[tauri::command]
 pub fn stop_collaboration_server(
+    database: State<'_, Database>,
     collaboration_manager: State<'_, CollaborationManager>,
 ) -> CollaborationServerStatus {
-    collaboration_manager.stop_server()
+    let status = collaboration_manager.stop_server();
+    record_security_event(
+        &database,
+        "collaboration",
+        "collaboration_stopped",
+        None,
+        Some("Trusted helper link stopped"),
+    );
+    status
 }
 
 #[tauri::command]
@@ -414,6 +507,21 @@ pub fn clear_collaboration_hint(
     collaboration_manager
         .clear_hint(&id)
         .map_err(to_command_error)
+}
+
+fn record_security_event(
+    database: &Database,
+    category: &str,
+    action: &str,
+    target: Option<&str>,
+    details: Option<&str>,
+) {
+    let _ = database.record_security_event(NewSecurityEvent {
+        category: category.to_string(),
+        action: action.to_string(),
+        target: target.map(str::to_string),
+        details: details.map(str::to_string),
+    });
 }
 
 fn to_command_error(error: anyhow::Error) -> String {

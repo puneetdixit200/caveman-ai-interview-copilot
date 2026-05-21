@@ -59,11 +59,13 @@ import {
   listAudioApplications,
   loadPluginManifests,
   listAudioDevices,
+  listSecurityEvents,
   saveProviderApiKey,
   saveSetting,
   setOverlayWindowBounds,
   transcribeWithCloudStt,
-  transcribeWithLocalWhisper
+  transcribeWithLocalWhisper,
+  type SecurityEvent
 } from "../lib/tauri";
 import { promptTemplates } from "../lib/promptTemplates";
 import { evaluateRealUseReadiness, type ReadinessStatus } from "../lib/readiness";
@@ -135,6 +137,7 @@ export function Settings() {
   const [knowledgeText, setKnowledgeText] = useState("");
   const [knowledgeQuery, setKnowledgeQuery] = useState("");
   const [pluginCatalog, setPluginCatalog] = useState<PluginCatalog>(createEmptyPluginCatalog());
+  const [securityEvents, setSecurityEvents] = useState<SecurityEvent[]>([]);
   const [profileName, setProfileName] = useState("");
   const [profileInterviewType, setProfileInterviewType] = useState<AppProfile["interviewType"]>("mixed");
   const [checkingUpdate, setCheckingUpdate] = useState(false);
@@ -153,12 +156,13 @@ export function Settings() {
     let cancelled = false;
 
     async function load() {
-      const [rawConfig, devices, applications, rawKnowledgeBase, rawPluginCatalog] = await Promise.all([
+      const [rawConfig, devices, applications, rawKnowledgeBase, rawPluginCatalog, events] = await Promise.all([
         getSetting(APP_CONFIG_SETTING_KEY),
         listAudioDevices(),
         listAudioApplications(),
         getSetting(KNOWLEDGE_BASE_SETTING_KEY),
-        getSetting(PLUGIN_CATALOG_SETTING_KEY)
+        getSetting(PLUGIN_CATALOG_SETTING_KEY),
+        listSecurityEvents(8)
       ]);
       const stored = parseAppConfig(rawConfig);
       const hydrated = await hydrateProviderApiKeys(stored);
@@ -181,6 +185,7 @@ export function Settings() {
         setOcrReviewText(nextConfig.ocr.lastText ?? "");
         setAudioDevices(devices);
         setAudioApplications(applications);
+        setSecurityEvents(events);
         setProviderSecretInputs(
           nextConfig.providers.reduce<Partial<Record<ProviderId, string>>>((values, provider) => {
             if (provider.kind === "cloud") {
@@ -220,6 +225,10 @@ export function Settings() {
         ? `${provider.label} is reachable${result.latencyMs ? ` in ${result.latencyMs}ms` : ""}`
         : `${provider.label} failed: ${result.error ?? "unavailable"}`
     );
+  }
+
+  async function refreshSecurityEvents() {
+    setSecurityEvents(await listSecurityEvents(8));
   }
 
   async function refreshProviderModels(provider: ModelProviderConfig) {
@@ -471,6 +480,7 @@ export function Settings() {
       });
       setConfig(nextConfig);
       await saveSetting(APP_CONFIG_SETTING_KEY, serializeAppConfig(nextConfig));
+      await refreshSecurityEvents();
       setStatus(`${provider.label} API key stored in OS keychain`);
     } catch (error) {
       setStatus(`Could not store ${provider.label} API key: ${error instanceof Error ? error.message : String(error)}`);
@@ -487,6 +497,7 @@ export function Settings() {
       setProviderSecretInputs((current) => ({ ...current, [provider.id]: "" }));
       setConfig(nextConfig);
       await saveSetting(APP_CONFIG_SETTING_KEY, serializeAppConfig(nextConfig));
+      await refreshSecurityEvents();
       setStatus(`${provider.label} API key removed from OS keychain`);
     } catch (error) {
       setStatus(`Could not delete ${provider.label} API key: ${error instanceof Error ? error.message : String(error)}`);
@@ -593,6 +604,7 @@ export function Settings() {
       };
       setConfig(nextConfig);
       await saveSetting(APP_CONFIG_SETTING_KEY, serializeAppConfig(nextConfig));
+      await refreshSecurityEvents();
       setStatus(`${config.stt.selectedMode} STT key stored in OS keychain`);
     } catch (error) {
       setStatus(`Could not store STT key: ${error instanceof Error ? error.message : String(error)}`);
@@ -614,6 +626,7 @@ export function Settings() {
     setSttSecretInput("");
     setConfig(nextConfig);
     await saveSetting(APP_CONFIG_SETTING_KEY, serializeAppConfig(nextConfig));
+    await refreshSecurityEvents();
     setStatus("Cloud STT key removed from OS keychain");
   }
 
@@ -2088,6 +2101,30 @@ export function Settings() {
           </Button>
         </div>
         {updateProgress ? <p className="page-status">Update download: {updateProgress}</p> : null}
+        <div className="security-activity">
+          <div className="provider-editor-header">
+            <strong>Security Activity</strong>
+            <Button icon={<RefreshCw size={16} />} onClick={refreshSecurityEvents}>
+              Refresh Activity
+            </Button>
+          </div>
+          {securityEvents.length > 0 ? (
+            <div className="provider-editor-list">
+              {securityEvents.map((event) => (
+                <article className="prompt-row" key={event.id}>
+                  <strong>{event.action}</strong>
+                  <p>
+                    {event.category}
+                    {event.target ? ` / ${event.target}` : ""} / {event.createdAt}
+                  </p>
+                  {event.details ? <small>{event.details}</small> : null}
+                </article>
+              ))}
+            </div>
+          ) : (
+            <p className="empty-copy">No sensitive activity recorded yet.</p>
+          )}
+        </div>
       </section>
 
       <section className="panel prompt-panel">

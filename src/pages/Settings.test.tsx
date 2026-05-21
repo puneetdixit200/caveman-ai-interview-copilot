@@ -94,6 +94,26 @@ describe("Settings", () => {
     expect(screen.getByText(/OS keychain/i)).toBeInTheDocument();
   });
 
+  it("shows a security activity log for sensitive settings actions", async () => {
+    render(<Settings />);
+
+    const openAiLabel = (await screen.findAllByText("OpenAI")).find(
+      (element) => element.tagName.toLowerCase() === "strong"
+    );
+    const openAiEditor = openAiLabel?.closest("article");
+    expect(openAiEditor).not.toBeNull();
+
+    fireEvent.change(within(openAiEditor as HTMLElement).getByLabelText("API key"), {
+      target: { value: "sk-live-secret" }
+    });
+    fireEvent.click(within(openAiEditor as HTMLElement).getByRole("button", { name: "Save Key" }));
+
+    expect(await screen.findByText("Security Activity")).toBeInTheDocument();
+    expect(await screen.findByText("provider_key_saved")).toBeInTheDocument();
+    expect(screen.getByText(/secret \/ openai/)).toBeInTheDocument();
+    expect(screen.queryByText("sk-live-secret")).not.toBeInTheDocument();
+  });
+
   it("uses select controls for microphone and system audio devices", async () => {
     render(<Settings />);
 
