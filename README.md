@@ -27,7 +27,7 @@ Implemented now:
 - Automatic interviewer question detection and answer triggering from live transcript updates
 - Token-budgeted context window management with history turn limits, supplemental context trimming, and reserved answer tokens
 - Prompt templates for DSA/coding, system design, frontend, backend, DevOps/cloud, behavioral, and HR/culture-fit interviews
-- Ollama, LM Studio, OpenRouter, OpenAI, Anthropic, Groq, Google Gemini, Mistral, Together AI, and Fireworks AI provider routing with streaming fallback
+- Ollama, LM Studio, OpenRouter, OpenAI, Anthropic, Groq, Google Gemini, Mistral, Together AI, and Fireworks AI provider routing with streaming fallback and Settings model discovery
 - Stealth overlay window with opacity, font controls, global hotkeys, click-through mode, position persistence, and Windows capture exclusion
 - Dashboard session setup for company, role, interview type, tags, and notes, plus archive search, cursor-paged replay, transcript correction, Markdown, JSON, and PDF export
 - Trusted collaborative helper link with token-gated live transcript/answer snapshot sharing and inbound helper hints

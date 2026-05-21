@@ -1,10 +1,19 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { createConfiguredProvider } from "../lib/providerClients";
 import { Settings } from "./Settings";
+
+vi.mock("../lib/providerClients", () => ({
+  createConfiguredProvider: vi.fn(() => ({
+    healthCheck: vi.fn(async () => ({ ok: true, latencyMs: 1 })),
+    listModels: vi.fn(async () => [])
+  }))
+}));
 
 describe("Settings", () => {
   afterEach(() => {
+    vi.clearAllMocks();
     cleanup();
   });
 
@@ -146,5 +155,33 @@ describe("Settings", () => {
 
     expect(screen.getByLabelText("Primary provider")).toHaveValue("openrouter");
     expect(screen.getByRole("textbox", { name: "Generate answer hotkey" })).toHaveValue("Ctrl+Alt+G");
+  });
+
+  it("refreshes provider models and applies a discovered model", async () => {
+    const listModels = vi.fn(async () => [
+      {
+        id: "llama3.1:8b",
+        name: "llama3.1:8b",
+        contextLength: 8192
+      }
+    ]);
+    vi.mocked(createConfiguredProvider).mockReturnValueOnce({
+      id: "ollama",
+      label: "Ollama",
+      kind: "local",
+      healthCheck: vi.fn(async () => ({ ok: true, latencyMs: 1 })),
+      chatStream: vi.fn(),
+      listModels
+    });
+    const user = userEvent.setup();
+    render(<Settings />);
+
+    await user.click((await screen.findAllByRole("button", { name: "Refresh Models" }))[0]);
+
+    expect(listModels).toHaveBeenCalled();
+    await user.selectOptions(await screen.findByRole("combobox", { name: "Ollama available models" }), "llama3.1:8b");
+
+    expect(screen.getAllByLabelText("Model")[0]).toHaveValue("llama3.1:8b");
+    expect(screen.getByText("Loaded 1 model for Ollama")).toBeInTheDocument();
   });
 });

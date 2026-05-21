@@ -1,4 +1,4 @@
-import type { ChatStreamParams, HealthCheckResult } from "../types/ai";
+import type { ChatStreamParams, HealthCheckResult, ModelInfo } from "../types/ai";
 import type { ModelProviderConfig } from "../types/settings";
 import type { AIProvider } from "./providerRouter";
 
@@ -16,6 +16,7 @@ export function createConfiguredProvider(
     label: config.label,
     kind: config.kind,
     healthCheck: () => healthCheck(config, fetchImpl),
+    listModels: () => listModels(config, fetchImpl),
     chatStream: (params) => chatStream(config, params, fetchImpl)
   };
 }
@@ -52,6 +53,27 @@ async function healthCheck(config: ModelProviderConfig, fetchImpl: FetchLike): P
       error: error instanceof Error ? error.message : String(error)
     };
   }
+}
+
+async function listModels(config: ModelProviderConfig, fetchImpl: FetchLike): Promise<ModelInfo[]> {
+  const secretError = validateSecret(config);
+  if (secretError) {
+    throw new Error(secretError);
+  }
+
+  if (config.id === "anthropic") {
+    return [{ id: config.model, name: config.model, contextLength: 0 }];
+  }
+
+  const response = await fetchImpl(modelListEndpoint(config), {
+    method: "GET",
+    headers: requestHeaders(config)
+  });
+  if (!response.ok) {
+    throw new Error(`${config.label} model list returned ${response.status}`);
+  }
+
+  return parseModelList(config, await response.json());
 }
 
 async function* chatStream(
@@ -222,6 +244,96 @@ function healthEndpoint(config: ModelProviderConfig): string {
   }
 
   return config.endpoint;
+}
+
+function modelListEndpoint(config: ModelProviderConfig): string {
+  if (config.id === "ollama") {
+    return config.endpoint.replace(/\/api\/chat\/?$/, "/api/tags");
+  }
+
+  if (config.id === "google") {
+    const url = new URL(config.endpoint);
+    url.pathname = url.pathname.replace(/\/models\/[^/]+:streamGenerateContent$/, "/models");
+    url.search = "";
+    url.searchParams.set("key", config.apiKey?.trim() ?? "");
+    return url.toString();
+  }
+
+  if (config.endpoint.includes("/v1/chat/completions")) {
+    return config.endpoint.replace(/\/v1\/chat\/completions\/?$/, "/v1/models");
+  }
+
+  if (config.endpoint.includes("/api/v1/chat/completions")) {
+    return config.endpoint.replace(/\/api\/v1\/chat\/completions\/?$/, "/api/v1/models");
+  }
+
+  return config.endpoint;
+}
+
+function parseModelList(config: ModelProviderConfig, payload: unknown): ModelInfo[] {
+  const record = isRecord(payload) ? payload : {};
+  const rawModels = Array.isArray(record.models)
+    ? record.models
+    : Array.isArray(record.data)
+      ? record.data
+      : [];
+
+  return rawModels.flatMap((entry): ModelInfo[] => {
+    if (!isRecord(entry)) {
+      return [];
+    }
+
+    const rawId = readString(entry.id) ?? readString(entry.name) ?? readString(entry.model);
+    if (!rawId) {
+      return [];
+    }
+
+    const id = config.id === "google" ? rawId.replace(/^models\//, "") : rawId;
+    const name =
+      readString(entry.displayName) ??
+      readString(entry.name)?.replace(/^models\//, "") ??
+      id;
+    const contextLength = readNumber(entry.context_length) ?? readNumber(entry.contextLength) ?? readNumber(entry.inputTokenLimit) ?? 0;
+
+    return [
+      {
+        id,
+        name,
+        contextLength,
+        pricing: readPricing(entry.pricing)
+      }
+    ];
+  });
+}
+
+function readPricing(value: unknown): ModelInfo["pricing"] | undefined {
+  if (!isRecord(value)) {
+    return undefined;
+  }
+
+  const inputPerToken = readNumber(value.prompt) ?? readNumber(value.input);
+  const outputPerToken = readNumber(value.completion) ?? readNumber(value.output);
+  if (inputPerToken === undefined || outputPerToken === undefined) {
+    return undefined;
+  }
+
+  return {
+    inputPer1k: inputPerToken * 1000,
+    outputPer1k: outputPerToken * 1000
+  };
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+function readString(value: unknown): string | undefined {
+  return typeof value === "string" && value.trim() ? value.trim() : undefined;
+}
+
+function readNumber(value: unknown): number | undefined {
+  const parsed = typeof value === "number" ? value : typeof value === "string" ? Number(value) : Number.NaN;
+  return Number.isFinite(parsed) ? parsed : undefined;
 }
 
 async function* parseOllamaStream(body: ReadableStream<Uint8Array>): AsyncGenerator<string> {

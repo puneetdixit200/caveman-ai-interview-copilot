@@ -81,6 +81,7 @@ import type {
   SttSettings,
   TtsSettings
 } from "../types/settings";
+import type { ModelInfo } from "../types/ai";
 import type { Speaker } from "../types/session";
 
 const SPEAKER_ROLE_OPTIONS: Array<{ value: Speaker; label: string }> = [
@@ -93,6 +94,8 @@ export function Settings() {
   const [config, setConfig] = useState<AppConfig>(DEFAULT_APP_CONFIG);
   const [status, setStatus] = useState("Loading settings...");
   const [testingProviderId, setTestingProviderId] = useState<ProviderId | null>(null);
+  const [loadingProviderModelsId, setLoadingProviderModelsId] = useState<ProviderId | null>(null);
+  const [providerModelOptions, setProviderModelOptions] = useState<Partial<Record<ProviderId, ModelInfo[]>>>({});
   const [sttSampleAudioPath, setSttSampleAudioPath] = useState("");
   const [testingStt, setTestingStt] = useState(false);
   const [detectingWhisper, setDetectingWhisper] = useState(false);
@@ -178,6 +181,26 @@ export function Settings() {
         ? `${provider.label} is reachable${result.latencyMs ? ` in ${result.latencyMs}ms` : ""}`
         : `${provider.label} failed: ${result.error ?? "unavailable"}`
     );
+  }
+
+  async function refreshProviderModels(provider: ModelProviderConfig) {
+    setLoadingProviderModelsId(provider.id);
+    setStatus(`Loading models for ${provider.label}...`);
+
+    try {
+      const models = await createConfiguredProvider(provider).listModels?.();
+      if (!models) {
+        setStatus(`${provider.label} does not expose model listing.`);
+        return;
+      }
+
+      setProviderModelOptions((current) => ({ ...current, [provider.id]: models }));
+      setStatus(`Loaded ${models.length} model${models.length === 1 ? "" : "s"} for ${provider.label}`);
+    } catch (error) {
+      setStatus(`Could not load ${provider.label} models: ${error instanceof Error ? error.message : String(error)}`);
+    } finally {
+      setLoadingProviderModelsId(null);
+    }
   }
 
   async function testLocalWhisper() {
@@ -824,13 +847,22 @@ export function Settings() {
                     onChange={(event) => updateProvider(provider.id, { enabled: event.currentTarget.checked })}
                   />
                 </label>
-                <Button
-                  icon={<Wifi size={16} />}
-                  onClick={() => testProvider(provider)}
-                  disabled={testingProviderId === provider.id}
-                >
-                  {testingProviderId === provider.id ? "Testing" : "Test"}
-                </Button>
+                <div className="button-row settings-actions">
+                  <Button
+                    icon={<RefreshCw size={16} />}
+                    onClick={() => refreshProviderModels(provider)}
+                    disabled={loadingProviderModelsId === provider.id}
+                  >
+                    {loadingProviderModelsId === provider.id ? "Loading Models" : "Refresh Models"}
+                  </Button>
+                  <Button
+                    icon={<Wifi size={16} />}
+                    onClick={() => testProvider(provider)}
+                    disabled={testingProviderId === provider.id}
+                  >
+                    {testingProviderId === provider.id ? "Testing" : "Test"}
+                  </Button>
+                </div>
               </div>
 
               <label className="settings-field">
@@ -847,6 +879,25 @@ export function Settings() {
                   onChange={(event) => updateProvider(provider.id, { model: event.currentTarget.value })}
                 />
               </label>
+              {(providerModelOptions[provider.id]?.length ?? 0) > 0 ? (
+                <label className="settings-field">
+                  <span>Available models</span>
+                  <select
+                    aria-label={`${provider.label} available models`}
+                    value={provider.model}
+                    onChange={(event) => updateProvider(provider.id, { model: event.currentTarget.value })}
+                  >
+                    {providerModelOptions[provider.id]?.some((model) => model.id === provider.model) ? null : (
+                      <option value={provider.model}>{provider.model}</option>
+                    )}
+                    {providerModelOptions[provider.id]?.map((model) => (
+                      <option key={model.id} value={model.id}>
+                        {formatModelOption(model)}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              ) : null}
               {provider.kind === "cloud" ? (
                 <>
                   <label className="settings-field">
@@ -1871,6 +1922,11 @@ function sttSecretProviderId(mode: "deepgram" | "assemblyai" | "google"): string
 
 function normalizeSttLanguage(language: string): string {
   return language.trim() || "auto";
+}
+
+function formatModelOption(model: ModelInfo): string {
+  const context = model.contextLength > 0 ? ` (${model.contextLength.toLocaleString()} ctx)` : "";
+  return `${model.name || model.id}${context}`;
 }
 
 function parentDirectory(path: string): string {

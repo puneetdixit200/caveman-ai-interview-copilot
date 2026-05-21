@@ -14,6 +14,13 @@ function streamingResponse(body: string, status = 200): Response {
   );
 }
 
+function jsonResponse(body: unknown, status = 200): Response {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { "Content-Type": "application/json" }
+  });
+}
+
 function provider(overrides: Partial<ModelProviderConfig>): ModelProviderConfig {
   return {
     id: "ollama",
@@ -28,6 +35,85 @@ function provider(overrides: Partial<ModelProviderConfig>): ModelProviderConfig 
 }
 
 describe("createConfiguredProvider", () => {
+  it("lists installed Ollama models from the tags endpoint", async () => {
+    const fetchImpl = vi.fn(async () =>
+      jsonResponse({
+        models: [
+          {
+            name: "llama3.1:8b",
+            details: {
+              parameter_size: "8.0B"
+            }
+          },
+          {
+            name: "codellama:13b"
+          }
+        ]
+      })
+    );
+    const configured = createConfiguredProvider(provider({ id: "ollama" }), fetchImpl);
+
+    await expect(configured.listModels?.()).resolves.toEqual([
+      { id: "llama3.1:8b", name: "llama3.1:8b", contextLength: 0 },
+      { id: "codellama:13b", name: "codellama:13b", contextLength: 0 }
+    ]);
+    expect(fetchImpl).toHaveBeenCalledWith(
+      "http://localhost:11434/api/tags",
+      expect.objectContaining({ method: "GET" })
+    );
+  });
+
+  it("lists OpenRouter models with context and pricing metadata", async () => {
+    const fetchImpl = vi.fn(async () =>
+      jsonResponse({
+        data: [
+          {
+            id: "openai/gpt-4o-mini",
+            name: "GPT-4o mini",
+            context_length: 128000,
+            pricing: {
+              prompt: "0.00000015",
+              completion: "0.0000006"
+            }
+          }
+        ]
+      })
+    );
+    const configured = createConfiguredProvider(
+      provider({
+        id: "openrouter",
+        label: "OpenRouter",
+        kind: "cloud",
+        endpoint: "https://openrouter.ai/api/v1/chat/completions",
+        model: "openai/gpt-4o-mini",
+        apiKeyStored: true,
+        apiKey: "sk-test"
+      }),
+      fetchImpl
+    );
+
+    await expect(configured.listModels?.()).resolves.toEqual([
+      {
+        id: "openai/gpt-4o-mini",
+        name: "GPT-4o mini",
+        contextLength: 128000,
+        pricing: {
+          inputPer1k: 0.00015,
+          outputPer1k: 0.0006
+        }
+      }
+    ]);
+    expect(fetchImpl).toHaveBeenCalledWith(
+      "https://openrouter.ai/api/v1/models",
+      expect.objectContaining({
+        method: "GET",
+        headers: expect.objectContaining({
+          Authorization: "Bearer sk-test"
+        })
+      })
+    );
+  });
+
   it("streams Ollama NDJSON message content", async () => {
     const fetchImpl = vi.fn(async () =>
       streamingResponse(
