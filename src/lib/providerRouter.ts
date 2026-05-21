@@ -37,26 +37,3 @@ export class ProviderRouter {
     throw new AggregateError(failures, "No configured AI provider completed the stream");
   }
 }
-
-export function createDemoProvider(): AIProvider {
-  return {
-    id: "demo-local",
-    label: "Demo Local Model",
-    kind: "local",
-    async healthCheck() {
-      return { ok: true, latencyMs: 18 };
-    },
-    async *chatStream() {
-      const chunks = [
-        "Start with the definition: a HashMap stores key-value pairs in buckets. ",
-        "Mention hashing, collision handling, resizing, and expected O(1) access. ",
-        "Close with the trade-off: speed comes from extra memory and a good hash function."
-      ];
-
-      for (const chunk of chunks) {
-        yield chunk;
-      }
-    }
-  };
-}
-
