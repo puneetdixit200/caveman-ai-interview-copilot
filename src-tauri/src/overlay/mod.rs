@@ -31,7 +31,7 @@ pub fn configure_overlay_security(app: &mut tauri::App) {
         let _ = window.set_decorations(false);
         let _ = window.set_shadow(false);
         let _ = window.set_ignore_cursor_events(true);
-        let _ = apply_capture_exclusion(&window);
+        let _ = apply_capture_exclusion(&window, true);
     }
 }
 
@@ -47,6 +47,7 @@ pub fn get_overlay_window_bounds(app: &tauri::AppHandle) -> anyhow::Result<Overl
 pub fn set_overlay_window_bounds(
     app: &tauri::AppHandle,
     bounds: OverlayWindowBounds,
+    capture_exclusion_enabled: bool,
 ) -> anyhow::Result<OverlayWindowBounds> {
     use tauri::Manager;
 
@@ -56,7 +57,7 @@ pub fn set_overlay_window_bounds(
     let bounds = sanitize_overlay_bounds(bounds);
     window.set_position(PhysicalPosition::new(bounds.x, bounds.y))?;
     window.set_size(PhysicalSize::new(bounds.width, bounds.height))?;
-    let _ = protect_overlay_window(app);
+    let _ = protect_overlay_window(app, capture_exclusion_enabled);
     read_overlay_window_bounds(&window)
 }
 
@@ -90,7 +91,10 @@ fn read_overlay_window_bounds(
     })
 }
 
-pub fn protect_overlay_window(app: &tauri::AppHandle) -> OverlayProtectionStatus {
+pub fn protect_overlay_window(
+    app: &tauri::AppHandle,
+    capture_exclusion_enabled: bool,
+) -> OverlayProtectionStatus {
     use tauri::Manager;
 
     let Some(window) = app.get_webview_window("overlay") else {
@@ -110,7 +114,7 @@ pub fn protect_overlay_window(app: &tauri::AppHandle) -> OverlayProtectionStatus
     let visible = window.is_visible().unwrap_or(false);
     let _ = window.set_decorations(false);
     let _ = window.set_shadow(false);
-    let mut status = apply_capture_exclusion(&window);
+    let mut status = apply_capture_exclusion(&window, capture_exclusion_enabled);
     status.always_on_top = always_on_top;
     status.skip_taskbar = skip_taskbar;
     status.click_through = click_through;
@@ -121,6 +125,7 @@ pub fn protect_overlay_window(app: &tauri::AppHandle) -> OverlayProtectionStatus
 pub fn set_overlay_window_visible(
     app: &tauri::AppHandle,
     visible: bool,
+    capture_exclusion_enabled: bool,
 ) -> OverlayProtectionStatus {
     use tauri::Manager;
 
@@ -135,7 +140,7 @@ pub fn set_overlay_window_visible(
         };
     };
 
-    let mut status = protect_overlay_window(app);
+    let mut status = protect_overlay_window(app, capture_exclusion_enabled);
     let visibility_result = if visible {
         window.show()
     } else {
@@ -151,13 +156,27 @@ pub fn set_overlay_window_visible(
 }
 
 #[cfg(target_os = "windows")]
-fn apply_capture_exclusion(window: &tauri::WebviewWindow) -> OverlayProtectionStatus {
+fn apply_capture_exclusion(
+    window: &tauri::WebviewWindow,
+    capture_exclusion_enabled: bool,
+) -> OverlayProtectionStatus {
     use windows::Win32::UI::WindowsAndMessaging::{
-        SetWindowDisplayAffinity, WDA_EXCLUDEFROMCAPTURE,
+        SetWindowDisplayAffinity, WDA_EXCLUDEFROMCAPTURE, WDA_NONE,
     };
 
     match window.hwnd() {
         Ok(hwnd) => {
+            if !capture_exclusion_enabled {
+                let ok = unsafe { SetWindowDisplayAffinity(hwnd, WDA_NONE) }.is_ok();
+                let mut status = capture_exclusion_disabled_status(false);
+                if !ok {
+                    status.capture_exclusion = "failed".to_string();
+                    status.message =
+                        Some("Windows rejected disabling capture exclusion.".to_string());
+                }
+                return status;
+            }
+
             let ok = unsafe { SetWindowDisplayAffinity(hwnd, WDA_EXCLUDEFROMCAPTURE) }.is_ok();
             OverlayProtectionStatus {
                 always_on_top: true,
@@ -184,8 +203,26 @@ fn apply_capture_exclusion(window: &tauri::WebviewWindow) -> OverlayProtectionSt
 }
 
 #[cfg(not(target_os = "windows"))]
-fn apply_capture_exclusion(_window: &tauri::WebviewWindow) -> OverlayProtectionStatus {
-    capture_exclusion_unavailable_status()
+fn apply_capture_exclusion(
+    _window: &tauri::WebviewWindow,
+    capture_exclusion_enabled: bool,
+) -> OverlayProtectionStatus {
+    if capture_exclusion_enabled {
+        capture_exclusion_unavailable_status()
+    } else {
+        capture_exclusion_disabled_status(false)
+    }
+}
+
+pub fn capture_exclusion_disabled_status(visible: bool) -> OverlayProtectionStatus {
+    OverlayProtectionStatus {
+        always_on_top: true,
+        skip_taskbar: true,
+        capture_exclusion: "disabled".to_string(),
+        click_through: false,
+        visible,
+        message: Some("Capture exclusion is disabled in Security settings.".to_string()),
+    }
 }
 
 pub fn capture_exclusion_unavailable_status() -> OverlayProtectionStatus {

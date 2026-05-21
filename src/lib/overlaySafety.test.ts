@@ -6,6 +6,7 @@ describe("overlaySafety", () => {
     expect(shouldAutoHideOverlay({ autoHideOnScreenShare: true, captureExclusion: "enabled" })).toBe(false);
     expect(shouldAutoHideOverlay({ autoHideOnScreenShare: true, captureExclusion: "failed" })).toBe(true);
     expect(shouldAutoHideOverlay({ autoHideOnScreenShare: true, captureExclusion: "unsupported" })).toBe(true);
+    expect(shouldAutoHideOverlay({ autoHideOnScreenShare: true, captureExclusion: "disabled" })).toBe(true);
     expect(shouldAutoHideOverlay({ autoHideOnScreenShare: false, captureExclusion: "failed" })).toBe(false);
   });
 });

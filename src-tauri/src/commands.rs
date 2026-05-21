@@ -151,10 +151,8 @@ pub fn start_capture(
     gain_db: Option<f32>,
     noise_gate_db: Option<f32>,
 ) -> Result<AudioCaptureState, String> {
-    let source_selection = audio::CaptureSourceSelection::from_mode(
-        capture_mode.as_deref(),
-        dual_stream_enabled,
-    );
+    let source_selection =
+        audio::CaptureSourceSelection::from_mode(capture_mode.as_deref(), dual_stream_enabled);
     capture_manager
         .start(
             app_handle,
@@ -272,13 +270,24 @@ pub fn transcribe_with_cloud_stt(
 }
 
 #[tauri::command]
-pub fn protect_overlay_window(app_handle: AppHandle) -> OverlayProtectionStatus {
-    crate::overlay::protect_overlay_window(&app_handle)
+pub fn protect_overlay_window(
+    app_handle: AppHandle,
+    capture_exclusion_enabled: Option<bool>,
+) -> OverlayProtectionStatus {
+    crate::overlay::protect_overlay_window(&app_handle, capture_exclusion_enabled.unwrap_or(true))
 }
 
 #[tauri::command]
-pub fn set_overlay_window_visible(app_handle: AppHandle, visible: bool) -> OverlayProtectionStatus {
-    crate::overlay::set_overlay_window_visible(&app_handle, visible)
+pub fn set_overlay_window_visible(
+    app_handle: AppHandle,
+    visible: bool,
+    capture_exclusion_enabled: Option<bool>,
+) -> OverlayProtectionStatus {
+    crate::overlay::set_overlay_window_visible(
+        &app_handle,
+        visible,
+        capture_exclusion_enabled.unwrap_or(true),
+    )
 }
 
 #[tauri::command]
@@ -290,8 +299,14 @@ pub fn get_overlay_window_bounds(app_handle: AppHandle) -> Result<OverlayWindowB
 pub fn set_overlay_window_bounds(
     app_handle: AppHandle,
     bounds: OverlayWindowBounds,
+    capture_exclusion_enabled: Option<bool>,
 ) -> Result<OverlayWindowBounds, String> {
-    crate::overlay::set_overlay_window_bounds(&app_handle, bounds).map_err(to_command_error)
+    crate::overlay::set_overlay_window_bounds(
+        &app_handle,
+        bounds,
+        capture_exclusion_enabled.unwrap_or(true),
+    )
+    .map_err(to_command_error)
 }
 
 #[tauri::command]

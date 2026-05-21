@@ -1,6 +1,6 @@
 use super::{
-    capture_exclusion_unavailable_status, sanitize_overlay_bounds, OverlayProtectionStatus,
-    OverlayWindowBounds,
+    capture_exclusion_disabled_status, capture_exclusion_unavailable_status,
+    sanitize_overlay_bounds, OverlayProtectionStatus, OverlayWindowBounds,
 };
 
 #[test]
@@ -20,6 +20,15 @@ fn reports_unavailable_capture_exclusion_for_unsupported_platforms() {
             )
         }
     );
+}
+
+#[test]
+fn reports_disabled_capture_exclusion_when_user_turns_it_off() {
+    let status = capture_exclusion_disabled_status(false);
+
+    assert_eq!(status.capture_exclusion, "disabled");
+    assert!(!status.visible);
+    assert!(status.message.unwrap().contains("disabled"));
 }
 
 #[test]

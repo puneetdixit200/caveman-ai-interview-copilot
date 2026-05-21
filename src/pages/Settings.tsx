@@ -705,7 +705,7 @@ export function Settings() {
 
   async function applyOverlayBounds() {
     try {
-      const bounds = await setOverlayWindowBounds(config.overlay.bounds);
+      const bounds = await setOverlayWindowBounds(config.overlay.bounds, config.security.captureExclusionEnabled);
       updateOverlayBounds(bounds);
       setStatus(`Overlay position applied on ${bounds.monitorName ?? "current display"}`);
     } catch (error) {

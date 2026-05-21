@@ -75,18 +75,18 @@ vi.mock("../lib/tauri", () => ({
   ]),
   onAudioChunk: vi.fn(async () => () => undefined),
   onAudioLevel: vi.fn(async () => () => undefined),
-  protectOverlayWindow: vi.fn(async () => ({
+  protectOverlayWindow: vi.fn(async (captureExclusionEnabled = true) => ({
     alwaysOnTop: false,
     skipTaskbar: false,
-    captureExclusion: "unsupported",
+    captureExclusion: captureExclusionEnabled ? "unsupported" : "disabled",
     clickThrough: false,
     visible: false
   })),
   setOverlayWindowBounds: vi.fn(async (bounds) => bounds),
-  setOverlayWindowVisible: vi.fn(async (visible) => ({
+  setOverlayWindowVisible: vi.fn(async (visible, captureExclusionEnabled = true) => ({
     alwaysOnTop: false,
     skipTaskbar: false,
-    captureExclusion: "unsupported",
+    captureExclusion: captureExclusionEnabled ? "unsupported" : "disabled",
     clickThrough: false,
     visible
   })),
@@ -247,5 +247,26 @@ describe("Dashboard collaboration helper", () => {
 
     expect(tauri.startCapture).not.toHaveBeenCalled();
     expect(await screen.findByText("Manual transcript mode active")).toBeInTheDocument();
+  });
+
+  it("does not request Windows capture exclusion when the security setting is disabled", async () => {
+    vi.mocked(tauri.getSetting)
+      .mockResolvedValueOnce(
+        serializeAppConfig({
+          ...DEFAULT_APP_CONFIG,
+          security: {
+            ...DEFAULT_APP_CONFIG.security,
+            captureExclusionEnabled: false
+          }
+        })
+      )
+      .mockResolvedValueOnce(undefined)
+      .mockResolvedValueOnce(undefined);
+
+    render(<Dashboard />);
+
+    expect(await screen.findByText("Live Interview Session")).toBeInTheDocument();
+    expect(tauri.protectOverlayWindow).toHaveBeenCalledWith(false);
+    expect(await screen.findByText("Capture disabled")).toBeInTheDocument();
   });
 });

@@ -132,6 +132,7 @@ export function Dashboard() {
   const [lastTriggeredTranscriptId, setLastTriggeredTranscriptId] = useState<number | undefined>();
   const [statusMessage, setStatusMessage] = useState("Loading session...");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [settingsLoaded, setSettingsLoaded] = useState(false);
   const [knowledgeBase, setKnowledgeBase] = useState<KnowledgeBase>(createKnowledgeBase());
   const [pluginCatalog, setPluginCatalog] = useState<PluginCatalog>(createEmptyPluginCatalog());
   const [collaborationStatus, setCollaborationStatus] =
@@ -163,10 +164,10 @@ export function Dashboard() {
   const setNativeOverlayVisible = useCallback(
     async (nextVisible: boolean) => {
       if (nextVisible) {
-        await setOverlayWindowBounds(config.overlay.bounds);
+        await setOverlayWindowBounds(config.overlay.bounds, config.security.captureExclusionEnabled);
       }
       setVisible(nextVisible);
-      const status = await setOverlayWindowVisible(nextVisible);
+      const status = await setOverlayWindowVisible(nextVisible, config.security.captureExclusionEnabled);
       if (
         nextVisible &&
         shouldAutoHideOverlay({
@@ -174,7 +175,7 @@ export function Dashboard() {
           captureExclusion: status.captureExclusion
         })
       ) {
-        const hiddenStatus = await setOverlayWindowVisible(false);
+        const hiddenStatus = await setOverlayWindowVisible(false, config.security.captureExclusionEnabled);
         setOverlayProtection(hiddenStatus);
         setOverlayMessage("Overlay hidden because capture exclusion is not enabled.");
         setVisible(false);
@@ -188,7 +189,7 @@ export function Dashboard() {
         setVisible(status.visible);
       }
     },
-    [config.overlay.autoHideOnScreenShare, config.overlay.bounds, setVisible]
+    [config.overlay.autoHideOnScreenShare, config.overlay.bounds, config.security.captureExclusionEnabled, setVisible]
   );
 
   const toggleOverlayWindow = useCallback(() => {
@@ -252,7 +253,7 @@ export function Dashboard() {
         setOpacity(hydratedConfig.overlay.opacity);
         setFontSize(hydratedConfig.overlay.fontSize);
         setLocked(hydratedConfig.overlay.locked);
-        await setOverlayWindowBounds(hydratedConfig.overlay.bounds);
+        await setOverlayWindowBounds(hydratedConfig.overlay.bounds, hydratedConfig.security.captureExclusionEnabled);
         setKnowledgeBase(parseKnowledgeBase(rawKnowledgeBase));
         setPluginCatalog(parsePluginCatalog(rawPluginCatalog));
         setAudioDevices(devices);
@@ -262,10 +263,12 @@ export function Dashboard() {
         setSession(activeSession);
         await refreshSessionData(activeSession.id);
         setStatusMessage(`Ready with ${hydratedConfig.selectedProviderId}`);
+        setSettingsLoaded(true);
       } catch (error) {
         if (!cancelled) {
           setErrorMessage(error instanceof Error ? error.message : String(error));
           setStatusMessage("Could not load session");
+          setSettingsLoaded(true);
         }
       }
     }
@@ -308,9 +311,13 @@ export function Dashboard() {
   }, []);
 
   useEffect(() => {
+    if (!settingsLoaded) {
+      return;
+    }
+
     let cancelled = false;
 
-    protectOverlayWindow().then(async (status) => {
+    protectOverlayWindow(config.security.captureExclusionEnabled).then(async (status) => {
       if (cancelled) {
         return;
       }
@@ -321,7 +328,7 @@ export function Dashboard() {
           captureExclusion: status.captureExclusion
         })
       ) {
-        const hiddenStatus = await setOverlayWindowVisible(false);
+        const hiddenStatus = await setOverlayWindowVisible(false, config.security.captureExclusionEnabled);
         if (!cancelled) {
           setOverlayProtection(hiddenStatus);
           setOverlayMessage("Overlay hidden because capture exclusion is not enabled.");
@@ -340,7 +347,7 @@ export function Dashboard() {
     return () => {
       cancelled = true;
     };
-  }, [config.overlay.autoHideOnScreenShare, setVisible]);
+  }, [config.overlay.autoHideOnScreenShare, config.security.captureExclusionEnabled, settingsLoaded, setVisible]);
 
   useEffect(() => {
     let disposed = false;

@@ -472,26 +472,37 @@ export async function transcribeWithCloudStt(input: {
   return invokeStrictOrFallback<SttTranscriptEvent[]>("transcribe_with_cloud_stt", { input }, () => []);
 }
 
-export async function protectOverlayWindow(): Promise<OverlayProtectionStatus> {
-  return invokeOrFallback<OverlayProtectionStatus>("protect_overlay_window", {}, () => ({
+export async function protectOverlayWindow(captureExclusionEnabled = true): Promise<OverlayProtectionStatus> {
+  return invokeOrFallback<OverlayProtectionStatus>("protect_overlay_window", { captureExclusionEnabled }, () => ({
     alwaysOnTop: false,
     skipTaskbar: false,
-    captureExclusion: "unsupported",
+    captureExclusion: captureExclusionEnabled ? "unsupported" : "disabled",
     clickThrough: false,
     visible: false,
-    message: "Native overlay protection is available only inside the Tauri desktop app."
+    message: captureExclusionEnabled
+      ? "Native overlay protection is available only inside the Tauri desktop app."
+      : "Capture exclusion is disabled in Security settings."
   }));
 }
 
-export async function setOverlayWindowVisible(visible: boolean): Promise<OverlayProtectionStatus> {
-  return invokeOrFallback<OverlayProtectionStatus>("set_overlay_window_visible", { visible }, () => ({
-    alwaysOnTop: false,
-    skipTaskbar: false,
-    captureExclusion: "unsupported",
-    clickThrough: false,
-    visible,
-    message: "Native overlay visibility is available only inside the Tauri desktop app."
-  }));
+export async function setOverlayWindowVisible(
+  visible: boolean,
+  captureExclusionEnabled = true
+): Promise<OverlayProtectionStatus> {
+  return invokeOrFallback<OverlayProtectionStatus>(
+    "set_overlay_window_visible",
+    { visible, captureExclusionEnabled },
+    () => ({
+      alwaysOnTop: false,
+      skipTaskbar: false,
+      captureExclusion: captureExclusionEnabled ? "unsupported" : "disabled",
+      clickThrough: false,
+      visible,
+      message: captureExclusionEnabled
+        ? "Native overlay visibility is available only inside the Tauri desktop app."
+        : "Capture exclusion is disabled in Security settings."
+    })
+  );
 }
 
 export async function getOverlayWindowBounds(): Promise<OverlayWindowBounds> {
@@ -503,8 +514,15 @@ export async function getOverlayWindowBounds(): Promise<OverlayWindowBounds> {
   }));
 }
 
-export async function setOverlayWindowBounds(bounds: OverlayWindowBounds): Promise<OverlayWindowBounds> {
-  return invokeOrFallback<OverlayWindowBounds>("set_overlay_window_bounds", { bounds }, () => bounds);
+export async function setOverlayWindowBounds(
+  bounds: OverlayWindowBounds,
+  captureExclusionEnabled = true
+): Promise<OverlayWindowBounds> {
+  return invokeOrFallback<OverlayWindowBounds>(
+    "set_overlay_window_bounds",
+    { bounds, captureExclusionEnabled },
+    () => bounds
+  );
 }
 
 export async function loadPluginManifests(directory: string): Promise<PluginManifestFile[]> {
