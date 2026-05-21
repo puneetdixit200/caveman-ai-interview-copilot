@@ -67,6 +67,21 @@ describe("practice", () => {
     });
   });
 
+  it("includes built-in practice coverage for frontend, backend, and DevOps interviews", () => {
+    expect(listPracticeQuestions("frontend")[0]).toMatchObject({
+      interviewType: "frontend",
+      focus: expect.arrayContaining(["accessibility"])
+    });
+    expect(listPracticeQuestions("backend")[0]).toMatchObject({
+      interviewType: "backend",
+      focus: expect.arrayContaining(["reliability"])
+    });
+    expect(listPracticeQuestions("devops_cloud")[0]).toMatchObject({
+      interviewType: "devops_cloud",
+      focus: expect.arrayContaining(["observability"])
+    });
+  });
+
   it("scores an answer locally with actionable feedback", () => {
     const question = listPracticeQuestions("system_design")[0];
     const feedback = scorePracticeAnswer({

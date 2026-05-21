@@ -98,6 +98,27 @@ export const practiceQuestions: PracticeQuestion[] = [
     expectedSignals: ["complete tree", "insert", "extract", "heapify", "priority queue", "log"]
   },
   {
+    id: "frontend-accessible-autocomplete",
+    interviewType: "frontend",
+    question: "Design an accessible autocomplete component for a large product catalog.",
+    focus: ["accessibility", "state", "performance"],
+    expectedSignals: ["keyboard", "aria", "debounce", "virtualization", "cache", "loading", "empty state"]
+  },
+  {
+    id: "backend-idempotent-payments",
+    interviewType: "backend",
+    question: "How would you design an idempotent payments API?",
+    focus: ["reliability", "data model", "failure modes"],
+    expectedSignals: ["idempotency key", "transaction", "retry", "unique constraint", "status", "observability"]
+  },
+  {
+    id: "devops-cloud-rollout",
+    interviewType: "devops_cloud",
+    question: "Plan a safe cloud deployment for a high-traffic API.",
+    focus: ["observability", "rollback", "blast radius"],
+    expectedSignals: ["canary", "health check", "rollback", "metrics", "logs", "autoscaling", "cost"]
+  },
+  {
     id: "behavioral-conflict",
     interviewType: "behavioral",
     question: "Tell me about a time you handled a conflict with another engineer.",

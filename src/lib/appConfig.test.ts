@@ -102,6 +102,15 @@ describe("appConfig", () => {
       JSON.stringify({
         profiles: [
           {
+            id: "frontend",
+            name: "Frontend Round",
+            interviewType: "frontend",
+            providerId: "ollama",
+            sttMode: "local_whisper",
+            overlay: DEFAULT_APP_CONFIG.overlay,
+            shortcuts: DEFAULT_APP_CONFIG.shortcuts
+          },
+          {
             id: "system-design",
             name: "System Design",
             interviewType: "system_design",
@@ -128,6 +137,13 @@ describe("appConfig", () => {
     );
 
     expect(parsed.profiles).toEqual([
+      expect.objectContaining({
+        id: "frontend",
+        name: "Frontend Round",
+        interviewType: "frontend",
+        providerId: "ollama",
+        sttMode: "local_whisper"
+      }),
       expect.objectContaining({
         id: "system-design",
         name: "System Design",

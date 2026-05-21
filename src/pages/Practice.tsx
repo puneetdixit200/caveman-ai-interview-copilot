@@ -33,6 +33,9 @@ import type { InterviewType } from "../types/session";
 const interviewTypes: Array<{ id: InterviewType; label: string }> = [
   { id: "system_design", label: "System Design" },
   { id: "dsa", label: "DSA" },
+  { id: "frontend", label: "Frontend" },
+  { id: "backend", label: "Backend" },
+  { id: "devops_cloud", label: "DevOps / Cloud" },
   { id: "behavioral", label: "Behavioral" },
   { id: "hr", label: "HR" },
   { id: "mixed", label: "Mixed" }

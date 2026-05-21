@@ -1,4 +1,12 @@
-export type InterviewType = "dsa" | "system_design" | "behavioral" | "hr" | "mixed";
+export type InterviewType =
+  | "dsa"
+  | "system_design"
+  | "frontend"
+  | "backend"
+  | "devops_cloud"
+  | "behavioral"
+  | "hr"
+  | "mixed";
 export type SessionStatus = "active" | "completed" | "archived";
 export type Speaker = "interviewer" | "candidate" | "unknown";
 export type ChatRole = "system" | "user" | "assistant";

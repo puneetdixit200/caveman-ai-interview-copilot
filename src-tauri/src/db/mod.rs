@@ -3,7 +3,7 @@ use std::sync::Mutex;
 
 use anyhow::{Context, Result};
 use chrono::Utc;
-use rusqlite::{params, Connection};
+use rusqlite::{params, Connection, OptionalExtension};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
@@ -55,6 +55,9 @@ pub struct TranscriptPage {
 pub struct Database {
     connection: Mutex<Connection>,
 }
+
+const SESSION_INTERVIEW_TYPE_CHECK: &str =
+    "('dsa','system_design','frontend','backend','devops_cloud','behavioral','hr','mixed')";
 
 impl Database {
     pub fn open(path: impl AsRef<Path>) -> Result<Self> {
@@ -395,7 +398,7 @@ impl Database {
                 title TEXT NOT NULL,
                 company TEXT,
                 role TEXT,
-                interview_type TEXT NOT NULL CHECK(interview_type IN ('dsa','system_design','behavioral','hr','mixed')),
+                interview_type TEXT NOT NULL CHECK(interview_type IN ('dsa','system_design','frontend','backend','devops_cloud','behavioral','hr','mixed')),
                 tags TEXT NOT NULL DEFAULT '[]',
                 status TEXT NOT NULL DEFAULT 'active' CHECK(status IN ('active','completed','archived')),
                 model_used TEXT,
@@ -460,6 +463,72 @@ impl Database {
             CREATE INDEX IF NOT EXISTS idx_responses_session ON ai_responses(session_id, created_at);
             ",
         )?;
+        Self::migrate_session_interview_types(&connection)?;
+        Ok(())
+    }
+
+    fn migrate_session_interview_types(connection: &Connection) -> Result<()> {
+        let sessions_sql = connection
+            .query_row(
+                "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'sessions'",
+                [],
+                |row| row.get::<_, String>(0),
+            )
+            .optional()?;
+
+        let Some(sessions_sql) = sessions_sql else {
+            return Ok(());
+        };
+
+        if sessions_sql.contains("'frontend'")
+            && sessions_sql.contains("'backend'")
+            && sessions_sql.contains("'devops_cloud'")
+        {
+            return Ok(());
+        }
+
+        connection.execute_batch(&format!(
+            "
+            PRAGMA foreign_keys = OFF;
+            PRAGMA legacy_alter_table = ON;
+            BEGIN TRANSACTION;
+
+            ALTER TABLE sessions RENAME TO sessions_legacy_interview_types;
+
+            CREATE TABLE sessions (
+                id TEXT PRIMARY KEY,
+                title TEXT NOT NULL,
+                company TEXT,
+                role TEXT,
+                interview_type TEXT NOT NULL CHECK(interview_type IN {SESSION_INTERVIEW_TYPE_CHECK}),
+                tags TEXT NOT NULL DEFAULT '[]',
+                status TEXT NOT NULL DEFAULT 'active' CHECK(status IN ('active','completed','archived')),
+                model_used TEXT,
+                provider TEXT,
+                total_tokens INTEGER NOT NULL DEFAULT 0,
+                duration_seconds INTEGER NOT NULL DEFAULT 0,
+                notes TEXT,
+                created_at TEXT NOT NULL,
+                ended_at TEXT
+            );
+
+            INSERT INTO sessions (
+                id, title, company, role, interview_type, tags, status, model_used, provider,
+                total_tokens, duration_seconds, notes, created_at, ended_at
+            )
+            SELECT
+                id, title, company, role, interview_type, tags, status, model_used, provider,
+                total_tokens, duration_seconds, notes, created_at, ended_at
+            FROM sessions_legacy_interview_types;
+
+            DROP TABLE sessions_legacy_interview_types;
+
+            COMMIT;
+            PRAGMA legacy_alter_table = OFF;
+            PRAGMA foreign_keys = ON;
+            "
+        ))?;
+
         Ok(())
     }
 

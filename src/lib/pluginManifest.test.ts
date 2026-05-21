@@ -15,6 +15,12 @@ describe("pluginManifest", () => {
               name: "Behavioral STAR Plugin",
               category: "behavioral",
               systemPrompt: "Coach a concise STAR response grounded in the candidate context."
+            },
+            {
+              id: "frontend-accessibility-plugin",
+              name: "Frontend Accessibility Plugin",
+              category: "frontend",
+              systemPrompt: "Coach frontend answers with accessibility, state, and rendering tradeoffs."
             }
           ],
           exportFormats: ["markdown"],
@@ -28,6 +34,18 @@ describe("pluginManifest", () => {
                   id: "queues",
                   prompt: "Design a durable queue.",
                   expectedSignals: ["partitioning", "retry", "dead letter"]
+                }
+              ]
+            },
+            {
+              id: "devops-cloud",
+              name: "DevOps Cloud Pack",
+              interviewType: "devops_cloud",
+              questions: [
+                {
+                  id: "incident-rollout",
+                  prompt: "Plan a safe production rollout.",
+                  expectedSignals: ["observability", "rollback", "blast radius"]
                 }
               ]
             }

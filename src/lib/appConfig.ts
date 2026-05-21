@@ -683,5 +683,14 @@ function isSpeaker(value: unknown): value is Speaker {
 }
 
 function isInterviewType(value: unknown): value is AppProfile["interviewType"] {
-  return value === "dsa" || value === "system_design" || value === "behavioral" || value === "hr" || value === "mixed";
+  return (
+    value === "dsa" ||
+    value === "system_design" ||
+    value === "frontend" ||
+    value === "backend" ||
+    value === "devops_cloud" ||
+    value === "behavioral" ||
+    value === "hr" ||
+    value === "mixed"
+  );
 }

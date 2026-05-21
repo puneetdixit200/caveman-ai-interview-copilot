@@ -899,7 +899,7 @@ export function Settings() {
             <span>Profile name</span>
             <input
               value={profileName}
-              placeholder="Coding Interview, System Design, Behavioral"
+              placeholder="Coding Interview, Backend, DevOps Cloud"
               onChange={(event) => setProfileName(event.currentTarget.value)}
             />
           </label>
@@ -911,6 +911,9 @@ export function Settings() {
             >
               <option value="dsa">DSA</option>
               <option value="system_design">System Design</option>
+              <option value="frontend">Frontend</option>
+              <option value="backend">Backend</option>
+              <option value="devops_cloud">DevOps / Cloud</option>
               <option value="behavioral">Behavioral</option>
               <option value="hr">HR</option>
               <option value="mixed">Mixed</option>

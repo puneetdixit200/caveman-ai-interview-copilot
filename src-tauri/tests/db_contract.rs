@@ -1,4 +1,5 @@
 use caveman_lib::db::{Database, NewAiResponse, NewSession, TranscriptCursor};
+use rusqlite::Connection;
 
 #[test]
 fn session_and_transcript_records_round_trip_through_sqlite() {
@@ -201,4 +202,85 @@ fn ai_response_records_round_trip_through_sqlite() {
     assert_eq!(responses[0].model, "llama3.1:8b");
     assert_eq!(responses[0].provider, "ollama");
     assert_eq!(responses[0].latency_ms, Some(820));
+}
+
+#[test]
+fn sessions_accept_goal_interview_types() {
+    let db = Database::in_memory().expect("in-memory database");
+
+    for interview_type in ["frontend", "backend", "devops_cloud"] {
+        let session = db
+            .create_session(NewSession {
+                title: format!("{interview_type} Round"),
+                company: None,
+                role: None,
+                interview_type: interview_type.to_string(),
+                tags: vec![],
+                notes: None,
+            })
+            .expect("create session with goal interview type");
+
+        assert_eq!(session.interview_type, interview_type);
+    }
+}
+
+#[test]
+fn existing_databases_migrate_session_interview_type_check() {
+    let path = std::env::temp_dir().join(format!(
+        "caveman-session-type-migration-{}.sqlite",
+        uuid::Uuid::new_v4()
+    ));
+    {
+        let connection = Connection::open(&path).expect("create old sqlite database");
+        connection
+            .execute_batch(
+                "
+                CREATE TABLE sessions (
+                    id TEXT PRIMARY KEY,
+                    title TEXT NOT NULL,
+                    company TEXT,
+                    role TEXT,
+                    interview_type TEXT NOT NULL CHECK(interview_type IN ('dsa','system_design','behavioral','hr','mixed')),
+                    tags TEXT NOT NULL DEFAULT '[]',
+                    status TEXT NOT NULL DEFAULT 'active' CHECK(status IN ('active','completed','archived')),
+                    model_used TEXT,
+                    provider TEXT,
+                    total_tokens INTEGER NOT NULL DEFAULT 0,
+                    duration_seconds INTEGER NOT NULL DEFAULT 0,
+                    notes TEXT,
+                    created_at TEXT NOT NULL,
+                    ended_at TEXT
+                );
+
+                INSERT INTO sessions (
+                    id, title, company, role, interview_type, tags, status, total_tokens,
+                    duration_seconds, created_at
+                )
+                VALUES (
+                    'legacy', 'Legacy System Design', NULL, NULL, 'system_design', '[]', 'active', 0,
+                    0, '2026-05-21T00:00:00Z'
+                );
+                ",
+            )
+            .expect("seed old schema");
+    }
+
+    let db = Database::open(&path).expect("open migrated database");
+    let frontend_session = db
+        .create_session(NewSession {
+            title: "Frontend Round".to_string(),
+            company: None,
+            role: None,
+            interview_type: "frontend".to_string(),
+            tags: vec![],
+            notes: None,
+        })
+        .expect("create frontend session after migration");
+    let sessions = db.list_sessions().expect("list migrated sessions");
+
+    assert_eq!(frontend_session.interview_type, "frontend");
+    assert!(sessions.iter().any(|session| session.id == "legacy"));
+
+    drop(db);
+    std::fs::remove_file(path).expect("clean temp sqlite database");
 }
