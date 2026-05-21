@@ -7,7 +7,7 @@
     "dev": "vite --host 127.0.0.1 --port 1420",
     "build": "tsc --noEmit && vite build",
     "test": "vitest run",
-    "test:release": "node --test scripts/generate-latest-json.test.mjs",
+    "test:release": "node --test scripts/generate-latest-json.test.mjs scripts/release-workflow.test.mjs",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
     "tauri": "tauri",

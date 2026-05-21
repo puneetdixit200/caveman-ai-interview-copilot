@@ -77,7 +77,7 @@ Dashboard helper links run from the desktop app on localhost by default. A trust
 
 ### Signed Updates
 
-Use `npm run tauri:build:signed` after creating a Tauri updater signing key. The script builds updater artifacts, verifies signed Windows bundles exist, and writes `latest.json` for GitHub Releases at `src-tauri/target/release/bundle/latest.json`.
+Use `npm run tauri:build:signed` after creating a Tauri updater signing key. The script builds updater artifacts, verifies signed Windows bundles exist, and writes `latest.json` for GitHub Releases at `src-tauri/target/release/bundle/latest.json`. The `Release Signed Windows Build` GitHub Actions workflow can publish those assets to a GitHub Release when `TAURI_SIGNING_PRIVATE_KEY` and `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` are configured as repository secrets.
 
 ## Architecture
 

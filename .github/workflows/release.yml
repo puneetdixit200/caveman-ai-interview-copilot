@@ -1,0 +1,76 @@
+name: Release Signed Windows Build
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Git tag to publish, for example v0.1.0
+        required: true
+        type: string
+      release_notes:
+        description: Release notes shown in GitHub and latest.json
+        required: false
+        default: Caveman signed desktop update.
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    env:
+      TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+      TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Verify release metadata scripts
+        run: npm run test:release
+
+      - name: Build signed updater assets
+        shell: powershell
+        run: >
+          npm run tauri:build:signed --
+          -ReleaseBaseUrl "https://github.com/${{ github.repository }}/releases/download/${{ inputs.tag }}"
+          -ReleaseNotes "${{ inputs.release_notes }}"
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: caveman-windows-signed-release
+          if-no-files-found: error
+          path: |
+            src-tauri/target/release/bundle/latest.json
+            src-tauri/target/release/bundle/nsis/*.exe
+            src-tauri/target/release/bundle/nsis/*.sig
+            src-tauri/target/release/bundle/msi/*.msi
+            src-tauri/target/release/bundle/msi/*.sig
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ inputs.tag }}
+          name: Caveman ${{ inputs.tag }}
+          body: ${{ inputs.release_notes }}
+          draft: false
+          prerelease: false
+          files: |
+            src-tauri/target/release/bundle/latest.json
+            src-tauri/target/release/bundle/nsis/*.exe
+            src-tauri/target/release/bundle/nsis/*.sig
+            src-tauri/target/release/bundle/msi/*.msi
+            src-tauri/target/release/bundle/msi/*.sig

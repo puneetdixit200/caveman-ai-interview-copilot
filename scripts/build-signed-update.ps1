@@ -9,11 +9,14 @@ param(
 $ErrorActionPreference = "Stop"
 $RepoRoot = Resolve-Path (Join-Path $PSScriptRoot "..")
 
-if (-not (Test-Path -LiteralPath $SigningKeyPath)) {
-  throw "Missing Tauri signing key at $SigningKeyPath. Run: npm run tauri signer generate -- -w $SigningKeyPath"
+if ([string]::IsNullOrWhiteSpace($env:TAURI_SIGNING_PRIVATE_KEY)) {
+  if (-not (Test-Path -LiteralPath $SigningKeyPath)) {
+    throw "Missing Tauri signing key at $SigningKeyPath. Run: npm run tauri signer generate -- -w $SigningKeyPath or set TAURI_SIGNING_PRIVATE_KEY."
+  }
+
+  $env:TAURI_SIGNING_PRIVATE_KEY = Get-Content -Raw -LiteralPath $SigningKeyPath
 }
 
-$env:TAURI_SIGNING_PRIVATE_KEY = Get-Content -Raw -LiteralPath $SigningKeyPath
 if ($SigningKeyPassword) {
   $env:TAURI_SIGNING_PRIVATE_KEY_PASSWORD = $SigningKeyPassword
 }
