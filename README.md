@@ -32,14 +32,14 @@ Implemented now:
 - Ollama, LM Studio, OpenRouter, OpenAI, Anthropic, Groq, Google Gemini, Mistral, Together AI, and Fireworks AI provider routing with streaming fallback and Settings model discovery
 - Stealth overlay window with opacity, font controls, global hotkeys, click-through mode, position persistence, Windows capture exclusion, and a screen-sharing process auto-hide guard
 - Dashboard session setup for company, role, interview type, tags, and notes, plus archive search, cursor-paged replay, transcript correction, Markdown, JSON, and PDF export
-- Settings real-use preflight checker for audio, STT, provider, automation, overlay, and privacy readiness before a live interview
+- Settings real-use preflight checker for audio, STT, provider, automation, overlay, privacy, and runtime performance budget readiness before a live interview
 - Trusted collaborative helper link with token-gated live transcript/answer snapshot sharing and inbound helper hints
 - Resume, job description, OCR, and local knowledge-base context injection with stale-document cleanup controls
 - Syntax-highlighted code answer extraction with clipboard copy and active-window typing for code/editor/chat handoff
 - Practice interview mode with local scoring and AI follow-up question generation
 - Analytics, TTS queue/playback, plugin manifests for prompt templates, practice packs, and custom session export templates, OS keychain API key storage, sensitive-action event logging, signed-update configuration, and GitHub `latest.json` release manifest generation
 - SQLite-backed Rust command layer for sessions, transcripts, responses, settings, screenshots, secrets, and native actions
-- Unit tests for audio, STT parsing, provider fallback, overlay safety, exports, analytics, plugins, hotkeys, OCR, practice, RAG, TTS, collaboration, and persistence
+- Unit tests for audio, STT parsing, provider fallback, overlay safety, exports, analytics, plugins, hotkeys, OCR, practice, RAG, TTS, collaboration, runtime budgets, and persistence
 
 Planned full build:
 

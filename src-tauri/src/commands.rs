@@ -17,6 +17,7 @@ use crate::ocr;
 use crate::ocr::ScreenFrame;
 use crate::overlay::{OverlayProtectionStatus, OverlayWindowBounds};
 use crate::plugins::PluginManifestFile;
+use crate::runtime::{RuntimeBudget, RuntimeBudgetStatus};
 use crate::screen_share::ScreenShareStatus;
 use crate::secrets::SecretStatus;
 use crate::stt;
@@ -450,6 +451,11 @@ pub fn set_overlay_window_bounds(
 #[tauri::command]
 pub fn detect_screen_share_status() -> Result<ScreenShareStatus, String> {
     crate::screen_share::detect_screen_share_status().map_err(to_command_error)
+}
+
+#[tauri::command]
+pub fn get_runtime_budget_status(runtime_budget: State<'_, RuntimeBudget>) -> RuntimeBudgetStatus {
+    runtime_budget.status()
 }
 
 #[tauri::command]

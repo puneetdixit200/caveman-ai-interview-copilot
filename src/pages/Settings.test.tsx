@@ -59,6 +59,8 @@ describe("Settings", () => {
     render(<Settings />);
 
     expect(await screen.findByText("Real-Use Readiness")).toBeInTheDocument();
+    expect(screen.getByText("Runtime Budget")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Refresh Runtime Budget" })).toBeInTheDocument();
     expect(await screen.findByText("Audio And STT")).toBeInTheDocument();
     expect(screen.getByText("Automatic Answering")).toBeInTheDocument();
     expect(screen.getByText("Screen OCR")).toBeInTheDocument();

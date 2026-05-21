@@ -8,6 +8,7 @@ pub mod models;
 pub mod ocr;
 pub mod overlay;
 pub mod plugins;
+pub mod runtime;
 pub mod screen_share;
 pub mod secrets;
 pub mod stt;
@@ -27,6 +28,7 @@ pub fn run() {
             app.manage(database);
             app.manage(audio::AudioCaptureManager::default());
             app.manage(collaboration::CollaborationManager::default());
+            app.manage(runtime::RuntimeBudget::default());
             overlay::configure_overlay_security(app);
             Ok(())
         })
@@ -71,6 +73,7 @@ pub fn run() {
             commands::get_overlay_window_bounds,
             commands::set_overlay_window_bounds,
             commands::detect_screen_share_status,
+            commands::get_runtime_budget_status,
             commands::list_prompt_templates,
             commands::load_plugin_manifests,
             commands::capture_screen_frame,

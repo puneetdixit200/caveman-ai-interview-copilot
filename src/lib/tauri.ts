@@ -28,6 +28,9 @@ import type {
 import type { AudioApplication, AudioCaptureMode, AudioDevice, OverlayWindowBounds } from "../types/settings";
 import type { CollaborationHint, CollaborationServerStatus, CollaborationSnapshot } from "../types/collaboration";
 import type { PluginManifestFile } from "./pluginLoader";
+import type { RuntimeBudgetStatus } from "./readiness";
+
+export type { RuntimeBudgetStatus } from "./readiness";
 
 export interface OverlayProtectionStatus {
   alwaysOnTop: boolean;
@@ -100,6 +103,8 @@ export interface NativeScreenFrame {
   monitorName?: string | null;
   capturedAtMs: number;
 }
+
+const browserStartupOriginMs = typeof performance !== "undefined" ? performance.now() : 0;
 
 declare global {
   interface Window {
@@ -690,6 +695,30 @@ export async function transcribeWithCloudStt(input: {
   blockCloudWhenLocalOnly?: boolean;
 }): Promise<SttTranscriptEvent[]> {
   return invokeStrictOrFallback<SttTranscriptEvent[]>("transcribe_with_cloud_stt", { input }, () => []);
+}
+
+export async function getRuntimeBudgetStatus(): Promise<RuntimeBudgetStatus> {
+  return invokeOrFallback<RuntimeBudgetStatus>("get_runtime_budget_status", {}, () => {
+    const runtime = typeof performance !== "undefined" ? performance : undefined;
+    const memory = runtime
+      ? (runtime as Performance & { memory?: { usedJSHeapSize?: number } }).memory
+      : undefined;
+    const workingSetMb =
+      typeof memory?.usedJSHeapSize === "number" ? Math.round((memory.usedJSHeapSize / 1024 / 1024) * 10) / 10 : null;
+
+    return {
+      startupMs: runtime ? Math.max(0, Math.round(runtime.now() - browserStartupOriginMs)) : 0,
+      workingSetMb,
+      processCpuPercent: null,
+      startupTargetMs: 3000,
+      memoryTargetMb: 500,
+      idleCpuTargetPercent: 15,
+      activeCpuTargetPercent: 40,
+      sampleCount: 1,
+      source: "browser-fallback",
+      message: "Native process metrics are available only inside the Caveman desktop app."
+    };
+  });
 }
 
 export async function protectOverlayWindow(captureExclusionEnabled = true): Promise<OverlayProtectionStatus> {

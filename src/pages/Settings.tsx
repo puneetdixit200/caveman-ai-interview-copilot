@@ -50,6 +50,7 @@ import {
   detectLocalWhisperSetup,
   downloadWhisperModel,
   listKnowledgeBase,
+  getRuntimeBudgetStatus,
   getProviderApiKey,
   getSetting,
   getOverlayWindowBounds,
@@ -66,7 +67,7 @@ import {
   type SecurityEvent
 } from "../lib/tauri";
 import { promptTemplates } from "../lib/promptTemplates";
-import { evaluateRealUseReadiness, type ReadinessStatus } from "../lib/readiness";
+import { evaluateRealUseReadiness, type ReadinessStatus, type RuntimeBudgetStatus } from "../lib/readiness";
 import { enqueueTtsResponse, playTtsItem, stopTtsPlayback } from "../lib/tts";
 import { checkForSignedUpdate, downloadInstallAndRelaunchSignedUpdate } from "../lib/updater";
 import type {
@@ -136,6 +137,8 @@ export function Settings() {
   const [knowledgeQuery, setKnowledgeQuery] = useState("");
   const [pluginCatalog, setPluginCatalog] = useState<PluginCatalog>(createEmptyPluginCatalog());
   const [securityEvents, setSecurityEvents] = useState<SecurityEvent[]>([]);
+  const [runtimeBudget, setRuntimeBudget] = useState<RuntimeBudgetStatus | null>(null);
+  const [refreshingRuntimeBudget, setRefreshingRuntimeBudget] = useState(false);
   const [profileName, setProfileName] = useState("");
   const [profileInterviewType, setProfileInterviewType] = useState<AppProfile["interviewType"]>("mixed");
   const [checkingUpdate, setCheckingUpdate] = useState(false);
@@ -145,22 +148,24 @@ export function Settings() {
     () =>
       evaluateRealUseReadiness({
         config,
-        audioDevices
+        audioDevices,
+        runtimeBudget
       }),
-    [audioDevices, config]
+    [audioDevices, config, runtimeBudget]
   );
 
   useEffect(() => {
     let cancelled = false;
 
     async function load() {
-      const [rawConfig, devices, applications, loadedKnowledgeBase, rawPluginCatalog, events] = await Promise.all([
+      const [rawConfig, devices, applications, loadedKnowledgeBase, rawPluginCatalog, events, loadedRuntimeBudget] = await Promise.all([
         getSetting(APP_CONFIG_SETTING_KEY),
         listAudioDevices(),
         listAudioApplications(),
         listKnowledgeBase(),
         getSetting(PLUGIN_CATALOG_SETTING_KEY),
-        listSecurityEvents(8)
+        listSecurityEvents(8),
+        getRuntimeBudgetStatus()
       ]);
       const stored = parseAppConfig(rawConfig);
       const hydrated = await hydrateProviderApiKeys(stored);
@@ -184,6 +189,7 @@ export function Settings() {
         setAudioDevices(devices);
         setAudioApplications(applications);
         setSecurityEvents(events);
+        setRuntimeBudget(loadedRuntimeBudget);
         setProviderSecretInputs(
           nextConfig.providers.reduce<Partial<Record<ProviderId, string>>>((values, provider) => {
             if (provider.kind === "cloud") {
@@ -227,6 +233,20 @@ export function Settings() {
 
   async function refreshSecurityEvents() {
     setSecurityEvents(await listSecurityEvents(8));
+  }
+
+  async function refreshRuntimeBudget() {
+    setRefreshingRuntimeBudget(true);
+    setStatus("Refreshing runtime budget...");
+    try {
+      const nextRuntimeBudget = await getRuntimeBudgetStatus();
+      setRuntimeBudget(nextRuntimeBudget);
+      setStatus("Runtime budget refreshed");
+    } catch (error) {
+      setStatus(`Runtime budget check failed: ${error instanceof Error ? error.message : String(error)}`);
+    } finally {
+      setRefreshingRuntimeBudget(false);
+    }
   }
 
   async function refreshProviderModels(provider: ModelProviderConfig) {
@@ -942,6 +962,9 @@ export function Settings() {
           <span className={`status-pill ${readinessStatusClass(readiness.overallStatus)}`}>
             {readinessStatusLabel(readiness.overallStatus)}
           </span>
+          <Button icon={<RefreshCw size={16} />} onClick={refreshRuntimeBudget} disabled={refreshingRuntimeBudget}>
+            {refreshingRuntimeBudget ? "Refreshing Runtime" : "Refresh Runtime Budget"}
+          </Button>
         </div>
 
         <div className="metric-strip readiness-summary">

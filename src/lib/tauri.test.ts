@@ -4,6 +4,7 @@ import {
   clearKnowledgeBaseNative,
   deleteProviderApiKey,
   deleteKnowledgeDocumentNative,
+  getRuntimeBudgetStatus,
   listPracticeScores,
   listKnowledgeBase,
   saveKnowledgeDocumentNative,
@@ -36,6 +37,18 @@ describe("tauri fallback security events", () => {
       target: "openai"
     });
     expect(serialized).not.toContain("sk-live-secret");
+  });
+});
+
+describe("tauri fallback runtime budget", () => {
+  it("reports startup, memory, and CPU budget targets for readiness checks", async () => {
+    const status = await getRuntimeBudgetStatus();
+
+    expect(status.startupTargetMs).toBe(3000);
+    expect(status.memoryTargetMb).toBe(500);
+    expect(status.idleCpuTargetPercent).toBe(15);
+    expect(status.activeCpuTargetPercent).toBe(40);
+    expect(status.startupMs).toBeGreaterThanOrEqual(0);
   });
 });
 

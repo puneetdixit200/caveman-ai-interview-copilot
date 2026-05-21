@@ -5,11 +5,24 @@ import type { AudioDevice, ModelProviderConfig, SttMode } from "../types/setting
 export type ReadinessStatus = "ready" | "warning" | "blocked";
 
 export interface ReadinessItem {
-  id: "audio" | "stt" | "provider" | "automation" | "overlay" | "privacy";
+  id: "audio" | "stt" | "provider" | "automation" | "overlay" | "privacy" | "performance";
   label: string;
   status: ReadinessStatus;
   detail: string;
   action?: string;
+}
+
+export interface RuntimeBudgetStatus {
+  startupMs: number;
+  workingSetMb?: number | null;
+  processCpuPercent?: number | null;
+  startupTargetMs: number;
+  memoryTargetMb: number;
+  idleCpuTargetPercent: number;
+  activeCpuTargetPercent: number;
+  sampleCount?: number;
+  source?: string;
+  message?: string | null;
 }
 
 export interface RealUseReadiness {
@@ -26,6 +39,7 @@ export interface RealUseReadinessInput {
   overlayProtection?: {
     captureExclusion?: string | null;
   } | null;
+  runtimeBudget?: RuntimeBudgetStatus | null;
 }
 
 const CLOUD_STT_LABELS: Record<Extract<SttMode, "deepgram" | "assemblyai" | "google">, string> = {
@@ -41,7 +55,8 @@ export function evaluateRealUseReadiness(input: RealUseReadinessInput): RealUseR
     evaluateProviderReadiness(input.config),
     evaluateAutomationReadiness(input.config),
     evaluateOverlayReadiness(input.config, input.overlayProtection),
-    evaluatePrivacyReadiness(input.config)
+    evaluatePrivacyReadiness(input.config),
+    evaluateRuntimeBudgetReadiness(input.runtimeBudget)
   ];
   const blockedCount = items.filter((item) => item.status === "blocked").length;
   const warningCount = items.filter((item) => item.status === "warning").length;
@@ -356,6 +371,65 @@ function evaluatePrivacyReadiness(config: AppConfig): ReadinessItem {
   };
 }
 
+function evaluateRuntimeBudgetReadiness(runtimeBudget?: RuntimeBudgetStatus | null): ReadinessItem {
+  if (!runtimeBudget) {
+    return {
+      id: "performance",
+      label: "Runtime Budget",
+      status: "warning",
+      detail: "Startup time, process memory, and process CPU have not been measured in this runtime session.",
+      action: "Refresh Runtime Budget in Settings after launch and before a live interview."
+    };
+  }
+
+  const overTarget = [
+    runtimeBudget.startupMs > runtimeBudget.startupTargetMs
+      ? `startup ${Math.round(runtimeBudget.startupMs)}ms > ${runtimeBudget.startupTargetMs}ms`
+      : undefined,
+    typeof runtimeBudget.workingSetMb === "number" && runtimeBudget.workingSetMb > runtimeBudget.memoryTargetMb
+      ? `memory ${formatMetric(runtimeBudget.workingSetMb)}MB > ${runtimeBudget.memoryTargetMb}MB`
+      : undefined,
+    typeof runtimeBudget.processCpuPercent === "number" &&
+    runtimeBudget.processCpuPercent > runtimeBudget.idleCpuTargetPercent
+      ? `idle CPU ${formatMetric(runtimeBudget.processCpuPercent)}% > ${runtimeBudget.idleCpuTargetPercent}%`
+      : undefined
+  ].filter((item): item is string => Boolean(item));
+
+  if (overTarget.length > 0) {
+    return {
+      id: "performance",
+      label: "Runtime budget over target",
+      status: "warning",
+      detail: overTarget.join("; "),
+      action: "Close unused windows, stop capture when idle, and re-check before the live interview."
+    };
+  }
+
+  if (runtimeBudget.workingSetMb == null || runtimeBudget.processCpuPercent == null) {
+    const missing = [
+      runtimeBudget.workingSetMb == null ? "process memory" : undefined,
+      runtimeBudget.processCpuPercent == null ? "process CPU" : undefined
+    ].filter((item): item is string => Boolean(item));
+
+    return {
+      id: "performance",
+      label: "Runtime Budget",
+      status: "warning",
+      detail: `Startup is ${Math.round(runtimeBudget.startupMs)}ms; ${missing.join(" and ")} not available yet.`,
+      action: "Refresh Runtime Budget in Settings after a few seconds of normal app use."
+    };
+  }
+
+  return {
+    id: "performance",
+    label: "Runtime budget ready",
+    status: "ready",
+    detail: `Startup ${Math.round(runtimeBudget.startupMs)}ms, memory ${formatMetric(
+      runtimeBudget.workingSetMb
+    )}MB, idle CPU ${formatMetric(runtimeBudget.processCpuPercent)}%.`
+  };
+}
+
 function providerUsable(provider: ModelProviderConfig): boolean {
   const hasEndpoint = Boolean(provider.endpoint.trim());
   const hasModel = Boolean(provider.model.trim());
@@ -393,4 +467,8 @@ function isCloudSttMode(mode: SttMode): mode is "deepgram" | "assemblyai" | "goo
 
 function capitalize(value: string): string {
   return value.charAt(0).toUpperCase() + value.slice(1);
+}
+
+function formatMetric(value: number): string {
+  return Number.isInteger(value) ? String(value) : value.toFixed(1);
 }

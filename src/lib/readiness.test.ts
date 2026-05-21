@@ -51,7 +51,16 @@ describe("evaluateRealUseReadiness", () => {
         }
       }),
       audioDevices: devices,
-      overlayProtection: { captureExclusion: "enabled" }
+      overlayProtection: { captureExclusion: "enabled" },
+      runtimeBudget: {
+        startupMs: 1200,
+        workingSetMb: 220,
+        processCpuPercent: 3,
+        startupTargetMs: 3000,
+        memoryTargetMb: 500,
+        idleCpuTargetPercent: 15,
+        activeCpuTargetPercent: 40
+      }
     });
 
     expect(readiness.overallStatus).toBe("ready");
@@ -63,7 +72,8 @@ describe("evaluateRealUseReadiness", () => {
       "provider",
       "automation",
       "overlay",
-      "privacy"
+      "privacy",
+      "performance"
     ]);
   });
 
@@ -156,6 +166,46 @@ describe("evaluateRealUseReadiness", () => {
     expect(missingCloudKey.items.find((item) => item.id === "stt")).toMatchObject({
       status: "blocked",
       action: "Save a Google STT key in the OS keychain before starting cloud STT."
+    });
+  });
+
+  it("warns when runtime budgets have not been measured yet", () => {
+    const readiness = evaluateRealUseReadiness({
+      config: mergeConfig({
+        audio: {
+          ...DEFAULT_APP_CONFIG.audio,
+          captureMode: "microphone",
+          microphoneDeviceId: "microphone-default"
+        }
+      }),
+      audioDevices: devices
+    });
+
+    expect(readiness.items.find((item) => item.id === "performance")).toMatchObject({
+      status: "warning",
+      action: "Refresh Runtime Budget in Settings after launch and before a live interview."
+    });
+  });
+
+  it("warns when runtime budgets exceed the documented real-use targets", () => {
+    const readiness = evaluateRealUseReadiness({
+      config: DEFAULT_APP_CONFIG,
+      audioDevices: devices,
+      runtimeBudget: {
+        startupMs: 4200,
+        workingSetMb: 640,
+        processCpuPercent: 21,
+        startupTargetMs: 3000,
+        memoryTargetMb: 500,
+        idleCpuTargetPercent: 15,
+        activeCpuTargetPercent: 40
+      }
+    });
+
+    expect(readiness.items.find((item) => item.id === "performance")).toMatchObject({
+      label: "Runtime budget over target",
+      status: "warning",
+      detail: expect.stringContaining("startup 4200ms > 3000ms")
     });
   });
 });
