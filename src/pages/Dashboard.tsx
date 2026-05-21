@@ -1046,7 +1046,12 @@ export function Dashboard() {
     }
 
     const runnableProviderConfigs = selectRunnableProviders(config);
-    const providers = runnableProviderConfigs.map((provider) => createConfiguredProvider(provider));
+    const providers = runnableProviderConfigs.map((provider) =>
+      createConfiguredProvider(provider, undefined, {
+        localOnlyMode: config.security.localOnlyMode,
+        blockCloudWhenLocalOnly: config.security.blockCloudWhenLocalOnly
+      })
+    );
     if (providers.length === 0) {
       setErrorMessage(
         config.security.localOnlyMode

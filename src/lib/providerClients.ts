@@ -7,21 +7,31 @@ type FetchLike = (input: string, init?: RequestInit) => Promise<Response>;
 const OPENROUTER_REFERER = "https://github.com/puneetdixit200/caveman-ai-interview-copilot";
 const OPENROUTER_TITLE = "Caveman AI Interview Copilot";
 
+export interface ProviderClientOptions {
+  localOnlyMode?: boolean;
+  blockCloudWhenLocalOnly?: boolean;
+}
+
 export function createConfiguredProvider(
   config: ModelProviderConfig,
-  fetchImpl: FetchLike = fetch
+  fetchImpl: FetchLike = fetch,
+  options: ProviderClientOptions = {}
 ): AIProvider {
   return {
     id: config.id,
     label: config.label,
     kind: config.kind,
-    healthCheck: () => healthCheck(config, fetchImpl),
-    listModels: () => listModels(config, fetchImpl),
-    chatStream: (params) => chatStream(config, params, fetchImpl)
+    healthCheck: () => healthCheck(config, fetchImpl, options),
+    listModels: () => listModels(config, fetchImpl, options),
+    chatStream: (params) => chatStream(config, params, fetchImpl, options)
   };
 }
 
-async function healthCheck(config: ModelProviderConfig, fetchImpl: FetchLike): Promise<HealthCheckResult> {
+async function healthCheck(
+  config: ModelProviderConfig,
+  fetchImpl: FetchLike,
+  options: ProviderClientOptions
+): Promise<HealthCheckResult> {
   if (!config.enabled) {
     return { ok: false, latencyMs: 0, error: `${config.label} is disabled` };
   }
@@ -29,6 +39,11 @@ async function healthCheck(config: ModelProviderConfig, fetchImpl: FetchLike): P
   const secretError = validateSecret(config);
   if (secretError) {
     return { ok: false, latencyMs: 0, error: secretError };
+  }
+
+  const networkError = validateNetworkAccess(config, options);
+  if (networkError) {
+    return { ok: false, latencyMs: 0, error: networkError };
   }
 
   if (config.kind === "cloud") {
@@ -55,10 +70,19 @@ async function healthCheck(config: ModelProviderConfig, fetchImpl: FetchLike): P
   }
 }
 
-async function listModels(config: ModelProviderConfig, fetchImpl: FetchLike): Promise<ModelInfo[]> {
+async function listModels(
+  config: ModelProviderConfig,
+  fetchImpl: FetchLike,
+  options: ProviderClientOptions
+): Promise<ModelInfo[]> {
   const secretError = validateSecret(config);
   if (secretError) {
     throw new Error(secretError);
+  }
+
+  const networkError = validateNetworkAccess(config, options);
+  if (networkError) {
+    throw new Error(networkError);
   }
 
   if (config.id === "anthropic") {
@@ -79,11 +103,17 @@ async function listModels(config: ModelProviderConfig, fetchImpl: FetchLike): Pr
 async function* chatStream(
   config: ModelProviderConfig,
   params: ChatStreamParams,
-  fetchImpl: FetchLike
+  fetchImpl: FetchLike,
+  options: ProviderClientOptions
 ): AsyncGenerator<string> {
   const secretError = validateSecret(config);
   if (secretError) {
     throw new Error(secretError);
+  }
+
+  const networkError = validateNetworkAccess(config, options);
+  if (networkError) {
+    throw new Error(networkError);
   }
 
   const response = await fetchImpl(requestEndpoint(config, params), {
@@ -225,6 +255,14 @@ function requestBody(config: ModelProviderConfig, params: ChatStreamParams): Rec
 function validateSecret(config: ModelProviderConfig): string | undefined {
   if (config.kind === "cloud" && !config.apiKey?.trim()) {
     return `${config.label} API key is required`;
+  }
+
+  return undefined;
+}
+
+function validateNetworkAccess(config: ModelProviderConfig, options: ProviderClientOptions): string | undefined {
+  if (config.kind === "cloud" && options.localOnlyMode && (options.blockCloudWhenLocalOnly ?? true)) {
+    return `${config.label} is blocked by local-only mode`;
   }
 
   return undefined;

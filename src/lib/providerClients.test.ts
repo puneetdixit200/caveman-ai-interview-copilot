@@ -195,6 +195,57 @@ describe("createConfiguredProvider", () => {
     expect(fetchImpl).not.toHaveBeenCalled();
   });
 
+  it("blocks cloud providers in local-only mode before making requests", async () => {
+    const fetchImpl = vi.fn();
+    const configured = createConfiguredProvider(
+      provider({
+        id: "openrouter",
+        label: "OpenRouter",
+        kind: "cloud",
+        endpoint: "https://openrouter.ai/api/v1/chat/completions",
+        model: "openai/gpt-4o-mini",
+        apiKeyStored: true,
+        apiKey: "sk-test"
+      }),
+      fetchImpl,
+      { localOnlyMode: true, blockCloudWhenLocalOnly: true }
+    );
+
+    await expect(configured.healthCheck()).resolves.toMatchObject({
+      ok: false,
+      error: "OpenRouter is blocked by local-only mode"
+    });
+    await expect(configured.listModels?.()).rejects.toThrow("OpenRouter is blocked by local-only mode");
+    await expect(async () => {
+      for await (const _chunk of configured.chatStream({
+        messages: [{ role: "user", content: "Should not leave this device" }]
+      })) {
+        // The guard should throw before streaming starts.
+      }
+    }).rejects.toThrow("OpenRouter is blocked by local-only mode");
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
+  it("allows local providers when local-only network blocking is active", async () => {
+    const fetchImpl = vi.fn(async () =>
+      jsonResponse({
+        models: [{ name: "llama3.1:8b" }]
+      })
+    );
+    const configured = createConfiguredProvider(provider({ id: "ollama" }), fetchImpl, {
+      localOnlyMode: true,
+      blockCloudWhenLocalOnly: true
+    });
+
+    await expect(configured.listModels?.()).resolves.toEqual([
+      { id: "llama3.1:8b", name: "llama3.1:8b", contextLength: 0 }
+    ]);
+    expect(fetchImpl).toHaveBeenCalledWith(
+      "http://localhost:11434/api/tags",
+      expect.objectContaining({ method: "GET" })
+    );
+  });
+
   it("sends OpenRouter bearer auth and metadata headers when configured", async () => {
     const fetchImpl = vi.fn(async () => streamingResponse("data: [DONE]"));
     const configured = createConfiguredProvider(
