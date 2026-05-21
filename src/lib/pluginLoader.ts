@@ -1,4 +1,9 @@
-import { validatePluginManifest, type PluginManifest, type PluginPracticePack } from "./pluginManifest";
+import {
+  validatePluginManifest,
+  type PluginExportTemplate,
+  type PluginManifest,
+  type PluginPracticePack
+} from "./pluginManifest";
 import type { PromptTemplate } from "../types/session";
 import type { PluginSettings } from "../types/settings";
 
@@ -18,6 +23,7 @@ export interface PluginCatalog {
   errors: string[];
   promptTemplates: PromptTemplate[];
   exportFormats: string[];
+  exportTemplates: PluginExportTemplate[];
   practicePacks: PluginPracticePack[];
 }
 
@@ -29,6 +35,7 @@ export function createEmptyPluginCatalog(): PluginCatalog {
     errors: [],
     promptTemplates: [],
     exportFormats: [],
+    exportTemplates: [],
     practicePacks: []
   };
 }
@@ -80,6 +87,9 @@ export function buildPluginCatalog(files: PluginManifestFile[], settings: Plugin
     exportFormats: settings.allowExportFormats
       ? dedupeStrings(loaded.flatMap((plugin) => plugin.manifest.contributes.exportFormats ?? []))
       : [],
+    exportTemplates: settings.allowExportFormats
+      ? dedupeById(loaded.flatMap((plugin) => plugin.manifest.contributes.exportTemplates ?? []))
+      : [],
     practicePacks: settings.allowPracticePacks
       ? dedupeById(loaded.flatMap((plugin) => plugin.manifest.contributes.practicePacks ?? []))
       : []
@@ -111,6 +121,9 @@ export function parsePluginCatalog(raw: string | null | undefined): PluginCatalo
         : [],
       exportFormats: Array.isArray(parsed.exportFormats)
         ? parsed.exportFormats.filter((format): format is string => typeof format === "string")
+        : [],
+      exportTemplates: Array.isArray(parsed.exportTemplates)
+        ? parsed.exportTemplates.filter((template): template is PluginExportTemplate => validateExportTemplate(template))
         : [],
       practicePacks: Array.isArray(parsed.practicePacks)
         ? parsed.practicePacks.filter((pack): pack is PluginPracticePack => validatePracticePack(pack))
@@ -154,6 +167,19 @@ function validatePracticePack(value: unknown): boolean {
   });
 
   return Boolean(validation.manifest?.contributes.practicePacks?.length);
+}
+
+function validateExportTemplate(value: unknown): boolean {
+  const validation = validatePluginManifest({
+    id: "export-check",
+    name: "Export Check",
+    version: "1.0.0",
+    contributes: {
+      exportTemplates: [value]
+    }
+  });
+
+  return Boolean(validation.manifest?.contributes.exportTemplates?.length);
 }
 
 function dedupeById<T extends { id: string }>(items: T[]): T[] {

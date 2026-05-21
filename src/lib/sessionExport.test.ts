@@ -3,6 +3,7 @@ import {
   buildSessionPdfLines,
   exportSessionJson,
   exportSessionMarkdown,
+  renderPluginSessionExport,
   sessionExportFilename
 } from "./sessionExport";
 import type { AIResponseRecord, SessionRecord, TranscriptSegment } from "../types/session";
@@ -44,6 +45,24 @@ describe("exportSessionMarkdown", () => {
     expect(sessionExportFilename({ ...input.session, title: "Backend / Interview: Acme" }, "pdf")).toBe(
       "backend-interview-acme.pdf"
     );
+  });
+
+  it("renders a safe plugin export template against session data", () => {
+    const rendered = renderPluginSessionExport(
+      {
+        id: "brief",
+        name: "Brief",
+        fileExtension: "txt",
+        contentTemplate:
+          "Title={{session.title}}\nCompany={{session.company}}\nTranscript={{transcript.plain}}\nAnswers={{responses.plain}}"
+      },
+      makeExportInput()
+    );
+
+    expect(rendered).toContain("Title=Backend Interview");
+    expect(rendered).toContain("Company=Acme");
+    expect(rendered).toContain("INTERVIEWER: Design a URL shortener");
+    expect(rendered).toContain("OpenRouter / gpt-4o");
   });
 });
 

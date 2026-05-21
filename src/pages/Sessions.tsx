@@ -3,11 +3,18 @@ import { useEffect, useMemo, useState } from "react";
 import { Button } from "../components/common/Button";
 import { ResponseCard } from "../components/overlay/ResponseCard";
 import { calculateSessionAnalytics } from "../lib/analytics";
-import { downloadSessionPdf, exportSessionJson, exportSessionMarkdown } from "../lib/sessionExport";
+import { downloadSessionPdf, exportSessionJson, exportSessionMarkdown, renderPluginSessionExport } from "../lib/sessionExport";
 import { filterSessionSummaries } from "../lib/sessionSearch";
 import { formatDuration, formatTimestampMs } from "../lib/formatters";
 import {
+  PLUGIN_CATALOG_SETTING_KEY,
+  createEmptyPluginCatalog,
+  parsePluginCatalog,
+  type PluginCatalog
+} from "../lib/pluginLoader";
+import {
   deleteTranscript,
+  getSetting,
   listAiResponses,
   listSessions,
   listTranscriptPage,
@@ -39,6 +46,7 @@ export function Sessions() {
   const [editingTranscriptId, setEditingTranscriptId] = useState<number | null>(null);
   const [transcriptDraft, setTranscriptDraft] = useState<TranscriptCorrectionDraft | null>(null);
   const [transcriptPage, setTranscriptPage] = useState<TranscriptPage | null>(null);
+  const [pluginCatalog, setPluginCatalog] = useState<PluginCatalog>(createEmptyPluginCatalog());
 
   const filteredSessions = useMemo(
     () => filterSessionSummaries({ query, sessions, transcriptsBySession, responsesBySession }),
@@ -88,9 +96,13 @@ export function Sessions() {
     let cancelled = false;
 
     async function loadSessions() {
-      const savedSessions = await listSessions();
+      const [savedSessions, rawPluginCatalog] = await Promise.all([
+        listSessions(),
+        getSetting(PLUGIN_CATALOG_SETTING_KEY)
+      ]);
       if (!cancelled) {
         setSessions(savedSessions);
+        setPluginCatalog(parsePluginCatalog(rawPluginCatalog));
         setSelectedSessionId(savedSessions[0]?.id ?? null);
         setStatus(savedSessions.length > 0 ? `${savedSessions.length} saved sessions` : "No saved sessions yet");
       }
@@ -202,6 +214,20 @@ export function Sessions() {
 
     await downloadSessionPdf({ session: selectedSession, transcripts: await loadFullSelectedTranscripts(), responses });
     setStatus("PDF export saved");
+  }
+
+  async function copyPluginExport(template: PluginCatalog["exportTemplates"][number]) {
+    if (!selectedSession) {
+      return;
+    }
+
+    const exportText = renderPluginSessionExport(template, {
+      session: selectedSession,
+      transcripts: await loadFullSelectedTranscripts(),
+      responses
+    });
+    await navigator.clipboard?.writeText(exportText);
+    setStatus(`${template.name} export copied`);
   }
 
   async function loadFullSelectedTranscripts(): Promise<TranscriptSegment[]> {
@@ -573,6 +599,16 @@ export function Sessions() {
             <Button icon={<Download size={16} />} onClick={savePdfExport} disabled={!selectedSession}>
               Save PDF
             </Button>
+            {pluginCatalog.exportTemplates.map((template) => (
+              <Button
+                key={template.id}
+                icon={<Copy size={16} />}
+                onClick={() => void copyPluginExport(template)}
+                disabled={!selectedSession}
+              >
+                Copy {template.name}
+              </Button>
+            ))}
           </div>
         </div>
         <pre>{markdownExport}</pre>

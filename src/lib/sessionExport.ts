@@ -1,4 +1,5 @@
 import type { AIResponseRecord, SessionRecord, TranscriptSegment } from "../types/session";
+import type { PluginExportTemplate } from "./pluginManifest";
 import { formatTimestampMs } from "./formatters";
 
 interface ExportSessionInput {
@@ -47,6 +48,27 @@ export function exportSessionMarkdown({ session, transcripts, responses }: Expor
   ].join("\n");
 }
 
+export function renderPluginSessionExport(template: PluginExportTemplate, input: ExportSessionInput): string {
+  const replacements: Record<string, string> = {
+    "session.title": input.session.title,
+    "session.company": input.session.company || "Unspecified",
+    "session.role": input.session.role || "Unspecified",
+    "session.interviewType": input.session.interviewType,
+    "session.tags": input.session.tags.length > 0 ? input.session.tags.join(", ") : "none",
+    "session.durationMinutes": String(Math.round(input.session.durationSeconds / 60)),
+    "session.totalTokens": String(input.session.totalTokens),
+    "transcript.plain": buildTranscriptPlain(input.transcripts),
+    "transcript.markdown": buildTranscriptMarkdown(input.transcripts),
+    "responses.plain": buildResponsesPlain(input.responses),
+    "responses.markdown": buildResponsesMarkdown(input.responses),
+    json: exportSessionJson(input)
+  };
+
+  return template.contentTemplate.replace(/\{\{\s*([a-zA-Z0-9_.]+)\s*\}\}/g, (match, key: string) => {
+    return replacements[key] ?? match;
+  });
+}
+
 export function exportSessionJson({ session, transcripts, responses }: ExportSessionInput): string {
   return JSON.stringify(
     {
@@ -59,6 +81,55 @@ export function exportSessionJson({ session, transcripts, responses }: ExportSes
     null,
     2
   );
+}
+
+function buildTranscriptMarkdown(transcripts: TranscriptSegment[]): string {
+  return transcripts.length > 0
+    ? transcripts
+        .map((segment) => `- [${formatTimestampMs(segment.timestampMs)}] ${segment.speaker.toUpperCase()}: ${segment.content}`)
+        .join("\n")
+    : "_No transcript captured._";
+}
+
+function buildTranscriptPlain(transcripts: TranscriptSegment[]): string {
+  return transcripts.length > 0
+    ? transcripts
+        .map((segment) => `[${formatTimestampMs(segment.timestampMs)}] ${segment.speaker.toUpperCase()}: ${segment.content}`)
+        .join("\n")
+    : "No transcript captured.";
+}
+
+function buildResponsesMarkdown(responses: AIResponseRecord[]): string {
+  return responses.length > 0
+    ? responses
+        .map((response) =>
+          [
+            `### ${formatProviderName(response.provider)} / ${response.model}`,
+            response.latencyMs ? `Latency: ${response.latencyMs}ms` : undefined,
+            "",
+            response.response
+          ]
+            .filter((line): line is string => line !== undefined)
+            .join("\n")
+        )
+        .join("\n\n")
+    : "_No AI responses captured._";
+}
+
+function buildResponsesPlain(responses: AIResponseRecord[]): string {
+  return responses.length > 0
+    ? responses
+        .map((response) =>
+          [
+            `${formatProviderName(response.provider)} / ${response.model}`,
+            response.latencyMs ? `Latency: ${response.latencyMs}ms` : undefined,
+            response.response
+          ]
+            .filter((line): line is string => line !== undefined)
+            .join("\n")
+        )
+        .join("\n\n")
+    : "No AI responses captured.";
 }
 
 export function buildSessionPdfLines({ session, transcripts, responses }: ExportSessionInput): string[] {

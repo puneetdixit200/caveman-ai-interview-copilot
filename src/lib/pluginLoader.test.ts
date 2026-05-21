@@ -35,6 +35,14 @@ describe("pluginLoader", () => {
                 }
               ],
               exportFormats: ["json"],
+              exportTemplates: [
+                {
+                  id: "interview-brief",
+                  name: "Interview Brief",
+                  fileExtension: "md",
+                  contentTemplate: "# {{session.title}}\n{{transcript.markdown}}"
+                }
+              ],
               practicePacks: [
                 {
                   id: "queues",
@@ -59,6 +67,7 @@ describe("pluginLoader", () => {
     expect(catalog.loaded).toHaveLength(1);
     expect(catalog.promptTemplates[0]).toMatchObject({ id: "backend-senior" });
     expect(catalog.exportFormats).toEqual(["json"]);
+    expect(catalog.exportTemplates[0]).toMatchObject({ id: "interview-brief", fileExtension: "md" });
     expect(catalog.practicePacks[0]).toMatchObject({ id: "queues" });
   });
 

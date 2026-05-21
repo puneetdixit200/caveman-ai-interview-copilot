@@ -24,6 +24,14 @@ describe("pluginManifest", () => {
             }
           ],
           exportFormats: ["markdown"],
+          exportTemplates: [
+            {
+              id: "ats-summary",
+              name: "ATS Summary",
+              fileExtension: "txt",
+              contentTemplate: "Session: {{session.title}}\n{{transcript.plain}}\n{{responses.plain}}"
+            }
+          ],
           practicePacks: [
             {
               id: "backend-senior",
@@ -55,7 +63,12 @@ describe("pluginManifest", () => {
     ).toEqual({
       ok: true,
       errors: [],
-      manifest: expect.objectContaining({ id: "local-practice-pack" })
+      manifest: expect.objectContaining({
+        id: "local-practice-pack",
+        contributes: expect.objectContaining({
+          exportTemplates: [expect.objectContaining({ id: "ats-summary", fileExtension: "txt" })]
+        })
+      })
     });
   });
 

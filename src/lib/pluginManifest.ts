@@ -7,8 +7,16 @@ export interface PluginManifest {
   contributes: {
     promptTemplates?: PromptTemplate[];
     exportFormats?: string[];
+    exportTemplates?: PluginExportTemplate[];
     practicePacks?: PluginPracticePack[];
   };
+}
+
+export interface PluginExportTemplate {
+  id: string;
+  name: string;
+  fileExtension: string;
+  contentTemplate: string;
 }
 
 export interface PluginPracticeQuestion {
@@ -66,6 +74,7 @@ export function validatePluginManifest(raw: unknown): PluginValidationResult {
           contributes: {
             promptTemplates: readPromptTemplates(contributes.promptTemplates),
             exportFormats: readStringArray(contributes.exportFormats),
+            exportTemplates: readExportTemplates(contributes.exportTemplates),
             practicePacks: readPracticePacks(contributes.practicePacks)
           }
         }
@@ -88,6 +97,29 @@ function readStringArray(value: unknown): string[] | undefined {
   }
 
   return value.filter((item): item is string => typeof item === "string" && item.trim().length > 0);
+}
+
+function readExportTemplates(value: unknown): PluginExportTemplate[] | undefined {
+  if (!Array.isArray(value)) {
+    return undefined;
+  }
+
+  const templates = value.filter(isExportTemplate);
+  return templates.length > 0 ? templates : undefined;
+}
+
+function isExportTemplate(value: unknown): value is PluginExportTemplate {
+  return (
+    isRecord(value) &&
+    isSafeId(value.id) &&
+    typeof value.name === "string" &&
+    value.name.trim().length > 0 &&
+    typeof value.fileExtension === "string" &&
+    /^[a-z0-9]{1,12}$/.test(value.fileExtension) &&
+    typeof value.contentTemplate === "string" &&
+    value.contentTemplate.trim().length > 0 &&
+    value.contentTemplate.length <= 64_000
+  );
 }
 
 function readPromptTemplates(value: unknown): PromptTemplate[] | undefined {

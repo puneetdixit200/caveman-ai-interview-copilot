@@ -1994,7 +1994,8 @@ export function Settings() {
               {pluginCatalog.loaded.length} plugin{pluginCatalog.loaded.length === 1 ? "" : "s"} /{" "}
               {pluginCatalog.promptTemplates.length} prompt template
               {pluginCatalog.promptTemplates.length === 1 ? "" : "s"} / {pluginCatalog.practicePacks.length} practice pack
-              {pluginCatalog.practicePacks.length === 1 ? "" : "s"}
+              {pluginCatalog.practicePacks.length === 1 ? "" : "s"} / {pluginCatalog.exportTemplates.length} export template
+              {pluginCatalog.exportTemplates.length === 1 ? "" : "s"}
             </strong>
           </div>
         </div>

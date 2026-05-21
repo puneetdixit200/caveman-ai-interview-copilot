@@ -1,6 +1,7 @@
-import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { PLUGIN_CATALOG_SETTING_KEY, serializePluginCatalog } from "../lib/pluginLoader";
 import * as tauri from "../lib/tauri";
 import { Sessions } from "./Sessions";
 
@@ -88,7 +89,8 @@ vi.mock("../lib/tauri", () => ({
     confidence: input.confidence,
     createdAt: "2026-05-20T00:00:01.000Z"
   })),
-  deleteTranscript: vi.fn(async () => undefined)
+  deleteTranscript: vi.fn(async () => undefined),
+  getSetting: vi.fn(async () => undefined)
 }));
 
 describe("Sessions", () => {
@@ -168,5 +170,41 @@ describe("Sessions", () => {
       direction: "before",
       limit: 100
     });
+  });
+
+  it("copies plugin-defined session exports from the archive", async () => {
+    vi.mocked(tauri.getSetting).mockImplementation(async (key: string) =>
+      key === PLUGIN_CATALOG_SETTING_KEY
+        ? serializePluginCatalog({
+            loaded: [],
+            errors: [],
+            promptTemplates: [],
+            exportFormats: [],
+            exportTemplates: [
+              {
+                id: "interview-brief",
+                name: "Interview Brief",
+                fileExtension: "txt",
+                contentTemplate: "Brief: {{session.title}}\n{{transcript.plain}}\n{{responses.plain}}"
+              }
+            ],
+            practicePacks: []
+          })
+        : undefined
+    );
+    const user = userEvent.setup();
+    const writeText = vi.fn(async () => undefined);
+    Object.defineProperty(window.navigator, "clipboard", {
+      configurable: true,
+      value: { writeText }
+    });
+    render(<Sessions />);
+
+    expect((await screen.findAllByText("Stripe Interview")).length).toBeGreaterThan(0);
+    await user.click(await screen.findByRole("button", { name: "Copy Interview Brief" }));
+
+    await waitFor(() => expect(writeText).toHaveBeenCalledWith(expect.stringContaining("Brief: Stripe Interview")));
+    expect(writeText).toHaveBeenCalledWith(expect.stringContaining("INTERVIEWER: How would you design retries?"));
+    expect(await screen.findByText("Interview Brief export copied")).toBeInTheDocument();
   });
 });

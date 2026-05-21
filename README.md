@@ -35,7 +35,7 @@ Implemented now:
 - Resume, job description, OCR, and local knowledge-base context injection
 - Syntax-highlighted code answer extraction with clipboard copy and active-window typing for code/editor/chat handoff
 - Practice interview mode with local scoring and AI follow-up question generation
-- Analytics, TTS queue/playback, plugin manifests/practice packs, OS keychain API key storage, signed-update configuration, and GitHub `latest.json` release manifest generation
+- Analytics, TTS queue/playback, plugin manifests for prompt templates, practice packs, and custom session export templates, OS keychain API key storage, signed-update configuration, and GitHub `latest.json` release manifest generation
 - SQLite-backed Rust command layer for sessions, transcripts, responses, settings, screenshots, secrets, and native actions
 - Unit tests for audio, STT parsing, provider fallback, overlay safety, exports, analytics, plugins, hotkeys, OCR, practice, RAG, TTS, collaboration, and persistence
 
@@ -59,7 +59,7 @@ The architecture supports offline-first use with local Whisper and local LLM pro
 
 ### Session History
 
-Sessions can store transcripts, AI responses, tags, notes, providers, model metadata, latency, and exports for review after the interview.
+Sessions can store transcripts, AI responses, tags, notes, providers, model metadata, latency, and exports for review after the interview. Built-in Markdown, JSON, and PDF exports can be extended with plugin-defined text templates for resumes, recruiter summaries, or interview debriefs.
 
 ### Interview Practice
 

@@ -17,6 +17,7 @@ vi.mock("../lib/tauri", () => ({
           errors: [],
           promptTemplates: [],
           exportFormats: [],
+          exportTemplates: [],
           practicePacks: [
             {
               id: "queues-pack",
