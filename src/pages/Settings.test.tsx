@@ -39,6 +39,7 @@ describe("Settings", () => {
   it("shows controls for live audio, STT, automation, OCR, TTS, security, and plugins", async () => {
     render(<Settings />);
 
+    expect(await screen.findByText("Real-Use Readiness")).toBeInTheDocument();
     expect(await screen.findByText("Audio And STT")).toBeInTheDocument();
     expect(screen.getByText("Automatic Answering")).toBeInTheDocument();
     expect(screen.getByText("Screen OCR")).toBeInTheDocument();
@@ -47,6 +48,15 @@ describe("Settings", () => {
     expect(screen.getByRole("button", { name: "Check Signed Updates" })).toBeInTheDocument();
     expect(screen.getByText("Plugin System")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Load Plugins" })).toBeInTheDocument();
+  });
+
+  it("shows preflight actions for settings that are not interview-ready", async () => {
+    render(<Settings />);
+
+    expect(await screen.findByText("Manual audio capture")).toBeInTheDocument();
+    expect(screen.getByText("Manual transcript mode")).toBeInTheDocument();
+    expect(screen.getByText("Manual answer trigger")).toBeInTheDocument();
+    expect(screen.getByText("Switch Audio capture mode to Microphone, System, or Dual before a live call.")).toBeInTheDocument();
   });
 
   it("shows OS keychain controls for cloud provider API keys", async () => {

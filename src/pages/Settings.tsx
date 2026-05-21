@@ -17,7 +17,7 @@ import {
   Volume2,
   Wifi
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Button } from "../components/common/Button";
 import {
   APP_CONFIG_SETTING_KEY,
@@ -63,6 +63,7 @@ import {
   transcribeWithLocalWhisper
 } from "../lib/tauri";
 import { promptTemplates } from "../lib/promptTemplates";
+import { evaluateRealUseReadiness, type ReadinessStatus } from "../lib/readiness";
 import { enqueueTtsResponse, playTtsItem, stopTtsPlayback } from "../lib/tts";
 import { checkForSignedUpdate, downloadInstallAndRelaunchSignedUpdate } from "../lib/updater";
 import type {
@@ -134,6 +135,14 @@ export function Settings() {
   const [checkingUpdate, setCheckingUpdate] = useState(false);
   const [installingUpdate, setInstallingUpdate] = useState(false);
   const [updateProgress, setUpdateProgress] = useState("");
+  const readiness = useMemo(
+    () =>
+      evaluateRealUseReadiness({
+        config,
+        audioDevices
+      }),
+    [audioDevices, config]
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -878,6 +887,52 @@ export function Settings() {
 
   return (
     <main className="settings-grid">
+      <section className="panel readiness-panel">
+        <div className="panel-heading">
+          <div>
+            <p className="eyebrow">Preflight</p>
+            <h1>Real-Use Readiness</h1>
+          </div>
+          <span className={`status-pill ${readinessStatusClass(readiness.overallStatus)}`}>
+            {readinessStatusLabel(readiness.overallStatus)}
+          </span>
+        </div>
+
+        <div className="metric-strip readiness-summary">
+          <div>
+            <span>Ready</span>
+            <strong>{readiness.readyCount}</strong>
+          </div>
+          <div>
+            <span>Warnings</span>
+            <strong>{readiness.warningCount}</strong>
+          </div>
+          <div>
+            <span>Blocked</span>
+            <strong>{readiness.blockedCount}</strong>
+          </div>
+          <div>
+            <span>Checks</span>
+            <strong>{readiness.items.length}</strong>
+          </div>
+        </div>
+
+        <div className="readiness-list">
+          {readiness.items.map((item) => (
+            <article className="readiness-item" key={item.id}>
+              <div className="provider-editor-header">
+                <strong>{item.label}</strong>
+                <span className={`status-pill ${readinessStatusClass(item.status)}`}>
+                  {readinessStatusLabel(item.status)}
+                </span>
+              </div>
+              <p>{item.detail}</p>
+              {item.action ? <small>{item.action}</small> : null}
+            </article>
+          ))}
+        </div>
+      </section>
+
       <section className="panel provider-config-panel">
         <div className="panel-heading">
           <div>
@@ -2039,6 +2094,30 @@ export function Settings() {
 
 function isCloudSttMode(mode: SttSettings["selectedMode"]): mode is "deepgram" | "assemblyai" | "google" {
   return mode === "deepgram" || mode === "assemblyai" || mode === "google";
+}
+
+function readinessStatusLabel(status: ReadinessStatus): string {
+  if (status === "blocked") {
+    return "Blocked";
+  }
+
+  if (status === "warning") {
+    return "Needs setup";
+  }
+
+  return "Ready";
+}
+
+function readinessStatusClass(status: ReadinessStatus): string {
+  if (status === "blocked") {
+    return "status-danger";
+  }
+
+  if (status === "warning") {
+    return "status-warning";
+  }
+
+  return "status-live";
 }
 
 function sttSecretProviderId(mode: "deepgram" | "assemblyai" | "google"): string {

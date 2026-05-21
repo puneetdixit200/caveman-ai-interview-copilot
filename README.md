@@ -31,6 +31,7 @@ Implemented now:
 - Ollama, LM Studio, OpenRouter, OpenAI, Anthropic, Groq, Google Gemini, Mistral, Together AI, and Fireworks AI provider routing with streaming fallback and Settings model discovery
 - Stealth overlay window with opacity, font controls, global hotkeys, click-through mode, position persistence, Windows capture exclusion, and a screen-sharing process auto-hide guard
 - Dashboard session setup for company, role, interview type, tags, and notes, plus archive search, cursor-paged replay, transcript correction, Markdown, JSON, and PDF export
+- Settings real-use preflight checker for audio, STT, provider, automation, overlay, and privacy readiness before a live interview
 - Trusted collaborative helper link with token-gated live transcript/answer snapshot sharing and inbound helper hints
 - Resume, job description, OCR, and local knowledge-base context injection
 - Syntax-highlighted code answer extraction with clipboard copy and active-window typing for code/editor/chat handoff
@@ -56,6 +57,10 @@ The overlay is designed for interview use: always on top, adjustable opacity, ad
 ### Local-First AI Workflow
 
 The architecture supports offline-first use with local Whisper and local LLM providers such as Ollama or LM Studio. Cloud providers such as OpenRouter can be enabled when the user chooses to send context to a cloud model.
+
+### Real-Use Preflight
+
+Settings includes a readiness panel that checks whether the current configuration is ready for a live interview. It flags manual/demo-like settings, missing STT keys or Whisper paths, blocked cloud providers in local-only mode, incomplete audio devices, overlay protection gaps, and risky automation settings.
 
 ### Session History
 
