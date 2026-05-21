@@ -1,4 +1,4 @@
-import { Copy, Eye, EyeOff, Keyboard, Link2, Play, Send, ShieldCheck, Square, Users, Wand2, X } from "lucide-react";
+import { Copy, Eye, EyeOff, FilePlus2, Keyboard, Link2, Play, Send, ShieldCheck, Square, Users, Wand2, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AudioControls } from "../components/audio/AudioControls";
 import { CodeAssistantPanel } from "../components/code/CodeAssistantPanel";
@@ -64,7 +64,15 @@ import {
 } from "../lib/tauri";
 import { ProviderRouter } from "../lib/providerRouter";
 import { useOverlayStore } from "../stores/overlayStore";
-import type { AIResponseRecord, ChatMessage, SessionRecord, Speaker, SttTranscriptEvent, TranscriptSegment } from "../types/session";
+import type {
+  AIResponseRecord,
+  ChatMessage,
+  InterviewType,
+  SessionRecord,
+  Speaker,
+  SttTranscriptEvent,
+  TranscriptSegment
+} from "../types/session";
 import type { AudioDevice } from "../types/settings";
 import type { CollaborationHint, CollaborationServerStatus, CollaborationSnapshot } from "../types/collaboration";
 import type { AppConfig } from "../lib/appConfig";
@@ -89,6 +97,17 @@ const DEFAULT_COLLABORATION_STATUS: CollaborationServerStatus = {
   hintCount: 0
 };
 
+const INTERVIEW_TYPE_OPTIONS: Array<{ id: InterviewType; label: string }> = [
+  { id: "system_design", label: "System Design" },
+  { id: "dsa", label: "DSA / Coding" },
+  { id: "frontend", label: "Frontend" },
+  { id: "backend", label: "Backend" },
+  { id: "devops_cloud", label: "DevOps / Cloud" },
+  { id: "behavioral", label: "Behavioral" },
+  { id: "hr", label: "HR / Culture" },
+  { id: "mixed", label: "Mixed" }
+];
+
 export function Dashboard() {
   const [running, setRunning] = useState(false);
   const [session, setSession] = useState<SessionRecord | null>(null);
@@ -103,6 +122,12 @@ export function Dashboard() {
   const [config, setConfig] = useState<AppConfig>(DEFAULT_APP_CONFIG);
   const [manualSpeaker, setManualSpeaker] = useState<Speaker>("interviewer");
   const [manualTranscript, setManualTranscript] = useState("");
+  const [newSessionTitle, setNewSessionTitle] = useState("");
+  const [newSessionCompany, setNewSessionCompany] = useState("");
+  const [newSessionRole, setNewSessionRole] = useState("");
+  const [newSessionInterviewType, setNewSessionInterviewType] = useState<InterviewType>("system_design");
+  const [newSessionTags, setNewSessionTags] = useState("");
+  const [newSessionNotes, setNewSessionNotes] = useState("");
   const [streaming, setStreaming] = useState(false);
   const [lastTriggeredTranscriptId, setLastTriggeredTranscriptId] = useState<number | undefined>();
   const [statusMessage, setStatusMessage] = useState("Loading session...");
@@ -869,6 +894,49 @@ export function Dashboard() {
     }
   }
 
+  async function startNewSession() {
+    const interviewTypeLabel =
+      INTERVIEW_TYPE_OPTIONS.find((option) => option.id === newSessionInterviewType)?.label ?? "Interview";
+    const title = newSessionTitle.trim() || `${interviewTypeLabel} Session`;
+
+    try {
+      if (running) {
+        const stopped = await stopCapture();
+        setCaptureStatus(stopped);
+        setRunning(false);
+        setAudioDevices((current) => current.map((device) => ({ ...device, level: 0 })));
+        setInterimPreviews([]);
+      }
+
+      const created = await createSession({
+        title,
+        company: newSessionCompany.trim(),
+        role: newSessionRole.trim(),
+        interviewType: newSessionInterviewType,
+        tags: parseSessionTags(newSessionTags),
+        notes: newSessionNotes.trim()
+      });
+
+      seenLiveTranscriptKeys.current.clear();
+      setSession(created);
+      setTranscripts([]);
+      setResponses([]);
+      setInterimPreviews([]);
+      setManualTranscript("");
+      setLastTriggeredTranscriptId(undefined);
+      setErrorMessage(null);
+      setStatusMessage(`Started ${created.title}`);
+      setNewSessionTitle("");
+      setNewSessionCompany("");
+      setNewSessionRole("");
+      setNewSessionTags("");
+      setNewSessionNotes("");
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : String(error));
+      setStatusMessage("Could not start new session");
+    }
+  }
+
   async function saveManualTranscript() {
     if (!session) {
       setErrorMessage("Session is still loading.");
@@ -1070,6 +1138,79 @@ export function Dashboard() {
           <div>
             <span>Saved</span>
             <strong>{responses.filter((item) => item.id !== TEMP_STREAM_ID).length} responses</strong>
+          </div>
+        </div>
+
+        <div className="session-setup-form">
+          <div className="session-setup-heading">
+            <div>
+              <p className="eyebrow">Session</p>
+              <h2>Interview Setup</h2>
+            </div>
+            <Button icon={<FilePlus2 size={16} />} onClick={startNewSession}>
+              Start New Session
+            </Button>
+          </div>
+          <div className="session-setup-grid">
+            <label>
+              <span>Title</span>
+              <input
+                aria-label="New session title"
+                value={newSessionTitle}
+                onChange={(event) => setNewSessionTitle(event.currentTarget.value)}
+                placeholder="Frontend Loop"
+              />
+            </label>
+            <label>
+              <span>Company</span>
+              <input
+                aria-label="New session company"
+                value={newSessionCompany}
+                onChange={(event) => setNewSessionCompany(event.currentTarget.value)}
+                placeholder="Acme"
+              />
+            </label>
+            <label>
+              <span>Role</span>
+              <input
+                aria-label="New session role"
+                value={newSessionRole}
+                onChange={(event) => setNewSessionRole(event.currentTarget.value)}
+                placeholder="Senior Engineer"
+              />
+            </label>
+            <label>
+              <span>Type</span>
+              <select
+                aria-label="New session interview type"
+                value={newSessionInterviewType}
+                onChange={(event) => setNewSessionInterviewType(event.currentTarget.value as InterviewType)}
+              >
+                {INTERVIEW_TYPE_OPTIONS.map((option) => (
+                  <option key={option.id} value={option.id}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              <span>Tags</span>
+              <input
+                aria-label="New session tags"
+                value={newSessionTags}
+                onChange={(event) => setNewSessionTags(event.currentTarget.value)}
+                placeholder="react, accessibility"
+              />
+            </label>
+            <label className="session-notes-field">
+              <span>Notes</span>
+              <textarea
+                aria-label="New session notes"
+                value={newSessionNotes}
+                onChange={(event) => setNewSessionNotes(event.currentTarget.value)}
+                placeholder="Focus points for this round"
+              />
+            </label>
           </div>
         </div>
 
@@ -1292,6 +1433,13 @@ function buildCollaborationSnapshot(
 function websocketSttEndpoint(endpoint: string): string | undefined {
   const trimmed = endpoint.trim();
   return trimmed.startsWith("ws://") || trimmed.startsWith("wss://") ? trimmed : undefined;
+}
+
+function parseSessionTags(value: string): string[] {
+  return value
+    .split(",")
+    .map((tag) => tag.trim())
+    .filter(Boolean);
 }
 
 function isSnapshotSttMode(mode: AppConfig["stt"]["selectedMode"]): mode is "assemblyai" | "google" {

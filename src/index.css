@@ -368,6 +368,57 @@ h2 {
   resize: vertical;
 }
 
+.session-setup-form {
+  display: grid;
+  gap: 12px;
+  margin-top: 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 12px;
+  background: #121816;
+}
+
+.session-setup-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.session-setup-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.session-setup-form label {
+  display: grid;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 0.84rem;
+  font-weight: 700;
+}
+
+.session-setup-form input,
+.session-setup-form select,
+.session-setup-form textarea {
+  width: 100%;
+  border: 1px solid #3a4a43;
+  border-radius: 8px;
+  padding: 10px;
+  color: var(--text);
+  background: #0f1412;
+}
+
+.session-setup-form textarea {
+  min-height: 72px;
+  resize: vertical;
+}
+
+.session-notes-field {
+  grid-column: 1 / -1;
+}
+
 .collaboration-strip {
   display: grid;
   gap: 12px;
@@ -1133,6 +1184,7 @@ code {
 
   .metric-strip,
   .profile-grid,
+  .session-setup-grid,
   .settings-two-column,
   .transcript-editor-grid {
     grid-template-columns: 1fr;

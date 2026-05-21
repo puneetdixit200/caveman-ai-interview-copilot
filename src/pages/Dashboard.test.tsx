@@ -1,4 +1,4 @@
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import * as tauri from "../lib/tauri";
@@ -148,5 +148,46 @@ describe("Dashboard collaboration helper", () => {
         })
       )
     );
+  });
+
+  it("starts a new live session with real interview metadata", async () => {
+    vi.mocked(tauri.createSession).mockResolvedValueOnce({
+      id: "s2",
+      title: "Frontend Loop",
+      company: "Acme",
+      role: "UI Engineer",
+      interviewType: "frontend",
+      tags: ["react", "accessibility"],
+      status: "active",
+      totalTokens: 0,
+      durationSeconds: 0,
+      notes: "Focus on accessible component design.",
+      createdAt: "2026-05-21T00:10:00.000Z"
+    });
+    const user = userEvent.setup();
+    render(<Dashboard />);
+
+    expect(await screen.findByText("Live Interview Session")).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText("New session title"), { target: { value: "Frontend Loop" } });
+    fireEvent.change(screen.getByLabelText("New session company"), { target: { value: "Acme" } });
+    fireEvent.change(screen.getByLabelText("New session role"), { target: { value: "UI Engineer" } });
+    await user.selectOptions(screen.getByLabelText("New session interview type"), "frontend");
+    fireEvent.change(screen.getByLabelText("New session tags"), { target: { value: "react, accessibility" } });
+    fireEvent.change(screen.getByLabelText("New session notes"), {
+      target: { value: "Focus on accessible component design." }
+    });
+    await user.click(screen.getByRole("button", { name: "Start New Session" }));
+
+    expect(tauri.createSession).toHaveBeenCalledWith({
+      title: "Frontend Loop",
+      company: "Acme",
+      role: "UI Engineer",
+      interviewType: "frontend",
+      tags: ["react", "accessibility"],
+      notes: "Focus on accessible component design."
+    });
+    expect(await screen.findByText("Frontend Loop")).toBeInTheDocument();
+    expect(screen.queryByText("How would you design retries?")).not.toBeInTheDocument();
   });
 });
