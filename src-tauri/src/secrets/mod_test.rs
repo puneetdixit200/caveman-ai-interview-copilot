@@ -71,3 +71,15 @@ fn rejects_blank_provider_api_keys() {
 
     assert!(error.to_string().contains("empty"));
 }
+
+#[test]
+fn wires_native_keychain_backends_for_desktop_platforms() {
+    let source = include_str!("mod.rs");
+    let manifest = include_str!("../../Cargo.toml");
+
+    assert!(source.contains("apple_native_keyring_store::keychain::Store::new"));
+    assert!(source.contains("zbus_secret_service_keyring_store::Store::new"));
+    assert!(manifest.contains("apple-native-keyring-store"));
+    assert!(manifest.contains("zbus-secret-service-keyring-store"));
+    assert!(!source.contains("OS keychain storage is only wired for Windows"));
+}

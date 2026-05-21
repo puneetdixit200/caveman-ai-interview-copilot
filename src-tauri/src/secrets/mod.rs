@@ -137,9 +137,25 @@ fn initialize_native_store() -> Result<(), String> {
     Ok(())
 }
 
-#[cfg(not(target_os = "windows"))]
+#[cfg(target_os = "macos")]
 fn initialize_native_store() -> Result<(), String> {
-    Err("OS keychain storage is only wired for Windows in this build".to_string())
+    let store =
+        apple_native_keyring_store::keychain::Store::new().map_err(|error| error.to_string())?;
+    keyring_core::set_default_store(store);
+    Ok(())
+}
+
+#[cfg(target_os = "linux")]
+fn initialize_native_store() -> Result<(), String> {
+    let store =
+        zbus_secret_service_keyring_store::Store::new().map_err(|error| error.to_string())?;
+    keyring_core::set_default_store(store);
+    Ok(())
+}
+
+#[cfg(not(any(target_os = "windows", target_os = "macos", target_os = "linux")))]
+fn initialize_native_store() -> Result<(), String> {
+    Err("OS keychain storage is not implemented for this platform".to_string())
 }
 
 #[cfg(test)]
