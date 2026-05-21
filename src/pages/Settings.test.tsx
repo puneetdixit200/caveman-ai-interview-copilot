@@ -72,6 +72,29 @@ describe("Settings", () => {
     expect(screen.getByRole("combobox", { name: "System audio device" })).toBeInTheDocument();
   });
 
+  it("shows application audio source selection", async () => {
+    render(<Settings />);
+
+    const applicationSource = await screen.findByRole("combobox", { name: "Application source" });
+    expect(applicationSource).toHaveValue("all-system-audio");
+    expect(screen.getByRole("option", { name: "All system audio" })).toBeInTheDocument();
+  });
+
+  it("keeps a saved application audio source visible when the app is not currently listed", async () => {
+    storeConfig({
+      audio: {
+        ...DEFAULT_APP_CONFIG.audio,
+        applicationTargetId: "pid:4242",
+        applicationTargetLabel: "Zoom Meeting"
+      }
+    });
+
+    render(<Settings />);
+
+    expect(await screen.findByRole("combobox", { name: "Application source" })).toHaveValue("pid:4242");
+    expect(screen.getByRole("option", { name: "Zoom Meeting" })).toBeInTheDocument();
+  });
+
   it("shows OS keychain controls for cloud STT provider keys", async () => {
     render(<Settings />);
 

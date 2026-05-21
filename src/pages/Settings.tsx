@@ -53,6 +53,7 @@ import {
   getProviderApiKey,
   getSetting,
   getOverlayWindowBounds,
+  listAudioApplications,
   loadPluginManifests,
   listAudioDevices,
   saveProviderApiKey,
@@ -66,6 +67,7 @@ import { enqueueTtsResponse, playTtsItem, stopTtsPlayback } from "../lib/tts";
 import { checkForSignedUpdate, downloadInstallAndRelaunchSignedUpdate } from "../lib/updater";
 import type {
   AudioSettings,
+  AudioApplication,
   AudioDevice,
   AppProfile,
   AutoTriggerSettings,
@@ -117,6 +119,7 @@ export function Settings() {
   const [providerSecretInputs, setProviderSecretInputs] = useState<Partial<Record<ProviderId, string>>>({});
   const [sttSecretInput, setSttSecretInput] = useState("");
   const [audioDevices, setAudioDevices] = useState<AudioDevice[]>([]);
+  const [audioApplications, setAudioApplications] = useState<AudioApplication[]>([]);
   const [ocrReviewText, setOcrReviewText] = useState("");
   const [capturingOcr, setCapturingOcr] = useState(false);
   const [knowledgeBase, setKnowledgeBase] = useState<KnowledgeBase>(createKnowledgeBase());
@@ -135,9 +138,10 @@ export function Settings() {
     let cancelled = false;
 
     async function load() {
-      const [rawConfig, devices, rawKnowledgeBase, rawPluginCatalog] = await Promise.all([
+      const [rawConfig, devices, applications, rawKnowledgeBase, rawPluginCatalog] = await Promise.all([
         getSetting(APP_CONFIG_SETTING_KEY),
         listAudioDevices(),
+        listAudioApplications(),
         getSetting(KNOWLEDGE_BASE_SETTING_KEY),
         getSetting(PLUGIN_CATALOG_SETTING_KEY)
       ]);
@@ -161,6 +165,7 @@ export function Settings() {
         setSttSecretInput(sttSecret ?? "");
         setOcrReviewText(nextConfig.ocr.lastText ?? "");
         setAudioDevices(devices);
+        setAudioApplications(applications);
         setProviderSecretInputs(
           nextConfig.providers.reduce<Partial<Record<ProviderId, string>>>((values, provider) => {
             if (provider.kind === "cloud") {
@@ -455,6 +460,22 @@ export function Settings() {
 
   function updateAudio(patch: Partial<AudioSettings>) {
     setConfig((current) => ({ ...current, audio: { ...current.audio, ...patch } }));
+  }
+
+  function updateApplicationTarget(applicationId: string) {
+    if (applicationId === "all-system-audio") {
+      updateAudio({
+        applicationTargetId: "all-system-audio",
+        applicationTargetLabel: "All system audio"
+      });
+      return;
+    }
+
+    const application = audioApplications.find((item) => item.id === applicationId);
+    updateAudio({
+      applicationTargetId: applicationId,
+      applicationTargetLabel: application ? audioApplicationLabel(application) : applicationId
+    });
   }
 
   function audioDeviceOptions(
@@ -1545,6 +1566,20 @@ export function Settings() {
               ))}
             </select>
           </label>
+          <label className="settings-field">
+            <span>Application source</span>
+            <select
+              value={config.audio.applicationTargetId}
+              onChange={(event) => updateApplicationTarget(event.currentTarget.value)}
+            >
+              <option value="all-system-audio">All system audio</option>
+              {applicationTargetOptions(config.audio, audioApplications).map((application) => (
+                <option key={application.id} value={application.id}>
+                  {application.label}
+                </option>
+              ))}
+            </select>
+          </label>
           <label className="toggle-row">
             <span>Diarization labels</span>
             <input
@@ -1987,6 +2022,35 @@ function sttLanguageOptions(language: string): Array<{ value: string; label: str
   }
 
   return [...STT_LANGUAGE_OPTIONS, { value: current, label: current }];
+}
+
+function audioApplicationLabel(application: AudioApplication): string {
+  return application.windowTitle?.trim() || application.name;
+}
+
+function applicationTargetOptions(
+  audio: AudioSettings,
+  applications: AudioApplication[]
+): Array<{ id: string; label: string }> {
+  const liveOptions = applications.map((application) => ({
+    id: application.id,
+    label: audioApplicationLabel(application)
+  }));
+  if (
+    audio.applicationTargetId !== "all-system-audio" &&
+    audio.applicationTargetId.trim() &&
+    !liveOptions.some((option) => option.id === audio.applicationTargetId)
+  ) {
+    return [
+      {
+        id: audio.applicationTargetId,
+        label: audio.applicationTargetLabel || audio.applicationTargetId
+      },
+      ...liveOptions
+    ];
+  }
+
+  return liveOptions;
 }
 
 function isCloudBlocked(config: AppConfig): boolean {

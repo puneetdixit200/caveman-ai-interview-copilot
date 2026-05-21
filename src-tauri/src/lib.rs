@@ -1,5 +1,6 @@
 pub mod ai;
 pub mod audio;
+pub mod audio_apps;
 pub mod collaboration;
 pub mod commands;
 pub mod db;
@@ -45,6 +46,7 @@ pub fn run() {
             commands::get_provider_api_key,
             commands::delete_provider_api_key,
             commands::list_audio_devices,
+            commands::list_audio_applications,
             commands::start_capture,
             commands::stop_capture,
             commands::get_capture_status,

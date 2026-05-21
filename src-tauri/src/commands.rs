@@ -2,6 +2,7 @@ use tauri::{AppHandle, Manager, State};
 
 use crate::ai;
 use crate::audio::{self, AudioCaptureManager, AudioCaptureState, AudioProcessingSettings};
+use crate::audio_apps;
 use crate::collaboration::{
     CollaborationHint, CollaborationManager, CollaborationServerStatus, CollaborationSnapshot,
 };
@@ -142,6 +143,11 @@ pub fn list_audio_devices() -> Vec<audio::AudioDevice> {
 }
 
 #[tauri::command]
+pub fn list_audio_applications() -> Result<Vec<audio_apps::AudioApplication>, String> {
+    audio_apps::list_audio_applications().map_err(to_command_error)
+}
+
+#[tauri::command]
 pub fn start_capture(
     app_handle: AppHandle,
     capture_manager: State<'_, AudioCaptureManager>,
@@ -149,6 +155,8 @@ pub fn start_capture(
     dual_stream_enabled: Option<bool>,
     system_device_id: String,
     microphone_device_id: String,
+    application_target_id: Option<String>,
+    application_target_label: Option<String>,
     gain_db: Option<f32>,
     noise_gate_db: Option<f32>,
 ) -> Result<AudioCaptureState, String> {
@@ -159,6 +167,7 @@ pub fn start_capture(
             app_handle,
             &system_device_id,
             &microphone_device_id,
+            audio::ApplicationTarget::new(application_target_id, application_target_label),
             source_selection,
             AudioProcessingSettings::from_optional(gain_db, noise_gate_db),
         )

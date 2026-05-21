@@ -20,7 +20,7 @@ Implemented now:
 
 - Tauri v2 desktop app with Rust backend and React frontend
 - Dashboard for active interview sessions
-- Native CPAL microphone, system audio, and dual-stream capture with device selection, gain, noise gate, meters, STT-ready 16 kHz mono snapshots, and 250 ms PCM chunk events for streaming STT clients
+- Native CPAL microphone, system audio, and dual-stream capture with device selection, app-aware target selection, gain, noise gate, meters, STT-ready 16 kHz mono snapshots, and 250 ms PCM chunk events for streaming STT clients
 - Local Whisper chunk-driven streaming from 250 ms PCM audio, Deepgram live WebSocket streaming with interim word preview, AssemblyAI and Google STT fallback commands, and first-class STT auto language detection
 - Speaker diarization calibration for microphone, system audio, and provider speaker slots from Whisper, Deepgram, AssemblyAI, and Google STT
 - Local Whisper setup helpers that scan for `whisper-cli`/`main` binaries, detect local `ggml` models, and download the official `base.en` model with SHA-1 verification
@@ -46,7 +46,7 @@ Planned full build:
 
 ### Real-Time Interview Copilot
 
-Caveman is designed to capture conversation audio, transcribe it, detect interviewer questions, build a model-ready context window, and stream AI-generated answer hints into the app and overlay.
+Caveman is designed to capture conversation audio, transcribe it, detect interviewer questions, build a model-ready context window, and stream AI-generated answer hints into the app and overlay. On Windows, Settings can enumerate visible applications so a session can be labeled and routed around the app you intend to capture while system loopback records desktop output.
 
 ### Stealth Overlay
 

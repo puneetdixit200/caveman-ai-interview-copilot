@@ -207,6 +207,8 @@ describe("Dashboard collaboration helper", () => {
             dualStreamEnabled: false,
             systemDeviceId: "speaker-loopback",
             microphoneDeviceId: "mic-1",
+            applicationTargetId: "pid:4242",
+            applicationTargetLabel: "Zoom Meeting",
             gainDb: 4,
             noiseGateDb: -50
           }
@@ -218,6 +220,8 @@ describe("Dashboard collaboration helper", () => {
       running: true,
       systemDeviceId: "speaker-loopback",
       microphoneDeviceId: "",
+      applicationTargetId: "pid:4242",
+      applicationTargetLabel: "Zoom Meeting",
       sampleRateHz: 16000,
       channels: 1,
       microphoneLevel: 0,
@@ -237,6 +241,8 @@ describe("Dashboard collaboration helper", () => {
       dualStreamEnabled: false,
       systemDeviceId: "speaker-loopback",
       microphoneDeviceId: "mic-1",
+      applicationTargetId: "pid:4242",
+      applicationTargetLabel: "Zoom Meeting",
       gainDb: 4,
       noiseGateDb: -50
     });

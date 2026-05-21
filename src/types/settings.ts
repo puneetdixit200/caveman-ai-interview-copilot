@@ -37,12 +37,21 @@ export interface AudioDevice {
   level: number;
 }
 
+export interface AudioApplication {
+  id: string;
+  name: string;
+  pid?: number | null;
+  windowTitle?: string | null;
+}
+
 export interface AudioSettings {
   captureMode: AudioCaptureMode;
   dualStreamEnabled: boolean;
   systemDeviceId: string;
   microphoneDeviceId: string;
   virtualDeviceId?: string;
+  applicationTargetId: string;
+  applicationTargetLabel: string;
   noiseGateDb: number;
   gainDb: number;
   sttMode: SttMode;

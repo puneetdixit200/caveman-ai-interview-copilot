@@ -930,6 +930,8 @@ export function Dashboard() {
         dualStreamEnabled: config.audio.dualStreamEnabled,
         systemDeviceId: config.audio.systemDeviceId,
         microphoneDeviceId: config.audio.microphoneDeviceId,
+        applicationTargetId: config.audio.applicationTargetId,
+        applicationTargetLabel: config.audio.applicationTargetLabel,
         gainDb: config.audio.gainDb,
         noiseGateDb: config.audio.noiseGateDb
       });

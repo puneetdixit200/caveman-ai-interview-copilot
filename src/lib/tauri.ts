@@ -11,7 +11,7 @@ import type {
   TranscriptPage,
   TranscriptSegment
 } from "../types/session";
-import type { AudioCaptureMode, AudioDevice, OverlayWindowBounds } from "../types/settings";
+import type { AudioApplication, AudioCaptureMode, AudioDevice, OverlayWindowBounds } from "../types/settings";
 import type { CollaborationHint, CollaborationServerStatus, CollaborationSnapshot } from "../types/collaboration";
 import type { PluginManifestFile } from "./pluginLoader";
 
@@ -316,11 +316,17 @@ export async function listAudioDevices(): Promise<AudioDevice[]> {
   return invokeOrFallback<AudioDevice[]>("list_audio_devices", {}, () => []);
 }
 
+export async function listAudioApplications(): Promise<AudioApplication[]> {
+  return invokeOrFallback<AudioApplication[]>("list_audio_applications", {}, () => []);
+}
+
 export async function startCapture(input: {
   captureMode: AudioCaptureMode;
   dualStreamEnabled: boolean;
   systemDeviceId: string;
   microphoneDeviceId: string;
+  applicationTargetId: string;
+  applicationTargetLabel: string;
   gainDb: number;
   noiseGateDb: number;
 }): Promise<AudioCaptureState> {
@@ -331,6 +337,8 @@ export async function startCapture(input: {
       dualStreamEnabled: input.dualStreamEnabled,
       systemDeviceId: input.systemDeviceId,
       microphoneDeviceId: input.microphoneDeviceId,
+      applicationTargetId: input.applicationTargetId,
+      applicationTargetLabel: input.applicationTargetLabel,
       gainDb: input.gainDb,
       noiseGateDb: input.noiseGateDb
     },
@@ -340,6 +348,12 @@ export async function startCapture(input: {
       microphoneDeviceId: shouldCaptureMicrophone(input.captureMode, input.dualStreamEnabled)
         ? input.microphoneDeviceId
         : "",
+      applicationTargetId: shouldCaptureSystem(input.captureMode, input.dualStreamEnabled)
+        ? input.applicationTargetId
+        : "all-system-audio",
+      applicationTargetLabel: shouldCaptureSystem(input.captureMode, input.dualStreamEnabled)
+        ? input.applicationTargetLabel
+        : "All system audio",
       sampleRateHz: 16000,
       channels: 1,
       microphoneLevel: 0,
@@ -364,6 +378,8 @@ export async function stopCapture(): Promise<AudioCaptureState> {
     running: false,
     systemDeviceId: "default",
     microphoneDeviceId: "default",
+    applicationTargetId: "all-system-audio",
+    applicationTargetLabel: "All system audio",
     sampleRateHz: 16000,
     channels: 1,
     microphoneLevel: 0,
@@ -379,6 +395,8 @@ export async function getCaptureStatus(): Promise<AudioCaptureState> {
     running: false,
     systemDeviceId: "default",
     microphoneDeviceId: "default",
+    applicationTargetId: "all-system-audio",
+    applicationTargetLabel: "All system audio",
     sampleRateHz: 16000,
     channels: 1,
     microphoneLevel: 0,

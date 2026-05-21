@@ -30,6 +30,8 @@ pub struct AudioCaptureState {
     pub running: bool,
     pub system_device_id: String,
     pub microphone_device_id: String,
+    pub application_target_id: String,
+    pub application_target_label: String,
     pub sample_rate_hz: u32,
     pub channels: u16,
     pub microphone_level: f32,
@@ -38,6 +40,25 @@ pub struct AudioCaptureState {
     pub noise_gate_db: f32,
     pub system_capture_supported: bool,
     pub error: Option<String>,
+}
+
+#[derive(Debug, Clone)]
+pub struct ApplicationTarget {
+    pub id: String,
+    pub label: String,
+}
+
+impl ApplicationTarget {
+    pub fn new(id: Option<String>, label: Option<String>) -> Self {
+        let id = id
+            .filter(|value| !value.trim().is_empty())
+            .unwrap_or_else(|| "all-system-audio".to_string());
+        let label = label
+            .filter(|value| !value.trim().is_empty())
+            .unwrap_or_else(|| "All system audio".to_string());
+
+        Self { id, label }
+    }
 }
 
 #[derive(Debug, Copy, Clone, Deserialize, Serialize)]
@@ -391,6 +412,7 @@ impl AudioCaptureManager {
         app_handle: AppHandle,
         system_device_id: &str,
         microphone_device_id: &str,
+        application_target: ApplicationTarget,
         source_selection: CaptureSourceSelection,
         processing_settings: AudioProcessingSettings,
     ) -> anyhow::Result<AudioCaptureState> {
@@ -420,6 +442,7 @@ impl AudioCaptureManager {
                 app_handle,
                 system_device_id,
                 microphone_device_id,
+                application_target,
                 source_selection,
                 processing_settings,
                 shared_state,
@@ -745,6 +768,8 @@ mod tests {
             running: true,
             system_device_id: "system-1".to_string(),
             microphone_device_id: "mic-1".to_string(),
+            application_target_id: "all-system-audio".to_string(),
+            application_target_label: "All system audio".to_string(),
             sample_rate_hz: 48_000,
             channels: 2,
             microphone_level: 0.0,
@@ -1040,6 +1065,7 @@ fn run_audio_capture_thread(
     app_handle: AppHandle,
     system_device_id: String,
     microphone_device_id: String,
+    application_target: ApplicationTarget,
     source_selection: CaptureSourceSelection,
     processing_settings: AudioProcessingSettings,
     shared_state: Arc<Mutex<AudioCaptureState>>,
@@ -1063,6 +1089,16 @@ fn run_audio_capture_thread(
                 microphone_device_id.clone()
             } else {
                 String::new()
+            },
+            application_target_id: if source_selection.system {
+                application_target.id.clone()
+            } else {
+                "all-system-audio".to_string()
+            },
+            application_target_label: if source_selection.system {
+                application_target.label.clone()
+            } else {
+                "All system audio".to_string()
             },
             sample_rate_hz: 16_000,
             channels: 1,
@@ -1537,6 +1573,8 @@ fn stopped_state() -> AudioCaptureState {
         running: false,
         system_device_id: "default".to_string(),
         microphone_device_id: "default".to_string(),
+        application_target_id: "all-system-audio".to_string(),
+        application_target_label: "All system audio".to_string(),
         sample_rate_hz: 16_000,
         channels: 1,
         microphone_level: 0.0,

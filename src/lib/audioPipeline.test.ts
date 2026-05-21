@@ -8,6 +8,8 @@ const settings: AudioSettings = {
   systemDeviceId: "speaker-loopback",
   microphoneDeviceId: "mic-1",
   virtualDeviceId: "virtual-1",
+  applicationTargetId: "all-system-audio",
+  applicationTargetLabel: "All system audio",
   noiseGateDb: -40,
   gainDb: 6,
   sttMode: "local_whisper",

@@ -200,6 +200,8 @@ describe("appConfig", () => {
       dualStreamEnabled: false,
       microphoneDeviceId: "default",
       systemDeviceId: "default",
+      applicationTargetId: "all-system-audio",
+      applicationTargetLabel: "All system audio",
       gainDb: 0,
       noiseGateDb: -45
     });
@@ -266,6 +268,8 @@ describe("appConfig", () => {
           dualStreamEnabled: true,
           microphoneDeviceId: "mic-7",
           systemDeviceId: "speaker-loopback",
+          applicationTargetId: "pid:4242",
+          applicationTargetLabel: "Zoom Meeting",
           gainDb: 18,
           noiseGateDb: 10
         },
@@ -326,6 +330,8 @@ describe("appConfig", () => {
       dualStreamEnabled: true,
       microphoneDeviceId: "mic-7",
       systemDeviceId: "speaker-loopback",
+      applicationTargetId: "pid:4242",
+      applicationTargetLabel: "Zoom Meeting",
       gainDb: 12,
       noiseGateDb: -45
     });

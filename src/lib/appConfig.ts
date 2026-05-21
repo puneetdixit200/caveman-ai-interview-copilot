@@ -150,6 +150,8 @@ export const DEFAULT_APP_CONFIG: AppConfig = {
     systemDeviceId: "default",
     microphoneDeviceId: "default",
     virtualDeviceId: "default",
+    applicationTargetId: "all-system-audio",
+    applicationTargetLabel: "All system audio",
     noiseGateDb: -45,
     gainDb: 0,
     sttMode: "manual",
@@ -360,6 +362,11 @@ function mergeAudioSettings(raw: unknown): AudioSettings {
     systemDeviceId: readString(value.systemDeviceId, DEFAULT_APP_CONFIG.audio.systemDeviceId),
     microphoneDeviceId: readString(value.microphoneDeviceId, DEFAULT_APP_CONFIG.audio.microphoneDeviceId),
     virtualDeviceId: readString(value.virtualDeviceId, DEFAULT_APP_CONFIG.audio.virtualDeviceId ?? "default"),
+    applicationTargetId: readString(value.applicationTargetId, DEFAULT_APP_CONFIG.audio.applicationTargetId),
+    applicationTargetLabel: readString(
+      value.applicationTargetLabel,
+      DEFAULT_APP_CONFIG.audio.applicationTargetLabel
+    ),
     gainDb: clampNumber(value.gainDb, -24, 12, DEFAULT_APP_CONFIG.audio.gainDb),
     noiseGateDb: readNoiseGateDb(value.noiseGateDb, DEFAULT_APP_CONFIG.audio.noiseGateDb),
     sttMode: isSttMode(value.sttMode) ? value.sttMode : DEFAULT_APP_CONFIG.audio.sttMode,

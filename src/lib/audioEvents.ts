@@ -27,6 +27,8 @@ export interface AudioCaptureState {
   running: boolean;
   systemDeviceId: string;
   microphoneDeviceId: string;
+  applicationTargetId?: string;
+  applicationTargetLabel?: string;
   sampleRateHz: number;
   channels: number;
   microphoneLevel: number;
