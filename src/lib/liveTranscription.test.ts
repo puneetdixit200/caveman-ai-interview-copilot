@@ -71,6 +71,42 @@ describe("liveTranscription", () => {
     expect(saved).toHaveLength(1);
   });
 
+  it("deletes cached snapshot audio after a transcription pass", async () => {
+    const deleteCaptureSnapshot = vi.fn(async () => true);
+    const saveCaptureSnapshot = vi.fn(async () => ({
+      source: "microphone" as const,
+      audioPath: "C:\\tmp\\caveman-live.wav",
+      sampleRateHz: 16000,
+      channels: 1,
+      durationMs: 1200,
+      sampleCount: 19200
+    }));
+    const transcribeWithLocalWhisper = vi.fn(async () => []);
+
+    await runLiveTranscriptionPass({
+      sessionId: "s1",
+      config: {
+        ...DEFAULT_APP_CONFIG,
+        audio: {
+          ...DEFAULT_APP_CONFIG.audio,
+          captureMode: "microphone"
+        },
+        stt: {
+          ...DEFAULT_APP_CONFIG.stt,
+          selectedMode: "local_whisper",
+          localWhisperBinaryPath: "C:\\tools\\whisper.exe",
+          localWhisperModelPath: "C:\\models\\ggml-base.en.bin"
+        }
+      },
+      seenTranscriptKeys: new Set<string>(),
+      saveCaptureSnapshot,
+      transcribeWithLocalWhisper,
+      deleteCaptureSnapshot
+    });
+
+    expect(deleteCaptureSnapshot).toHaveBeenCalledWith("C:\\tmp\\caveman-live.wav");
+  });
+
   it("transcribes microphone and system audio separately in dual capture mode", async () => {
     const saveCaptureSnapshot = vi.fn(async (input: { source: "microphone" | "system" }) => ({
       source: input.source,

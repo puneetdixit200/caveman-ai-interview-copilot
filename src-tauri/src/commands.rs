@@ -187,6 +187,15 @@ pub fn save_capture_snapshot(
 }
 
 #[tauri::command]
+pub fn delete_capture_snapshot(app_handle: AppHandle, audio_path: String) -> Result<bool, String> {
+    let app_cache_dir = app_handle
+        .path()
+        .app_cache_dir()
+        .map_err(|error| error.to_string())?;
+    audio::delete_capture_snapshot_file(&app_cache_dir, &audio_path).map_err(to_command_error)
+}
+
+#[tauri::command]
 pub fn list_stt_providers() -> Vec<stt::SttProviderStatus> {
     stt::list_stt_providers()
 }

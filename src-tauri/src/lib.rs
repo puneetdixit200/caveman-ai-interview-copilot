@@ -48,6 +48,7 @@ pub fn run() {
             commands::stop_capture,
             commands::get_capture_status,
             commands::save_capture_snapshot,
+            commands::delete_capture_snapshot,
             commands::list_stt_providers,
             commands::detect_local_whisper_setup,
             commands::download_whisper_model,

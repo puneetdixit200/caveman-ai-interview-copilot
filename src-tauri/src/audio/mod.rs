@@ -2,7 +2,7 @@ use base64::Engine;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::io::Write;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::{mpsc, Arc, Mutex};
 use std::thread::{self, JoinHandle};
 use std::time::Duration;
@@ -516,6 +516,48 @@ impl AudioCaptureManager {
     }
 }
 
+pub fn delete_capture_snapshot_file(
+    app_cache_dir: &Path,
+    audio_path: &str,
+) -> anyhow::Result<bool> {
+    let trimmed = audio_path.trim();
+    if trimmed.is_empty() {
+        return Ok(false);
+    }
+
+    let path = PathBuf::from(trimmed);
+    if !path.exists() {
+        return Ok(false);
+    }
+
+    let live_capture_dir = app_cache_dir.join("live-capture");
+    let canonical_live_capture_dir = std::fs::canonicalize(&live_capture_dir)?;
+    let canonical_path = std::fs::canonicalize(&path)?;
+
+    if !canonical_path.starts_with(&canonical_live_capture_dir) {
+        return Err(anyhow::anyhow!(
+            "Refusing to delete capture snapshot outside the live-capture cache"
+        ));
+    }
+
+    if !canonical_path.is_file() {
+        return Err(anyhow::anyhow!("Capture snapshot path is not a file"));
+    }
+
+    let is_wav = canonical_path
+        .extension()
+        .and_then(|extension| extension.to_str())
+        .is_some_and(|extension| extension.eq_ignore_ascii_case("wav"));
+    if !is_wav {
+        return Err(anyhow::anyhow!(
+            "Capture snapshot cleanup only accepts WAV files"
+        ));
+    }
+
+    std::fs::remove_file(canonical_path)?;
+    Ok(true)
+}
+
 fn enumerate_audio_devices() -> anyhow::Result<Vec<AudioDevice>> {
     let host = cpal::default_host();
     let default_input = host
@@ -642,9 +684,10 @@ mod tests {
 
     use super::{
         apply_audio_level_to_state, apply_audio_processing, classify_device_kind,
-        prepare_stt_samples, stable_device_id, AudioCaptureManager, AudioCaptureState,
-        AudioChunkAccumulator, AudioChunkEvent, AudioLevelEvent, AudioProcessingSettings,
-        CaptureSourceSelection, RollingAudioBuffer, TARGET_CHANNELS, TARGET_SAMPLE_RATE_HZ,
+        delete_capture_snapshot_file, prepare_stt_samples, stable_device_id, AudioCaptureManager,
+        AudioCaptureState, AudioChunkAccumulator, AudioChunkEvent, AudioLevelEvent,
+        AudioProcessingSettings, CaptureSourceSelection, RollingAudioBuffer, TARGET_CHANNELS,
+        TARGET_SAMPLE_RATE_HZ,
     };
 
     #[test]
@@ -866,6 +909,33 @@ mod tests {
         assert_eq!(system_events.len(), 1);
         assert_eq!(system_events[0].sequence, 1);
         assert_eq!(system_events[0].source, "system");
+    }
+
+    #[test]
+    fn deletes_only_live_capture_snapshot_files() {
+        let cache_dir =
+            std::env::temp_dir().join(format!("caveman-audio-cleanup-{}", uuid::Uuid::new_v4()));
+        let live_capture_dir = cache_dir.join("live-capture");
+        std::fs::create_dir_all(&live_capture_dir).expect("create live capture dir");
+        let snapshot = live_capture_dir.join("microphone-123.wav");
+        std::fs::write(&snapshot, b"wav").expect("write snapshot");
+        let outside = cache_dir.join("keep.wav");
+        std::fs::write(&outside, b"keep").expect("write outside file");
+
+        assert!(
+            delete_capture_snapshot_file(&cache_dir, &snapshot.display().to_string())
+                .expect("delete snapshot")
+        );
+        assert!(!snapshot.exists());
+        assert!(
+            delete_capture_snapshot_file(&cache_dir, &snapshot.display().to_string())
+                .expect("ignore missing snapshot")
+                == false
+        );
+        assert!(delete_capture_snapshot_file(&cache_dir, &outside.display().to_string()).is_err());
+        assert!(outside.exists());
+
+        std::fs::remove_dir_all(cache_dir).expect("clean temp dir");
     }
 }
 

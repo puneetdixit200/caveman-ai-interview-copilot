@@ -399,6 +399,10 @@ export async function saveCaptureSnapshot(input: {
   );
 }
 
+export async function deleteCaptureSnapshot(audioPath: string): Promise<boolean> {
+  return invokeStrictOrFallback<boolean>("delete_capture_snapshot", { audioPath }, () => false);
+}
+
 export async function onAudioLevel(callback: (event: AudioLevelEvent) => void): Promise<() => void> {
   if (!isRunningInTauri()) {
     return () => undefined;

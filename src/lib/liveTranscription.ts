@@ -1,6 +1,7 @@
 import type { AppConfig } from "./appConfig";
 import {
   addTranscript,
+  deleteCaptureSnapshot,
   saveCaptureSnapshot,
   transcribeWithCloudStt,
   transcribeWithLocalWhisper,
@@ -15,6 +16,7 @@ type SnapshotSource = "microphone" | "system";
 
 export interface LiveTranscriptionDeps {
   saveCaptureSnapshot: typeof saveCaptureSnapshot;
+  deleteCaptureSnapshot: typeof deleteCaptureSnapshot;
   transcribeWithLocalWhisper: typeof transcribeWithLocalWhisper;
   transcribeWithCloudStt: typeof transcribeWithCloudStt;
   addTranscript: typeof addTranscript;
@@ -29,6 +31,7 @@ export async function runLiveTranscriptionPass(input: {
   maxSeconds?: number;
   deps?: Partial<LiveTranscriptionDeps>;
   saveCaptureSnapshot?: LiveTranscriptionDeps["saveCaptureSnapshot"];
+  deleteCaptureSnapshot?: LiveTranscriptionDeps["deleteCaptureSnapshot"];
   transcribeWithLocalWhisper?: LiveTranscriptionDeps["transcribeWithLocalWhisper"];
   transcribeWithCloudStt?: LiveTranscriptionDeps["transcribeWithCloudStt"];
   addTranscript?: LiveTranscriptionDeps["addTranscript"];
@@ -43,6 +46,8 @@ export async function runLiveTranscriptionPass(input: {
 
   const deps = {
     saveCaptureSnapshot: input.saveCaptureSnapshot ?? input.deps?.saveCaptureSnapshot ?? saveCaptureSnapshot,
+    deleteCaptureSnapshot:
+      input.deleteCaptureSnapshot ?? input.deps?.deleteCaptureSnapshot ?? deleteCaptureSnapshot,
     transcribeWithLocalWhisper:
       input.transcribeWithLocalWhisper ?? input.deps?.transcribeWithLocalWhisper ?? transcribeWithLocalWhisper,
     transcribeWithCloudStt: input.transcribeWithCloudStt ?? input.deps?.transcribeWithCloudStt ?? transcribeWithCloudStt,
@@ -52,44 +57,54 @@ export async function runLiveTranscriptionPass(input: {
 
   for (const source of selectSnapshotSources(input.config.audio.captureMode)) {
     const snapshot = await snapshotCapturedAudio(deps.saveCaptureSnapshot, source, input.maxSeconds ?? 6);
-    if (!snapshot || !snapshot.audioPath || snapshot.sampleCount === 0 || snapshot.durationMs < 250) {
+    if (!snapshot) {
       continue;
     }
 
-    const events = await transcribeSnapshot({ config: input.config, snapshot, sttMode, deps });
-
-    for (const event of events) {
-      const text = event.text.trim();
-      if (!text) {
+    try {
+      if (!snapshot.audioPath || snapshot.sampleCount === 0 || snapshot.durationMs < 250) {
         continue;
       }
 
-      const speaker = resolveCalibratedSpeaker({
-        speaker: event.speaker,
-        providerSpeaker: event.providerSpeaker,
-        source: snapshot.source,
-        calibration: input.config.stt.speakerCalibration
-      });
-      const key = transcriptKey(speaker, text);
-      if (input.seenTranscriptKeys.has(key)) {
-        continue;
-      }
+      const events = await transcribeSnapshot({ config: input.config, snapshot, sttMode, deps });
 
-      input.seenTranscriptKeys.add(key);
-      saved.push(
-        await deps.addTranscript({
-          sessionId: input.sessionId,
-          speaker,
-          content: text,
-          timestampMs: transcriptTimestampMs({
-            eventStartMs: event.startMs,
-            snapshotDurationMs: snapshot.durationMs,
-            sessionStartedAt: input.sessionStartedAt,
-            now: input.now ?? new Date()
-          }),
-          confidence: event.confidence
-        })
-      );
+      for (const event of events) {
+        const text = event.text.trim();
+        if (!text) {
+          continue;
+        }
+
+        const speaker = resolveCalibratedSpeaker({
+          speaker: event.speaker,
+          providerSpeaker: event.providerSpeaker,
+          source: snapshot.source,
+          calibration: input.config.stt.speakerCalibration
+        });
+        const key = transcriptKey(speaker, text);
+        if (input.seenTranscriptKeys.has(key)) {
+          continue;
+        }
+
+        input.seenTranscriptKeys.add(key);
+        saved.push(
+          await deps.addTranscript({
+            sessionId: input.sessionId,
+            speaker,
+            content: text,
+            timestampMs: transcriptTimestampMs({
+              eventStartMs: event.startMs,
+              snapshotDurationMs: snapshot.durationMs,
+              sessionStartedAt: input.sessionStartedAt,
+              now: input.now ?? new Date()
+            }),
+            confidence: event.confidence
+          })
+        );
+      }
+    } finally {
+      if (snapshot.audioPath) {
+        await deps.deleteCaptureSnapshot(snapshot.audioPath);
+      }
     }
   }
 
