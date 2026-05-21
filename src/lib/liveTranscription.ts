@@ -9,7 +9,7 @@ import {
 import type { SttTranscriptEvent, TranscriptSegment } from "../types/session";
 import type { AudioCaptureMode, SttMode } from "../types/settings";
 
-type SttCloudMode = "deepgram" | "assemblyai" | "google";
+type SttCloudMode = "assemblyai" | "google";
 type SnapshotSource = "microphone" | "system";
 
 export interface LiveTranscriptionDeps {
@@ -33,7 +33,7 @@ export async function runLiveTranscriptionPass(input: {
   addTranscript?: LiveTranscriptionDeps["addTranscript"];
 }): Promise<TranscriptSegment[]> {
   const sttMode = input.config.stt.selectedMode;
-  if (sttMode === "manual") {
+  if (sttMode === "manual" || sttMode === "deepgram") {
     return [];
   }
 
@@ -152,7 +152,7 @@ async function transcribeSnapshot(input: {
 }
 
 function isCloudSttMode(mode: SttMode): mode is SttCloudMode {
-  return mode === "deepgram" || mode === "assemblyai" || mode === "google";
+  return mode === "assemblyai" || mode === "google";
 }
 
 function cloudSttLanguage(language: string): string {

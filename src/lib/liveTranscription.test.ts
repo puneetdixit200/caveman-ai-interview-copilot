@@ -213,7 +213,7 @@ describe("liveTranscription", () => {
     });
   });
 
-  it("passes auto language to cloud STT when the language setting is blank", async () => {
+  it("passes auto language to snapshot cloud STT when the language setting is blank", async () => {
     const saveCaptureSnapshot = vi.fn(async () => ({
       source: "system" as const,
       audioPath: "C:\\tmp\\system.wav",
@@ -251,7 +251,7 @@ describe("liveTranscription", () => {
         },
         stt: {
           ...DEFAULT_APP_CONFIG.stt,
-          selectedMode: "deepgram",
+          selectedMode: "assemblyai",
           language: "",
           apiKey: "dg_key"
         }
@@ -263,12 +263,40 @@ describe("liveTranscription", () => {
     });
 
     expect(transcribeWithCloudStt).toHaveBeenCalledWith({
-      provider: "deepgram",
+      provider: "assemblyai",
       apiKey: "dg_key",
       audioPath: "C:\\tmp\\system.wav",
       language: "auto",
       diarizationEnabled: true,
       endpoint: undefined
     });
+  });
+
+  it("leaves Deepgram to the live WebSocket path instead of snapshot transcription", async () => {
+    const saveCaptureSnapshot = vi.fn();
+    const transcribeWithCloudStt = vi.fn();
+
+    const saved = await runLiveTranscriptionPass({
+      sessionId: "s1",
+      config: {
+        ...DEFAULT_APP_CONFIG,
+        audio: {
+          ...DEFAULT_APP_CONFIG.audio,
+          captureMode: "system"
+        },
+        stt: {
+          ...DEFAULT_APP_CONFIG.stt,
+          selectedMode: "deepgram",
+          apiKey: "dg_key"
+        }
+      },
+      seenTranscriptKeys: new Set<string>(),
+      saveCaptureSnapshot,
+      transcribeWithCloudStt
+    });
+
+    expect(saved).toEqual([]);
+    expect(saveCaptureSnapshot).not.toHaveBeenCalled();
+    expect(transcribeWithCloudStt).not.toHaveBeenCalled();
   });
 });

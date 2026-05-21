@@ -21,7 +21,7 @@ Implemented now:
 - Tauri v2 desktop app with Rust backend and React frontend
 - Dashboard for active interview sessions
 - Native CPAL microphone, system audio, and dual-stream capture with device selection, gain, noise gate, meters, STT-ready 16 kHz mono snapshots, and 250 ms PCM chunk events for streaming STT clients
-- Local Whisper sidecar transcription plus Deepgram, AssemblyAI, and Google STT fallback commands
+- Local Whisper sidecar transcription, Deepgram live WebSocket streaming from 250 ms PCM chunks, plus AssemblyAI and Google STT fallback commands
 - Automatic interviewer question detection and answer triggering from live transcript updates
 - Ollama, LM Studio, OpenRouter, OpenAI, Anthropic, and Groq provider routing with streaming fallback
 - Stealth overlay window with opacity, font controls, global hotkeys, click-through mode, position persistence, and Windows capture exclusion
@@ -35,7 +35,7 @@ Implemented now:
 
 Planned full build:
 
-- Lower-latency true word-by-word STT streaming
+- Local Whisper true streaming sidecar integration
 - Richer speaker diarization calibration and long-session transcript cursoring
 - Collaborative helper mode for trusted remote observers
 - Production release signing, hosted update manifest publishing, and broader platform packaging

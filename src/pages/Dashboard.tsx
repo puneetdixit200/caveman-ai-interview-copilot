@@ -9,6 +9,7 @@ import { APP_CONFIG_SETTING_KEY, DEFAULT_APP_CONFIG, parseAppConfig } from "../l
 import { applyAudioLevelEvent, type AudioCaptureState } from "../lib/audioEvents";
 import { shouldTriggerAnswer } from "../lib/autoTrigger";
 import { buildChatMessages } from "../lib/contextBuilder";
+import { DeepgramLiveTranscriber } from "../lib/deepgramStreaming";
 import { canSendOcrContext } from "../lib/ocr";
 import { registerGlobalActionShortcuts } from "../lib/globalHotkeys";
 import { DEFAULT_OVERLAY_SHORTCUT, overlayShortcutLabel } from "../lib/hotkeys";
@@ -45,6 +46,7 @@ import {
   listSessions,
   listTranscripts,
   onAudioLevel,
+  onAudioChunk,
   protectOverlayWindow,
   setOverlayWindowBounds,
   setOverlayWindowVisible,
@@ -54,7 +56,7 @@ import {
 } from "../lib/tauri";
 import { ProviderRouter } from "../lib/providerRouter";
 import { useOverlayStore } from "../stores/overlayStore";
-import type { AIResponseRecord, ChatMessage, SessionRecord, Speaker, TranscriptSegment } from "../types/session";
+import type { AIResponseRecord, ChatMessage, SessionRecord, Speaker, SttTranscriptEvent, TranscriptSegment } from "../types/session";
 import type { AudioDevice } from "../types/settings";
 import type { AppConfig } from "../lib/appConfig";
 import type { OverlayProtectionStatus } from "../lib/tauri";
@@ -332,7 +334,7 @@ export function Dashboard() {
   }, [session?.id]);
 
   useEffect(() => {
-    if (!running || !session || config.stt.selectedMode === "manual") {
+    if (!running || !session || config.stt.selectedMode === "manual" || config.stt.selectedMode === "deepgram") {
       return;
     }
 
@@ -393,6 +395,146 @@ export function Dashboard() {
       window.clearInterval(interval);
     };
   }, [config, lastTriggeredTranscriptId, running, session?.id]);
+
+  useEffect(() => {
+    if (!running || !session || config.stt.selectedMode !== "deepgram") {
+      return;
+    }
+
+    const apiKey = config.stt.apiKey?.trim() ?? "";
+    if (!apiKey) {
+      setStatusMessage("Save a Deepgram STT API key before starting streaming transcription.");
+      return;
+    }
+
+    let disposed = false;
+    let cleanup: (() => void) | undefined;
+    const streamStartedAtMs = Date.now();
+    const sessionStartedAtMs = Date.parse(session.createdAt);
+    const sessionOffsetMs = Number.isFinite(sessionStartedAtMs)
+      ? Math.max(0, streamStartedAtMs - sessionStartedAtMs)
+      : 0;
+    const transcribers = new Map<"microphone" | "system", DeepgramLiveTranscriber>();
+
+    async function saveStreamingTranscript(event: SttTranscriptEvent) {
+      if (!session || disposed) {
+        return;
+      }
+
+      const text = event.text.trim();
+      if (!text) {
+        return;
+      }
+
+      const key = `${event.speaker}:${text.toLowerCase().replace(/\s+/g, " ")}`;
+      if (seenLiveTranscriptKeys.current.has(key)) {
+        return;
+      }
+      seenLiveTranscriptKeys.current.add(key);
+
+      try {
+        const saved = await addTranscript({
+          sessionId: session.id,
+          speaker: event.speaker,
+          content: text,
+          timestampMs: sessionOffsetMs + event.startMs,
+          confidence: event.confidence
+        });
+
+        if (disposed) {
+          return;
+        }
+
+        setTranscripts((current) => {
+          const nextTranscripts = [...current, saved];
+          const trigger = shouldTriggerAnswer({
+            segments: nextTranscripts,
+            settings: config.autoTrigger,
+            lastTriggeredTranscriptId,
+            nowMs: saved.timestampMs + config.autoTrigger.silenceTimeoutMs
+          });
+
+          if (trigger.shouldTrigger && trigger.transcriptId) {
+            setLastTriggeredTranscriptId(trigger.transcriptId);
+            setStatusMessage(`Deepgram detected ${trigger.reason}; generating answer...`);
+            void generateResponse(nextTranscripts, trigger.transcriptId);
+          }
+
+          return nextTranscripts;
+        });
+        setStatusMessage("Deepgram streaming STT saved a transcript segment");
+      } catch (error) {
+        if (!disposed) {
+          setErrorMessage(error instanceof Error ? error.message : String(error));
+          setStatusMessage("Deepgram streaming STT failed");
+        }
+      }
+    }
+
+    function getTranscriber(source: "microphone" | "system") {
+      const existing = transcribers.get(source);
+      if (existing) {
+        return existing;
+      }
+
+      const transcriber = new DeepgramLiveTranscriber({
+        apiKey,
+        source,
+        language: config.stt.language || "auto",
+        diarizationEnabled: config.stt.diarizationEnabled,
+        endpoint: websocketSttEndpoint(config.stt.cloudEndpoint),
+        onTranscript: (event) => void saveStreamingTranscript(event),
+        onStatus: (message) => {
+          if (!disposed) {
+            setStatusMessage(message);
+          }
+        },
+        onError: (error) => {
+          if (!disposed) {
+            setErrorMessage(error.message);
+            setStatusMessage("Deepgram streaming STT failed");
+          }
+        }
+      });
+      transcribers.set(source, transcriber);
+      return transcriber;
+    }
+
+    onAudioChunk((chunk) => {
+      if (chunk.source !== "microphone" && chunk.source !== "system") {
+        return;
+      }
+
+      getTranscriber(chunk.source).sendChunk(chunk);
+    }).then((unlisten) => {
+      if (disposed) {
+        unlisten();
+        return;
+      }
+
+      cleanup = unlisten;
+    });
+    setStatusMessage("Deepgram streaming STT armed");
+
+    return () => {
+      disposed = true;
+      cleanup?.();
+      for (const transcriber of transcribers.values()) {
+        transcriber.close();
+      }
+    };
+  }, [
+    config.autoTrigger,
+    config.stt.apiKey,
+    config.stt.cloudEndpoint,
+    config.stt.diarizationEnabled,
+    config.stt.language,
+    config.stt.selectedMode,
+    lastTriggeredTranscriptId,
+    running,
+    session?.createdAt,
+    session?.id
+  ]);
 
   async function toggleCapture() {
     if (running) {
@@ -750,4 +892,9 @@ function buildPromptMessages(
     ocrContext: includeOcrContext ? config.ocr.lastText : undefined,
     knowledgeContext: knowledgeContext || undefined
   });
+}
+
+function websocketSttEndpoint(endpoint: string): string | undefined {
+  const trimmed = endpoint.trim();
+  return trimmed.startsWith("ws://") || trimmed.startsWith("wss://") ? trimmed : undefined;
 }
