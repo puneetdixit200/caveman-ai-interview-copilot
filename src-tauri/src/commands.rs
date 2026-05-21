@@ -7,11 +7,11 @@ use crate::collaboration::{
     CollaborationHint, CollaborationManager, CollaborationServerStatus, CollaborationSnapshot,
 };
 use crate::db::{
-    Database, NewAiResponse, NewKnowledgeDocument, NewSecurityEvent, NewSession, TranscriptCursor,
-    TranscriptPage, UpdateSession,
+    Database, NewAiResponse, NewKnowledgeDocument, NewPracticeScore, NewSecurityEvent, NewSession,
+    TranscriptCursor, TranscriptPage, UpdateSession,
 };
 use crate::models::{
-    AiResponse, KnowledgeBase, PromptTemplate, SecurityEvent, Session, Transcript,
+    AiResponse, KnowledgeBase, PracticeScore, PromptTemplate, SecurityEvent, Session, Transcript,
 };
 use crate::ocr;
 use crate::ocr::ScreenFrame;
@@ -116,6 +116,24 @@ pub fn list_ai_responses(
 ) -> Result<Vec<AiResponse>, String> {
     database
         .list_ai_responses(&session_id)
+        .map_err(to_command_error)
+}
+
+#[tauri::command]
+pub fn add_practice_score(
+    database: State<'_, Database>,
+    input: NewPracticeScore,
+) -> Result<PracticeScore, String> {
+    database.add_practice_score(input).map_err(to_command_error)
+}
+
+#[tauri::command]
+pub fn list_practice_scores(
+    database: State<'_, Database>,
+    session_id: String,
+) -> Result<Vec<PracticeScore>, String> {
+    database
+        .list_practice_scores(&session_id)
         .map_err(to_command_error)
 }
 

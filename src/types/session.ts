@@ -96,6 +96,30 @@ export interface AIResponseRecord {
   createdAt: string;
 }
 
+export interface PracticeScoreRecord {
+  id: number;
+  sessionId: string;
+  questionId: string;
+  question: string;
+  answer: string;
+  score: number;
+  feedback: string;
+  nextAction: string;
+  matchedSignals: string[];
+  createdAt: string;
+}
+
+export interface NewPracticeScoreInput {
+  sessionId: string;
+  questionId: string;
+  question: string;
+  answer: string;
+  score: number;
+  feedback: string;
+  nextAction: string;
+  matchedSignals: string[];
+}
+
 export interface NewAIResponseInput {
   sessionId: string;
   triggerTranscriptId?: number;

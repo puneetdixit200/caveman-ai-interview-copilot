@@ -41,6 +41,8 @@ pub fn run() {
             commands::delete_transcript,
             commands::add_ai_response,
             commands::list_ai_responses,
+            commands::add_practice_score,
+            commands::list_practice_scores,
             commands::save_setting,
             commands::get_setting,
             commands::save_provider_api_key,

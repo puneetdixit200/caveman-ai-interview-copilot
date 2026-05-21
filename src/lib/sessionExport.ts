@@ -1,4 +1,4 @@
-import type { AIResponseRecord, SessionRecord, TranscriptSegment } from "../types/session";
+import type { AIResponseRecord, PracticeScoreRecord, SessionRecord, TranscriptSegment } from "../types/session";
 import type { PluginExportTemplate } from "./pluginManifest";
 import { formatTimestampMs } from "./formatters";
 
@@ -6,9 +6,10 @@ interface ExportSessionInput {
   session: SessionRecord;
   transcripts: TranscriptSegment[];
   responses: AIResponseRecord[];
+  practiceScores?: PracticeScoreRecord[];
 }
 
-export function exportSessionMarkdown({ session, transcripts, responses }: ExportSessionInput): string {
+export function exportSessionMarkdown({ session, transcripts, responses, practiceScores = [] }: ExportSessionInput): string {
   const metadata = [
     `Company: ${session.company ?? "Unspecified"}`,
     `Role: ${session.role ?? "Unspecified"}`,
@@ -44,6 +45,9 @@ export function exportSessionMarkdown({ session, transcripts, responses }: Expor
     "",
     "## AI Responses",
     responseLines.length > 0 ? responseLines.join("\n\n") : "_No AI responses captured._",
+    "",
+    "## Practice Scores",
+    practiceScores.length > 0 ? buildPracticeScoresMarkdown(practiceScores) : "_No practice scores saved._",
     ""
   ].join("\n");
 }
@@ -61,6 +65,8 @@ export function renderPluginSessionExport(template: PluginExportTemplate, input:
     "transcript.markdown": buildTranscriptMarkdown(input.transcripts),
     "responses.plain": buildResponsesPlain(input.responses),
     "responses.markdown": buildResponsesMarkdown(input.responses),
+    "practiceScores.plain": buildPracticeScoresPlain(input.practiceScores ?? []),
+    "practiceScores.markdown": buildPracticeScoresMarkdown(input.practiceScores ?? []),
     json: exportSessionJson(input)
   };
 
@@ -69,14 +75,15 @@ export function renderPluginSessionExport(template: PluginExportTemplate, input:
   });
 }
 
-export function exportSessionJson({ session, transcripts, responses }: ExportSessionInput): string {
+export function exportSessionJson({ session, transcripts, responses, practiceScores = [] }: ExportSessionInput): string {
   return JSON.stringify(
     {
       exportVersion: 1,
       exportedAt: new Date().toISOString(),
       session,
       transcripts,
-      responses
+      responses,
+      practiceScores
     },
     null,
     2
@@ -132,7 +139,40 @@ function buildResponsesPlain(responses: AIResponseRecord[]): string {
     : "No AI responses captured.";
 }
 
-export function buildSessionPdfLines({ session, transcripts, responses }: ExportSessionInput): string[] {
+function buildPracticeScoresMarkdown(practiceScores: PracticeScoreRecord[]): string {
+  return practiceScores
+    .map((score) =>
+      [
+        `### Score: ${score.score}/5`,
+        `Question: ${score.question}`,
+        `Answer: ${score.answer}`,
+        `Feedback: ${score.feedback}`,
+        `Next action: ${score.nextAction}`,
+        `Signals: ${score.matchedSignals.length > 0 ? score.matchedSignals.join(", ") : "none"}`
+      ].join("\n")
+    )
+    .join("\n\n");
+}
+
+function buildPracticeScoresPlain(practiceScores: PracticeScoreRecord[]): string {
+  return practiceScores.length > 0
+    ? practiceScores
+        .map(
+          (score) =>
+            [
+              `Score: ${score.score}/5`,
+              `Question: ${score.question}`,
+              `Answer: ${score.answer}`,
+              `Feedback: ${score.feedback}`,
+              `Next action: ${score.nextAction}`,
+              `Signals: ${score.matchedSignals.length > 0 ? score.matchedSignals.join(", ") : "none"}`
+            ].join("\n")
+        )
+        .join("\n\n")
+    : "No practice scores saved.";
+}
+
+export function buildSessionPdfLines({ session, transcripts, responses, practiceScores = [] }: ExportSessionInput): string[] {
   return [
     session.title,
     "",
@@ -160,7 +200,20 @@ export function buildSessionPdfLines({ session, transcripts, responses }: Export
           response.response,
           ""
         ])
-      : ["No AI responses captured."])
+      : ["No AI responses captured."]),
+    "",
+    "Practice Scores",
+    ...(practiceScores.length > 0
+      ? practiceScores.flatMap((score) => [
+          `Score: ${score.score}/5`,
+          `Question: ${score.question}`,
+          `Answer: ${score.answer}`,
+          `Feedback: ${score.feedback}`,
+          `Next action: ${score.nextAction}`,
+          `Signals: ${score.matchedSignals.length > 0 ? score.matchedSignals.join(", ") : "none"}`,
+          ""
+        ])
+      : ["No practice scores saved."])
   ];
 }
 

@@ -15,7 +15,9 @@ import {
 import type {
   AIResponseRecord,
   NewAIResponseInput,
+  NewPracticeScoreInput,
   NewSessionInput,
+  PracticeScoreRecord,
   SessionRecord,
   SttTranscriptEvent,
   TranscriptCursor,
@@ -205,6 +207,7 @@ function providerSecretStorageKey(providerId: string): string {
 }
 
 const SECURITY_EVENTS_FALLBACK_KEY = "caveman.security-events";
+const PRACTICE_SCORES_FALLBACK_KEY = "caveman.practice-scores";
 
 export async function saveProviderApiKey(providerId: string, secret: string): Promise<SecretStatus> {
   return invokeStrictOrFallback<SecretStatus>("save_provider_api_key", { providerId, secret }, () => {
@@ -440,6 +443,43 @@ export async function addAiResponse(input: NewAIResponseInput): Promise<AIRespon
 
 export async function listAiResponses(sessionId: string): Promise<AIResponseRecord[]> {
   return invokeOrFallback<AIResponseRecord[]>("list_ai_responses", { sessionId }, () => []);
+}
+
+export async function addPracticeScore(input: NewPracticeScoreInput): Promise<PracticeScoreRecord> {
+  const normalized = normalizePracticeScoreInput(input);
+
+  return invokeOrFallback<PracticeScoreRecord>("add_practice_score", { input: normalized }, () => {
+    const scores = readFallbackPracticeScores();
+    const next: PracticeScoreRecord = {
+      ...normalized,
+      id: Date.now() + scores.length,
+      createdAt: new Date().toISOString()
+    };
+    localStorage.setItem(PRACTICE_SCORES_FALLBACK_KEY, JSON.stringify([...scores, next]));
+    return next;
+  });
+}
+
+export async function listPracticeScores(sessionId: string): Promise<PracticeScoreRecord[]> {
+  return invokeOrFallback<PracticeScoreRecord[]>("list_practice_scores", { sessionId }, () =>
+    readFallbackPracticeScores()
+      .filter((score) => score.sessionId === sessionId)
+      .sort((left, right) => left.createdAt.localeCompare(right.createdAt) || left.id - right.id)
+  );
+}
+
+function normalizePracticeScoreInput(input: NewPracticeScoreInput): NewPracticeScoreInput {
+  return {
+    ...input,
+    sessionId: input.sessionId.trim(),
+    questionId: input.questionId.trim(),
+    question: input.question.trim(),
+    answer: input.answer.trim(),
+    score: Math.min(5, Math.max(1, Math.round(input.score))),
+    feedback: input.feedback.trim(),
+    nextAction: input.nextAction.trim(),
+    matchedSignals: input.matchedSignals.map((signal) => signal.trim()).filter(Boolean)
+  };
 }
 
 export async function listAudioDevices(): Promise<AudioDevice[]> {
@@ -832,6 +872,32 @@ function isSecurityEvent(value: unknown): value is SecurityEvent {
     typeof (value as SecurityEvent).category === "string" &&
     typeof (value as SecurityEvent).action === "string" &&
     typeof (value as SecurityEvent).createdAt === "string"
+  );
+}
+
+function readFallbackPracticeScores(): PracticeScoreRecord[] {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(PRACTICE_SCORES_FALLBACK_KEY) ?? "[]") as PracticeScoreRecord[];
+    return Array.isArray(parsed) ? parsed.filter(isPracticeScoreRecord) : [];
+  } catch {
+    return [];
+  }
+}
+
+function isPracticeScoreRecord(value: unknown): value is PracticeScoreRecord {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    typeof (value as PracticeScoreRecord).id === "number" &&
+    typeof (value as PracticeScoreRecord).sessionId === "string" &&
+    typeof (value as PracticeScoreRecord).questionId === "string" &&
+    typeof (value as PracticeScoreRecord).question === "string" &&
+    typeof (value as PracticeScoreRecord).answer === "string" &&
+    typeof (value as PracticeScoreRecord).score === "number" &&
+    typeof (value as PracticeScoreRecord).feedback === "string" &&
+    typeof (value as PracticeScoreRecord).nextAction === "string" &&
+    Array.isArray((value as PracticeScoreRecord).matchedSignals) &&
+    typeof (value as PracticeScoreRecord).createdAt === "string"
   );
 }
 

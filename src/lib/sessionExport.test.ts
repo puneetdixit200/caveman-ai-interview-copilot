@@ -6,7 +6,7 @@ import {
   renderPluginSessionExport,
   sessionExportFilename
 } from "./sessionExport";
-import type { AIResponseRecord, SessionRecord, TranscriptSegment } from "../types/session";
+import type { AIResponseRecord, PracticeScoreRecord, SessionRecord, TranscriptSegment } from "../types/session";
 
 describe("exportSessionMarkdown", () => {
   it("renders session metadata, transcripts, and AI responses as markdown", () => {
@@ -17,6 +17,9 @@ describe("exportSessionMarkdown", () => {
     expect(markdown).toContain("[00:05.000] INTERVIEWER: Design a URL shortener");
     expect(markdown).toContain("OpenRouter / gpt-4o");
     expect(markdown).toContain("Start with requirements and scale.");
+    expect(markdown).toContain("## Practice Scores");
+    expect(markdown).toContain("Score: 4/5");
+    expect(markdown).toContain("Next action: Add storage tradeoffs.");
   });
 
   it("renders a stable JSON export with session, transcript, and response records", () => {
@@ -27,6 +30,10 @@ describe("exportSessionMarkdown", () => {
     expect(parsed.session.title).toBe("Backend Interview");
     expect(parsed.transcripts).toHaveLength(1);
     expect(parsed.responses[0].provider).toBe("openrouter");
+    expect(parsed.practiceScores[0]).toMatchObject({
+      questionId: "system-design-url-shortener",
+      score: 4
+    });
     expect(json).toContain('\n  "session"');
   });
 
@@ -39,7 +46,9 @@ describe("exportSessionMarkdown", () => {
         "Company: Acme",
         "[00:05.000] INTERVIEWER: Design a URL shortener",
         "OpenRouter / gpt-4o",
-        "Start with requirements and scale."
+        "Start with requirements and scale.",
+        "Practice Scores",
+        "Score: 4/5"
       ])
     );
     expect(sessionExportFilename({ ...input.session, title: "Backend / Interview: Acme" }, "pdf")).toBe(
@@ -70,6 +79,7 @@ function makeExportInput(): {
   session: SessionRecord;
   transcripts: TranscriptSegment[];
   responses: AIResponseRecord[];
+  practiceScores: PracticeScoreRecord[];
 } {
   return {
     session: {
@@ -103,6 +113,20 @@ function makeExportInput(): {
         provider: "openrouter",
         latencyMs: 710,
         createdAt: "2026-05-19T18:00:08Z"
+      }
+    ],
+    practiceScores: [
+      {
+        id: 1,
+        sessionId: "s1",
+        questionId: "system-design-url-shortener",
+        question: "Design a URL shortener for heavy read traffic.",
+        answer: "Use requirements, cache, queues, and storage tradeoffs.",
+        score: 4,
+        feedback: "Covered requirements, cache, queue.",
+        nextAction: "Add storage tradeoffs.",
+        matchedSignals: ["requirements", "cache", "queue"],
+        createdAt: "2026-05-19T18:01:00Z"
       }
     ]
   };

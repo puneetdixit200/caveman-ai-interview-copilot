@@ -80,6 +80,7 @@ vi.mock("../lib/tauri", () => ({
       createdAt: "2026-05-20T00:00:02.000Z"
     }
   ]),
+  listPracticeScores: vi.fn(async () => []),
   updateTranscript: vi.fn(async (input) => ({
     id: input.id,
     sessionId: "s1",
@@ -133,8 +134,7 @@ describe("Sessions", () => {
     await user.click(screen.getByRole("button", { name: "Edit transcript line 1" }));
     await user.selectOptions(screen.getByRole("combobox", { name: "Speaker for transcript line 1" }), "candidate");
     const transcriptText = screen.getByRole("textbox", { name: "Transcript text for line 1" });
-    await user.clear(transcriptText);
-    await user.type(transcriptText, "I would design retry budgets.");
+    fireEvent.change(transcriptText, { target: { value: "I would design retry budgets." } });
     fireEvent.change(screen.getByRole("spinbutton", { name: "Timestamp ms for transcript line 1" }), {
       target: { value: "2400" }
     });

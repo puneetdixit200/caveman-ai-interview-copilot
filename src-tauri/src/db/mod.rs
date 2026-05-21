@@ -8,8 +8,8 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use crate::models::{
-    AiResponse, KnowledgeBase, KnowledgeChunk, KnowledgeDocumentRecord, SecurityEvent, Session,
-    Transcript,
+    AiResponse, KnowledgeBase, KnowledgeChunk, KnowledgeDocumentRecord, PracticeScore,
+    SecurityEvent, Session, Transcript,
 };
 
 const KNOWLEDGE_BASE_SETTING_KEY: &str = "knowledge.base";
@@ -50,6 +50,19 @@ pub struct NewAiResponse {
     pub input_tokens: Option<i64>,
     pub output_tokens: Option<i64>,
     pub latency_ms: Option<i64>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct NewPracticeScore {
+    pub session_id: String,
+    pub question_id: String,
+    pub question: String,
+    pub answer: String,
+    pub score: i64,
+    pub feedback: String,
+    pub next_action: String,
+    pub matched_signals: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -428,6 +441,71 @@ impl Database {
             .map_err(Into::into)
     }
 
+    pub fn add_practice_score(&self, input: NewPracticeScore) -> Result<PracticeScore> {
+        let session_id = input.session_id.trim().to_string();
+        if session_id.is_empty() {
+            anyhow::bail!("practice score session id cannot be empty");
+        }
+
+        let question_id = input.question_id.trim().to_string();
+        if question_id.is_empty() {
+            anyhow::bail!("practice score question id cannot be empty");
+        }
+
+        let question = input.question.trim().to_string();
+        if question.is_empty() {
+            anyhow::bail!("practice score question cannot be empty");
+        }
+
+        let answer = input.answer.trim().to_string();
+        if answer.is_empty() {
+            anyhow::bail!("practice score answer cannot be empty");
+        }
+
+        let feedback = input.feedback.trim().to_string();
+        let next_action = input.next_action.trim().to_string();
+        let matched_signals = normalize_tags(input.matched_signals);
+        let matched_signals_json = serde_json::to_string(&matched_signals)?;
+        let score = input.score.clamp(1, 5);
+        let now = Utc::now().to_rfc3339();
+        let connection = self.lock()?;
+        connection.execute(
+            "INSERT INTO practice_scores (
+                session_id, question_id, question, answer, score, feedback,
+                next_action, matched_signals, created_at
+             ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
+            params![
+                session_id,
+                question_id,
+                question,
+                answer,
+                score,
+                feedback,
+                next_action,
+                matched_signals_json,
+                now
+            ],
+        )?;
+        let id = connection.last_insert_rowid();
+        drop(connection);
+
+        self.get_practice_score(id)
+    }
+
+    pub fn list_practice_scores(&self, session_id: &str) -> Result<Vec<PracticeScore>> {
+        let connection = self.lock()?;
+        let mut statement = connection.prepare(
+            "SELECT id, session_id, question_id, question, answer, score, feedback,
+                    next_action, matched_signals, created_at
+             FROM practice_scores
+             WHERE session_id = ?1
+             ORDER BY created_at ASC, id ASC",
+        )?;
+        let rows = statement.query_map(params![session_id], map_practice_score)?;
+        rows.collect::<rusqlite::Result<Vec<_>>>()
+            .map_err(Into::into)
+    }
+
     pub fn save_setting(&self, key: &str, value: &str) -> Result<()> {
         let now = Utc::now().to_rfc3339();
         let connection = self.lock()?;
@@ -759,6 +837,19 @@ impl Database {
             .map_err(Into::into)
     }
 
+    fn get_practice_score(&self, id: i64) -> Result<PracticeScore> {
+        let connection = self.lock()?;
+        connection
+            .query_row(
+                "SELECT id, session_id, question_id, question, answer, score, feedback,
+                        next_action, matched_signals, created_at
+                 FROM practice_scores WHERE id = ?1",
+                params![id],
+                map_practice_score,
+            )
+            .map_err(Into::into)
+    }
+
     fn get_security_event(&self, id: i64) -> Result<SecurityEvent> {
         let connection = self.lock()?;
         connection
@@ -818,6 +909,19 @@ impl Database {
                 created_at TEXT NOT NULL
             );
 
+            CREATE TABLE IF NOT EXISTS practice_scores (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                session_id TEXT NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
+                question_id TEXT NOT NULL,
+                question TEXT NOT NULL,
+                answer TEXT NOT NULL,
+                score INTEGER NOT NULL CHECK(score BETWEEN 1 AND 5),
+                feedback TEXT NOT NULL,
+                next_action TEXT NOT NULL,
+                matched_signals TEXT NOT NULL DEFAULT '[]',
+                created_at TEXT NOT NULL
+            );
+
             CREATE TABLE IF NOT EXISTS api_keys (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 provider TEXT NOT NULL UNIQUE,
@@ -872,6 +976,7 @@ impl Database {
 
             CREATE INDEX IF NOT EXISTS idx_transcripts_session ON transcripts(session_id, timestamp_ms);
             CREATE INDEX IF NOT EXISTS idx_responses_session ON ai_responses(session_id, created_at);
+            CREATE INDEX IF NOT EXISTS idx_practice_scores_session ON practice_scores(session_id, created_at);
             CREATE INDEX IF NOT EXISTS idx_security_events_created ON security_events(created_at);
             CREATE INDEX IF NOT EXISTS idx_knowledge_chunks_document ON knowledge_chunks(document_id, rank_order);
             ",
@@ -1099,6 +1204,24 @@ fn map_ai_response(row: &rusqlite::Row<'_>) -> rusqlite::Result<AiResponse> {
         output_tokens: row.get(8)?,
         latency_ms: row.get(9)?,
         created_at: row.get(10)?,
+    })
+}
+
+fn map_practice_score(row: &rusqlite::Row<'_>) -> rusqlite::Result<PracticeScore> {
+    let matched_signals_json: String = row.get(8)?;
+    let matched_signals = serde_json::from_str(&matched_signals_json).unwrap_or_default();
+
+    Ok(PracticeScore {
+        id: row.get(0)?,
+        session_id: row.get(1)?,
+        question_id: row.get(2)?,
+        question: row.get(3)?,
+        answer: row.get(4)?,
+        score: row.get(5)?,
+        feedback: row.get(6)?,
+        next_action: row.get(7)?,
+        matched_signals,
+        created_at: row.get(9)?,
     })
 }
 

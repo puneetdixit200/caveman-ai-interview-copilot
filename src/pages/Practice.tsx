@@ -27,7 +27,7 @@ import { createConfiguredProvider } from "../lib/providerClients";
 import { ProviderRouter } from "../lib/providerRouter";
 import { hydrateProviderApiKeys } from "../lib/providerSecrets";
 import { selectRunnableProviders } from "../lib/providerSelection";
-import { getSetting } from "../lib/tauri";
+import { addPracticeScore, addTranscript, createSession, getSetting, updateSession } from "../lib/tauri";
 import type { InterviewType } from "../types/session";
 
 const interviewTypes: Array<{ id: InterviewType; label: string }> = [
@@ -116,7 +116,7 @@ export function Practice() {
     setStatus(nextPackId === "built-in" ? "Built-in practice pack loaded" : "Plugin practice pack loaded");
   }
 
-  function submitAnswer() {
+  async function submitAnswer() {
     const answer = draftAnswer.trim();
     if (!answer) {
       setStatus("Write an answer before scoring.");
@@ -124,13 +124,27 @@ export function Practice() {
     }
 
     const answered = nextPracticeState(state, { type: "submit_answer", answer });
+    const scoring = scorePracticeAnswer({ question: activeQuestion, answer });
     const scored = nextPracticeState(answered, {
       type: "apply_score",
-      score: scorePracticeAnswer({ question: activeQuestion, answer }).score
+      score: scoring.score
     });
     setState(scored);
     setAiFollowUp("");
-    setStatus("Answer scored locally");
+    setStatus("Saving practice score...");
+
+    try {
+      const savedSession = await savePracticeSession({
+        answer,
+        feedback: scoring.feedback,
+        matchedSignals: scoring.matchedSignals,
+        nextAction: scoring.nextAction,
+        score: scoring.score
+      });
+      setStatus(`Saved practice score ${scoring.score}/5 to Sessions (${savedSession.title})`);
+    } catch (error) {
+      setStatus(`Answer scored locally; save failed: ${error instanceof Error ? error.message : String(error)}`);
+    }
   }
 
   function nextQuestion() {
@@ -199,6 +213,58 @@ export function Practice() {
       })
     );
     setStatus("Scoring prompt copied");
+  }
+
+  async function savePracticeSession(input: {
+    answer: string;
+    score: number;
+    feedback: string;
+    nextAction: string;
+    matchedSignals: string[];
+  }) {
+    const title = practiceSessionTitle(activeQuestion.question);
+    const created = await createSession({
+      title,
+      interviewType,
+      tags: ["practice", interviewType],
+      notes: `Practice score ${input.score}/5. ${input.nextAction}`
+    });
+
+    await addTranscript({
+      sessionId: created.id,
+      speaker: "interviewer",
+      content: activeQuestion.question,
+      timestampMs: 0,
+      confidence: 1
+    });
+    await addTranscript({
+      sessionId: created.id,
+      speaker: "candidate",
+      content: input.answer,
+      timestampMs: 60_000,
+      confidence: 1
+    });
+    await addPracticeScore({
+      sessionId: created.id,
+      questionId: activeQuestion.id,
+      question: activeQuestion.question,
+      answer: input.answer,
+      score: input.score,
+      feedback: input.feedback,
+      nextAction: input.nextAction,
+      matchedSignals: input.matchedSignals
+    });
+
+    return updateSession({
+      id: created.id,
+      title: created.title,
+      company: created.company,
+      role: created.role,
+      interviewType: created.interviewType,
+      tags: created.tags,
+      status: "completed",
+      notes: `Practice score ${input.score}/5. ${input.feedback} ${input.nextAction}`
+    });
   }
 
   return (
@@ -307,4 +373,10 @@ function createState(question: PracticeQuestion): PracticeState {
     answer: "",
     score: null
   };
+}
+
+function practiceSessionTitle(question: string): string {
+  const normalized = question.trim().replace(/\s+/g, " ");
+  const shortened = normalized.length > 54 ? `${normalized.slice(0, 51).trim()}...` : normalized;
+  return `Practice - ${shortened || "Interview Question"}`;
 }

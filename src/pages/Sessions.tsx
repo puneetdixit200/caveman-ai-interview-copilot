@@ -16,6 +16,7 @@ import {
   deleteTranscript,
   getSetting,
   listAiResponses,
+  listPracticeScores,
   listSessions,
   listTranscriptPage,
   listTranscripts,
@@ -25,6 +26,7 @@ import {
 import type {
   AIResponseRecord,
   InterviewType,
+  PracticeScoreRecord,
   SessionRecord,
   SessionStatus,
   Speaker,
@@ -57,6 +59,7 @@ export function Sessions() {
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
   const [transcripts, setTranscripts] = useState<TranscriptSegment[]>([]);
   const [responses, setResponses] = useState<AIResponseRecord[]>([]);
+  const [practiceScores, setPracticeScores] = useState<PracticeScoreRecord[]>([]);
   const [analyticsTranscripts, setAnalyticsTranscripts] = useState<TranscriptSegment[]>([]);
   const [analyticsResponses, setAnalyticsResponses] = useState<AIResponseRecord[]>([]);
   const [transcriptsBySession, setTranscriptsBySession] = useState<Record<string, string[]>>({});
@@ -98,9 +101,10 @@ export function Sessions() {
     return exportSessionMarkdown({
       session: selectedSession,
       transcripts,
-      responses
+      responses,
+      practiceScores
     });
-  }, [responses, selectedSession, transcripts]);
+  }, [practiceScores, responses, selectedSession, transcripts]);
 
   const jsonExport = useMemo(() => {
     if (!selectedSession) {
@@ -110,9 +114,10 @@ export function Sessions() {
     return exportSessionJson({
       session: selectedSession,
       transcripts,
-      responses
+      responses,
+      practiceScores
     });
-  }, [responses, selectedSession, transcripts]);
+  }, [practiceScores, responses, selectedSession, transcripts]);
 
   useEffect(() => {
     let cancelled = false;
@@ -186,19 +191,22 @@ export function Sessions() {
       if (!selectedSession) {
         setTranscripts([]);
         setResponses([]);
+        setPracticeScores([]);
         setTranscriptPage(null);
         return;
       }
 
-      const [sessionTranscriptPage, sessionResponses] = await Promise.all([
+      const [sessionTranscriptPage, sessionResponses, sessionPracticeScores] = await Promise.all([
         listTranscriptPage(selectedSession.id, { limit: TRANSCRIPT_PAGE_LIMIT }),
-        listAiResponses(selectedSession.id)
+        listAiResponses(selectedSession.id),
+        listPracticeScores(selectedSession.id)
       ]);
 
       if (!cancelled) {
         setTranscripts(sessionTranscriptPage.items);
         setTranscriptPage(sessionTranscriptPage);
         setResponses(sessionResponses);
+        setPracticeScores(sessionPracticeScores);
         setEditingTranscriptId(null);
         setTranscriptDraft(null);
         setEditingSessionDetails(false);
@@ -216,7 +224,7 @@ export function Sessions() {
   async function copyMarkdownExport() {
     const fullTranscripts = await loadFullSelectedTranscripts();
     const exportText = selectedSession
-      ? exportSessionMarkdown({ session: selectedSession, transcripts: fullTranscripts, responses })
+      ? exportSessionMarkdown({ session: selectedSession, transcripts: fullTranscripts, responses, practiceScores })
       : markdownExport;
     await navigator.clipboard?.writeText(exportText);
     setStatus("Markdown export copied");
@@ -225,7 +233,7 @@ export function Sessions() {
   async function copyJsonExport() {
     const fullTranscripts = await loadFullSelectedTranscripts();
     const exportText = selectedSession
-      ? exportSessionJson({ session: selectedSession, transcripts: fullTranscripts, responses })
+      ? exportSessionJson({ session: selectedSession, transcripts: fullTranscripts, responses, practiceScores })
       : jsonExport;
     await navigator.clipboard?.writeText(exportText);
     setStatus("JSON export copied");
@@ -236,7 +244,7 @@ export function Sessions() {
       return;
     }
 
-    await downloadSessionPdf({ session: selectedSession, transcripts: await loadFullSelectedTranscripts(), responses });
+    await downloadSessionPdf({ session: selectedSession, transcripts: await loadFullSelectedTranscripts(), responses, practiceScores });
     setStatus("PDF export saved");
   }
 
@@ -248,7 +256,8 @@ export function Sessions() {
     const exportText = renderPluginSessionExport(template, {
       session: selectedSession,
       transcripts: await loadFullSelectedTranscripts(),
-      responses
+      responses,
+      practiceScores
     });
     await navigator.clipboard?.writeText(exportText);
     setStatus(`${template.name} export copied`);
@@ -753,6 +762,29 @@ export function Sessions() {
                 responses.map((response) => <ResponseCard key={response.id} response={response} />)
               ) : (
                 <p className="empty-copy">No AI responses saved for this session.</p>
+              )}
+            </div>
+            <h3>Practice Scores</h3>
+            <div className="overlay-responses">
+              {practiceScores.length > 0 ? (
+                practiceScores.map((score) => (
+                  <article className="response-card" key={score.id}>
+                    <div className="response-meta">
+                      <span>Score {score.score}/5</span>
+                      <span>{new Date(score.createdAt).toLocaleString()}</span>
+                    </div>
+                    <h4>{score.question}</h4>
+                    <p>{score.feedback}</p>
+                    <strong>{score.nextAction}</strong>
+                    <div className="tag-list">
+                      {score.matchedSignals.map((signal) => (
+                        <span key={signal}>{signal}</span>
+                      ))}
+                    </div>
+                  </article>
+                ))
+              ) : (
+                <p className="empty-copy">No practice scores saved for this session.</p>
               )}
             </div>
           </div>

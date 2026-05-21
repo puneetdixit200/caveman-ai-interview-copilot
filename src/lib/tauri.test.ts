@@ -1,8 +1,10 @@
 import { afterEach, describe, expect, it } from "vitest";
 import {
+  addPracticeScore,
   clearKnowledgeBaseNative,
   deleteProviderApiKey,
   deleteKnowledgeDocumentNative,
+  listPracticeScores,
   listKnowledgeBase,
   saveKnowledgeDocumentNative,
   listSecurityEvents,
@@ -34,6 +36,35 @@ describe("tauri fallback security events", () => {
       target: "openai"
     });
     expect(serialized).not.toContain("sk-live-secret");
+  });
+});
+
+describe("tauri fallback practice scores", () => {
+  afterEach(() => {
+    localStorage.clear();
+    sessionStorage.clear();
+  });
+
+  it("persists practice scores through native-compatible wrappers", async () => {
+    const saved = await addPracticeScore({
+      sessionId: "practice-session-1",
+      questionId: "system-design-url-shortener",
+      question: "Design a URL shortener.",
+      answer: "Use requirements, cache, queue, and storage tradeoffs.",
+      score: 4,
+      feedback: "Covered requirements, cache, queue.",
+      nextAction: "Add storage tradeoffs.",
+      matchedSignals: ["requirements", "cache", "queue"]
+    });
+
+    expect(saved.id).toBeGreaterThan(0);
+    expect(await listPracticeScores("practice-session-1")).toEqual([
+      expect.objectContaining({
+        sessionId: "practice-session-1",
+        questionId: "system-design-url-shortener",
+        score: 4
+      })
+    ]);
   });
 });
 

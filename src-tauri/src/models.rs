@@ -49,6 +49,21 @@ pub struct AiResponse {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
+pub struct PracticeScore {
+    pub id: i64,
+    pub session_id: String,
+    pub question_id: String,
+    pub question: String,
+    pub answer: String,
+    pub score: i64,
+    pub feedback: String,
+    pub next_action: String,
+    pub matched_signals: Vec<String>,
+    pub created_at: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
 pub struct SecurityEvent {
     pub id: i64,
     pub category: String,

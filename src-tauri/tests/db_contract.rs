@@ -1,6 +1,6 @@
 use caveman_lib::db::{
-    Database, NewAiResponse, NewKnowledgeChunk, NewKnowledgeDocument, NewSecurityEvent, NewSession,
-    TranscriptCursor, UpdateSession,
+    Database, NewAiResponse, NewKnowledgeChunk, NewKnowledgeDocument, NewPracticeScore,
+    NewSecurityEvent, NewSession, TranscriptCursor, UpdateSession,
 };
 use rusqlite::Connection;
 
@@ -338,6 +338,54 @@ fn legacy_knowledge_setting_migrates_to_sqlite_tables() {
             .len(),
         1
     );
+}
+
+#[test]
+fn practice_scores_round_trip_through_sqlite() {
+    let db = Database::in_memory().expect("in-memory database");
+    let session = db
+        .create_session(NewSession {
+            title: "Practice - URL shortener".to_string(),
+            company: None,
+            role: None,
+            interview_type: "system_design".to_string(),
+            tags: vec!["practice".to_string()],
+            notes: Some("Practice score 4/5".to_string()),
+        })
+        .expect("create session");
+
+    let score = db
+        .add_practice_score(NewPracticeScore {
+            session_id: session.id.clone(),
+            question_id: "system-design-url-shortener".to_string(),
+            question: "Design a URL shortener for heavy read traffic.".to_string(),
+            answer: "I would define requirements, use cache, and add queue based analytics."
+                .to_string(),
+            score: 4,
+            feedback: "Covered requirements, cache, queue.".to_string(),
+            next_action: "Add storage and tradeoff detail.".to_string(),
+            matched_signals: vec![
+                "requirements".to_string(),
+                "cache".to_string(),
+                "queue".to_string(),
+            ],
+        })
+        .expect("add practice score");
+
+    assert_eq!(score.session_id, session.id);
+    assert_eq!(score.score, 4);
+    assert_eq!(
+        score.matched_signals,
+        vec!["requirements", "cache", "queue"]
+    );
+
+    let scores = db
+        .list_practice_scores(&session.id)
+        .expect("list practice scores");
+
+    assert_eq!(scores.len(), 1);
+    assert_eq!(scores[0].question_id, "system-design-url-shortener");
+    assert_eq!(scores[0].feedback, "Covered requirements, cache, queue.");
 }
 
 #[test]
