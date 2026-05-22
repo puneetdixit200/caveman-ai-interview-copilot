@@ -56,7 +56,8 @@ test("release workflow builds macOS and Linux packages before publishing one rel
   const workflow = await readFile(workflowPath, "utf8");
 
   assert.match(workflow, /build-macos:/);
-  assert.match(workflow, /runs-on:\s*macos-13/);
+  assert.match(workflow, /runs-on:\s*macos-15-intel/);
+  assert.doesNotMatch(workflow, /runs-on:\s*macos-13/);
   assert.match(workflow, /npm run tauri build -- --ci --bundles app --config src-tauri\/tauri\.release\.conf\.json/);
   assert.match(workflow, /node scripts\/create-macos-dmg\.mjs/);
   assert.match(workflow, /src-tauri\/target\/release\/bundle\/dmg\/\*\.dmg/);
@@ -133,7 +134,8 @@ test("desktop package smoke workflow builds macOS and Windows installers without
   assert.match(workflow, /build-windows:/);
   assert.match(workflow, /build-macos:/);
   assert.match(workflow, /windows-latest/);
-  assert.match(workflow, /macos-13/);
+  assert.match(workflow, /macos-15-intel/);
+  assert.doesNotMatch(workflow, /macos-13/);
   assert.match(workflow, /if:\s*\$\{\{\s*github\.event_name == 'workflow_dispatch'\s*\}\}/);
   assert.match(workflow, /npm ci/);
   assert.match(workflow, /npm run test:release/);
