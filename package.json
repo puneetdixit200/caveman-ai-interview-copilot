@@ -12,6 +12,7 @@
     "typecheck": "tsc --noEmit",
     "tauri": "tauri",
     "tauri:build:mac": "tauri build --ci --bundles app && node scripts/create-macos-dmg.mjs",
+    "tauri:build:windows": "tauri build --ci --bundles nsis,msi",
     "tauri:build:signed": "powershell -ExecutionPolicy Bypass -File scripts/build-signed-update.ps1",
     "verify": "npm run test:release && npm run test && npm run typecheck && npm run build"
   },

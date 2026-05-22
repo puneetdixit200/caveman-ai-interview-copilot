@@ -112,6 +112,18 @@ test("release workflow contract is part of the release test suite", async () => 
   assert.match(packageJson.scripts["test:release"], /create-macos-dmg\.test\.mjs/);
 });
 
+test("package scripts expose repeatable macOS and Windows installer builds", async () => {
+  const packageJson = JSON.parse(await readFile("package.json", "utf8"));
+  const readme = await readFile("README.md", "utf8");
+  const workflow = await readFile(desktopSmokeWorkflowPath, "utf8");
+
+  assert.equal(packageJson.scripts["tauri:build:mac"], "tauri build --ci --bundles app && node scripts/create-macos-dmg.mjs");
+  assert.equal(packageJson.scripts["tauri:build:windows"], "tauri build --ci --bundles nsis,msi");
+  assert.match(readme, /npm run tauri:build:mac/);
+  assert.match(readme, /npm run tauri:build:windows/);
+  assert.match(workflow, /npm run tauri:build:windows/);
+});
+
 test("desktop package smoke workflow builds macOS and Windows installers without publishing releases", async () => {
   const workflow = await readFile(desktopSmokeWorkflowPath, "utf8");
 
@@ -125,7 +137,7 @@ test("desktop package smoke workflow builds macOS and Windows installers without
   assert.match(workflow, /if:\s*\$\{\{\s*github\.event_name == 'workflow_dispatch'\s*\}\}/);
   assert.match(workflow, /npm ci/);
   assert.match(workflow, /npm run test:release/);
-  assert.match(workflow, /npm run tauri build -- --ci --bundles nsis,msi/);
+  assert.match(workflow, /npm run tauri:build:windows/);
   assert.match(workflow, /npm run tauri:build:mac/);
   assert.match(workflow, /actions\/upload-artifact@v4/);
   assert.doesNotMatch(workflow, /softprops\/action-gh-release/);

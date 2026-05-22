@@ -136,16 +136,16 @@ cd src-tauri
 cargo test
 ```
 
-Build the desktop installer:
+Build the macOS app and DMG on macOS:
 
 ```powershell
 npm run tauri:build:mac
 ```
 
-On Windows, build the Windows installer from a Windows machine:
+Build the Windows NSIS and MSI installers on Windows:
 
 ```powershell
-npm run tauri build -- --ci
+npm run tauri:build:windows
 ```
 
 ## Documentation
