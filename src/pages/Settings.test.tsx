@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { APP_CONFIG_SETTING_KEY, DEFAULT_APP_CONFIG, serializeAppConfig, type AppConfig } from "../lib/appConfig";
 import { runAudioCaptureRehearsal } from "../lib/audioRehearsal";
 import { KNOWLEDGE_BASE_SETTING_KEY, parseKnowledgeBase } from "../lib/knowledge";
+import { runLivePipelineSmokeCheck } from "../lib/livePipelineSmoke";
 import { PREFLIGHT_REPORT_SETTING_KEY } from "../lib/preflightReport";
 import { runScreenOcr } from "../lib/ocr";
 import { createConfiguredProvider } from "../lib/providerClients";
@@ -31,6 +32,39 @@ vi.mock("../lib/audioRehearsal", () => ({
     systemReady: true,
     warnings: [],
     message: "Audio rehearsal detected microphone."
+  }))
+}));
+
+vi.mock("../lib/livePipelineSmoke", () => ({
+  runLivePipelineSmokeCheck: vi.fn(async () => ({
+    status: "ready",
+    startedAt: "2026-05-21T16:29:58.000Z",
+    durationMs: 980,
+    transcriptSegments: 1,
+    firstAiChunk: "OK",
+    items: [
+      {
+        id: "audio",
+        label: "Live audio snapshot",
+        status: "ready",
+        detail: "Captured 900ms of microphone audio for STT validation."
+      },
+      {
+        id: "stt",
+        label: "Local Whisper smoke test",
+        status: "ready",
+        detail: "Transcribed 1 segment from the live snapshot.",
+        latencyMs: 220
+      },
+      {
+        id: "provider",
+        label: "Ollama first chunk",
+        status: "ready",
+        detail: "Received the first AI chunk.",
+        latencyMs: 760
+      }
+    ],
+    message: "Live pipeline smoke check passed."
   }))
 }));
 
@@ -158,6 +192,42 @@ describe("Settings", () => {
     });
     expect(await screen.findByText("Audio rehearsal detected microphone.")).toBeInTheDocument();
     expect(screen.getByText("Mic peak 32%")).toBeInTheDocument();
+  });
+
+  it("runs a live pipeline smoke check from Settings and includes it in the preflight report", async () => {
+    const user = userEvent.setup();
+    storeConfig({
+      audio: {
+        ...DEFAULT_APP_CONFIG.audio,
+        captureMode: "microphone",
+        microphoneDeviceId: "microphone-default",
+        sttMode: "local_whisper"
+      },
+      stt: {
+        ...DEFAULT_APP_CONFIG.stt,
+        selectedMode: "local_whisper",
+        localWhisperBinaryPath: "C:\\tools\\whisper.cpp\\main.exe",
+        localWhisperModelPath: "C:\\models\\ggml-base.en.bin"
+      }
+    });
+    render(<Settings />);
+
+    await user.click(await screen.findByRole("button", { name: "Run Live Pipeline Smoke Check" }));
+
+    expect(runLivePipelineSmokeCheck).toHaveBeenCalledWith({
+      config: expect.objectContaining({
+        audio: expect.objectContaining({ captureMode: "microphone" }),
+        stt: expect.objectContaining({ selectedMode: "local_whisper" })
+      })
+    });
+    expect((await screen.findAllByText("Live pipeline smoke check passed.")).length).toBeGreaterThan(0);
+    expect(screen.getByText("1 transcript segment")).toBeInTheDocument();
+    expect(screen.getByText("First AI chunk: OK")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Save Preflight Report" }));
+
+    const report = localStorage.getItem(PREFLIGHT_REPORT_SETTING_KEY) ?? "";
+    expect(report).toContain("Live pipeline smoke check: ready - Live pipeline smoke check passed.");
   });
 
   it("shows application audio source selection", async () => {

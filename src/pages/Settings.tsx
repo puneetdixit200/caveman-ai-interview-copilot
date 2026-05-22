@@ -28,6 +28,7 @@ import {
   serializeAppConfig
 } from "../lib/appConfig";
 import { runAudioCaptureRehearsal, type AudioRehearsalResult } from "../lib/audioRehearsal";
+import { runLivePipelineSmokeCheck, type LivePipelineSmokeResult } from "../lib/livePipelineSmoke";
 import {
   createKnowledgeBase,
   searchKnowledgeBase,
@@ -124,6 +125,8 @@ export function Settings() {
   const [testingStt, setTestingStt] = useState(false);
   const [testingAudioRehearsal, setTestingAudioRehearsal] = useState(false);
   const [audioRehearsalResult, setAudioRehearsalResult] = useState<AudioRehearsalResult | null>(null);
+  const [testingLivePipeline, setTestingLivePipeline] = useState(false);
+  const [livePipelineSmokeResult, setLivePipelineSmokeResult] = useState<LivePipelineSmokeResult | null>(null);
   const [detectingWhisper, setDetectingWhisper] = useState(false);
   const [downloadingWhisper, setDownloadingWhisper] = useState(false);
   const [providerSecretInputs, setProviderSecretInputs] = useState<Partial<Record<ProviderId, string>>>({});
@@ -267,7 +270,8 @@ export function Settings() {
     return buildPreflightReport({
       readiness,
       runtimeBudget,
-      audioRehearsal: audioRehearsalResult
+      audioRehearsal: audioRehearsalResult,
+      livePipelineSmoke: livePipelineSmokeResult
     });
   }
 
@@ -391,6 +395,22 @@ export function Settings() {
       setStatus(`Audio rehearsal failed: ${error instanceof Error ? error.message : String(error)}`);
     } finally {
       setTestingAudioRehearsal(false);
+    }
+  }
+
+  async function runLivePipelineSmoke() {
+    setTestingLivePipeline(true);
+    setStatus("Running live pipeline smoke check...");
+
+    try {
+      const result = await runLivePipelineSmokeCheck({ config });
+      setLivePipelineSmokeResult(result);
+      setStatus(result.message);
+    } catch (error) {
+      setLivePipelineSmokeResult(null);
+      setStatus(`Live pipeline smoke check failed: ${error instanceof Error ? error.message : String(error)}`);
+    } finally {
+      setTestingLivePipeline(false);
     }
   }
 
@@ -1007,6 +1027,9 @@ export function Settings() {
           <Button icon={<RefreshCw size={16} />} onClick={refreshRuntimeBudget} disabled={refreshingRuntimeBudget}>
             {refreshingRuntimeBudget ? "Refreshing Runtime" : "Refresh Runtime Budget"}
           </Button>
+          <Button icon={<Play size={16} />} onClick={runLivePipelineSmoke} disabled={testingLivePipeline}>
+            {testingLivePipeline ? "Testing Live Pipeline" : "Run Live Pipeline Smoke Check"}
+          </Button>
           <Button icon={<Save size={16} />} onClick={savePreflightReport}>
             Save Preflight Report
           </Button>
@@ -1048,6 +1071,26 @@ export function Settings() {
             </article>
           ))}
         </div>
+
+        {livePipelineSmokeResult ? (
+          <div className="settings-field audio-rehearsal-result">
+            <span>Live pipeline smoke check</span>
+            <strong>{livePipelineSmokeResult.message}</strong>
+            <div className="audio-rehearsal-metrics">
+              <span>
+                {livePipelineSmokeResult.transcriptSegments} transcript{" "}
+                {livePipelineSmokeResult.transcriptSegments === 1 ? "segment" : "segments"}
+              </span>
+              <span>First AI chunk: {livePipelineSmokeResult.firstAiChunk || "none"}</span>
+              <span>{livePipelineSmokeResult.durationMs} ms</span>
+            </div>
+            {livePipelineSmokeResult.items.map((item) => (
+              <small key={item.id}>
+                {item.label}: {item.detail}
+              </small>
+            ))}
+          </div>
+        ) : null}
 
         {preflightReport ? (
           <label className="settings-field">

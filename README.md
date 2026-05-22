@@ -22,6 +22,7 @@ Implemented now:
 - Dashboard for active interview sessions
 - Native CPAL microphone, system audio, and dual-stream capture with device selection, app-aware target selection, gain, noise gate, meters, STT-ready 16 kHz mono snapshots, and 250 ms PCM chunk events for streaming STT clients
 - Audio rehearsal in Settings that briefly runs native capture and reports live microphone/system peaks before a real interview
+- Live pipeline smoke check that records a short real audio snapshot, runs the configured STT path, probes the selected AI provider for its first streamed chunk, and deletes the raw snapshot
 - Raw audio cache cleanup that purges stale live-capture and local Whisper temporary artifacts on startup
 - Local Whisper chunk-driven streaming from 250 ms PCM audio, Deepgram live WebSocket streaming with interim word preview, AssemblyAI and Google STT fallback commands, and first-class STT auto language detection
 - Speaker diarization calibration for microphone, system audio, and provider speaker slots from Whisper, Deepgram, AssemblyAI, and Google STT

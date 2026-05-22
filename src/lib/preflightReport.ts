@@ -1,4 +1,5 @@
 import type { AudioRehearsalResult } from "./audioRehearsal";
+import type { LivePipelineSmokeResult } from "./livePipelineSmoke";
 import type { RealUseReadiness, RuntimeBudgetStatus } from "./readiness";
 
 export const PREFLIGHT_REPORT_SETTING_KEY = "preflight.latestReport";
@@ -7,6 +8,7 @@ export interface BuildPreflightReportInput {
   readiness: RealUseReadiness;
   runtimeBudget?: RuntimeBudgetStatus | null;
   audioRehearsal?: AudioRehearsalResult | null;
+  livePipelineSmoke?: LivePipelineSmokeResult | null;
   generatedAt?: Date;
 }
 
@@ -14,6 +16,7 @@ export function buildPreflightReport({
   readiness,
   runtimeBudget,
   audioRehearsal,
+  livePipelineSmoke,
   generatedAt = new Date()
 }: BuildPreflightReportInput): string {
   return [
@@ -28,6 +31,9 @@ export function buildPreflightReport({
     "",
     "## Audio Rehearsal",
     formatAudioRehearsal(audioRehearsal),
+    "",
+    "## Live Pipeline Smoke Check",
+    ...formatLivePipelineSmoke(livePipelineSmoke),
     "",
     "## Readiness Items",
     ...readiness.items.flatMap(formatReadinessItem),
@@ -62,11 +68,30 @@ function formatAudioRehearsal(audioRehearsal?: AudioRehearsalResult | null): str
   return `Audio rehearsal: ${audioRehearsal.status} - ${audioRehearsal.message}${warnings}`;
 }
 
+function formatLivePipelineSmoke(livePipelineSmoke?: LivePipelineSmokeResult | null): string[] {
+  if (!livePipelineSmoke) {
+    return ["Live pipeline smoke check: not run"];
+  }
+
+  return [
+    `Live pipeline smoke check: ${livePipelineSmoke.status} - ${livePipelineSmoke.message}`,
+    `Transcript segments: ${livePipelineSmoke.transcriptSegments}`,
+    livePipelineSmoke.firstAiChunk ? `First AI chunk: ${livePipelineSmoke.firstAiChunk}` : undefined,
+    ...livePipelineSmoke.items.map(formatSmokeItem)
+  ].filter((line): line is string => Boolean(line));
+}
+
 function formatReadinessItem(item: RealUseReadiness["items"][number]): string[] {
   return [
     `- [${item.status}] ${item.label}: ${item.detail}`,
     item.action ? `  Action: ${item.action}` : undefined
   ].filter((line): line is string => Boolean(line));
+}
+
+function formatSmokeItem(item: LivePipelineSmokeResult["items"][number]): string {
+  const latency = typeof item.latencyMs === "number" ? ` (${Math.round(item.latencyMs)}ms)` : "";
+  const action = item.action ? ` Action: ${item.action}` : "";
+  return `- [${item.status}] ${item.label}: ${item.detail}${latency}${action}`;
 }
 
 function formatOptionalMetric(value: number | null | undefined, unit: string): string {

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { AudioRehearsalResult } from "./audioRehearsal";
+import type { LivePipelineSmokeResult } from "./livePipelineSmoke";
 import { buildPreflightReport, PREFLIGHT_REPORT_SETTING_KEY } from "./preflightReport";
 import type { RealUseReadiness, RuntimeBudgetStatus } from "./readiness";
 
@@ -52,6 +53,37 @@ const audioRehearsal: AudioRehearsalResult = {
   message: "Audio rehearsal detected microphone and system audio."
 };
 
+const livePipelineSmoke: LivePipelineSmokeResult = {
+  status: "ready",
+  startedAt: "2026-05-21T16:29:58.000Z",
+  durationMs: 980,
+  transcriptSegments: 1,
+  firstAiChunk: "OK",
+  items: [
+    {
+      id: "audio",
+      label: "Live audio snapshot",
+      status: "ready",
+      detail: "Captured 900ms of microphone audio for STT validation."
+    },
+    {
+      id: "stt",
+      label: "Local Whisper smoke test",
+      status: "ready",
+      detail: "Transcribed 1 segment from the live snapshot.",
+      latencyMs: 220
+    },
+    {
+      id: "provider",
+      label: "Ollama first chunk",
+      status: "ready",
+      detail: "Received the first AI chunk.",
+      latencyMs: 760
+    }
+  ],
+  message: "Live pipeline smoke check passed."
+};
+
 describe("preflightReport", () => {
   it("uses a stable setting key for the latest saved report", () => {
     expect(PREFLIGHT_REPORT_SETTING_KEY).toBe("preflight.latestReport");
@@ -62,6 +94,7 @@ describe("preflightReport", () => {
       readiness,
       runtimeBudget,
       audioRehearsal,
+      livePipelineSmoke,
       generatedAt: new Date("2026-05-21T16:30:00.000Z")
     });
 
@@ -71,6 +104,8 @@ describe("preflightReport", () => {
     expect(report).toContain("Ready: 5 | Warnings: 2 | Blocked: 0");
     expect(report).toContain("Runtime: startup 1200ms / memory 220MB / idle CPU 3%");
     expect(report).toContain("Audio rehearsal: ready - Audio rehearsal detected microphone and system audio.");
+    expect(report).toContain("Live pipeline smoke check: ready - Live pipeline smoke check passed.");
+    expect(report).toContain("- [ready] Local Whisper smoke test: Transcribed 1 segment from the live snapshot. (220ms)");
     expect(report).toContain("- [ready] Dual audio capture ready: Microphone and system streams are configured separately.");
     expect(report).toContain("  Action: Open the overlay once before joining a call.");
     expect(report).toContain("- [ ] Confirm live transcript updates while the real call audio is playing.");
