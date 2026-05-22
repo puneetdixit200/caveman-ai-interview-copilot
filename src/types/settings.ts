@@ -4,6 +4,8 @@ export type ProviderKind = "local" | "cloud";
 export type ProviderId =
   | "ollama"
   | "lmstudio"
+  | "llamacpp"
+  | "vllm"
   | "openrouter"
   | "openai"
   | "anthropic"

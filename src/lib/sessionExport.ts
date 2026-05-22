@@ -259,9 +259,11 @@ export async function downloadSessionPdf(input: ExportSessionInput): Promise<voi
 
 function formatProviderName(provider: string): string {
   const knownProviders: Record<string, string> = {
+    llamacpp: "llama.cpp",
     lmstudio: "LM Studio",
     openai: "OpenAI",
-    openrouter: "OpenRouter"
+    openrouter: "OpenRouter",
+    vllm: "vLLM"
   };
   const normalized = provider.toLowerCase().replace(/[-_\s]+/g, "");
 

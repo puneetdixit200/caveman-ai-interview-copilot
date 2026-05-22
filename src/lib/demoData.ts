@@ -123,6 +123,24 @@ export const modelProviders: ModelProviderConfig[] = [
     model: "local-model",
     enabled: false,
     apiKeyStored: false
+  },
+  {
+    id: "llamacpp",
+    label: "llama.cpp",
+    kind: "local",
+    endpoint: "http://localhost:8080/v1/chat/completions",
+    model: "local-model",
+    enabled: false,
+    apiKeyStored: false
+  },
+  {
+    id: "vllm",
+    label: "vLLM",
+    kind: "local",
+    endpoint: "http://localhost:8000/v1/chat/completions",
+    model: "local-model",
+    enabled: false,
+    apiKeyStored: false
   }
 ];
 

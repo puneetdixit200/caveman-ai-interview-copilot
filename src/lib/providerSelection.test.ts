@@ -3,6 +3,24 @@ import { DEFAULT_APP_CONFIG } from "./appConfig";
 import { selectRunnableProviders } from "./providerSelection";
 
 describe("providerSelection", () => {
+  it("ships all local model providers named in the product goal", () => {
+    const localProviders = DEFAULT_APP_CONFIG.providers.filter((provider) => provider.kind === "local");
+
+    expect(localProviders.map((provider) => provider.id)).toEqual([
+      "ollama",
+      "lmstudio",
+      "llamacpp",
+      "vllm"
+    ]);
+    expect(localProviders.map((provider) => provider.label)).toEqual([
+      "Ollama",
+      "LM Studio",
+      "llama.cpp",
+      "vLLM"
+    ]);
+    expect(localProviders.every((provider) => provider.endpoint.includes("localhost"))).toBe(true);
+  });
+
   it("orders the selected enabled provider first", () => {
     const providers = selectRunnableProviders({
       ...DEFAULT_APP_CONFIG,
@@ -28,6 +46,6 @@ describe("providerSelection", () => {
     });
 
     expect(providers.every((provider) => provider.kind === "local")).toBe(true);
-    expect(providers.map((provider) => provider.id)).toEqual(["ollama", "lmstudio"]);
+    expect(providers.map((provider) => provider.id)).toEqual(["ollama", "lmstudio", "llamacpp", "vllm"]);
   });
 });

@@ -5,6 +5,8 @@ describe("appConfig", () => {
   it("defaults to real local provider endpoints and keeps cloud providers disabled until configured", () => {
     const ollama = DEFAULT_APP_CONFIG.providers.find((provider) => provider.id === "ollama");
     const lmstudio = DEFAULT_APP_CONFIG.providers.find((provider) => provider.id === "lmstudio");
+    const llamacpp = DEFAULT_APP_CONFIG.providers.find((provider) => provider.id === "llamacpp");
+    const vllm = DEFAULT_APP_CONFIG.providers.find((provider) => provider.id === "vllm");
     const openrouter = DEFAULT_APP_CONFIG.providers.find((provider) => provider.id === "openrouter");
     const openai = DEFAULT_APP_CONFIG.providers.find((provider) => provider.id === "openai");
     const anthropic = DEFAULT_APP_CONFIG.providers.find((provider) => provider.id === "anthropic");
@@ -22,6 +24,14 @@ describe("appConfig", () => {
     expect(lmstudio).toMatchObject({
       enabled: false,
       endpoint: "http://localhost:1234/v1/chat/completions"
+    });
+    expect(llamacpp).toMatchObject({
+      enabled: false,
+      endpoint: "http://localhost:8080/v1/chat/completions"
+    });
+    expect(vllm).toMatchObject({
+      enabled: false,
+      endpoint: "http://localhost:8000/v1/chat/completions"
     });
     expect(openrouter).toMatchObject({
       enabled: false,
