@@ -296,7 +296,7 @@ describe("Dashboard collaboration helper", () => {
     expect(await screen.findByText("Manual transcript mode active")).toBeInTheDocument();
   });
 
-  it("does not request Windows capture exclusion when the security setting is disabled", async () => {
+  it("does not request screen capture exclusion when the security setting is disabled", async () => {
     vi.mocked(tauri.getSetting)
       .mockResolvedValueOnce(
         serializeAppConfig({

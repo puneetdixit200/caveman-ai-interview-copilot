@@ -1,6 +1,7 @@
 use super::{
-    capture_exclusion_disabled_status, capture_exclusion_unavailable_status,
-    sanitize_overlay_bounds, OverlayProtectionStatus, OverlayWindowBounds,
+    capture_exclusion_disabled_status, capture_exclusion_enabled_status,
+    capture_exclusion_unavailable_status, sanitize_overlay_bounds, OverlayProtectionStatus,
+    OverlayWindowBounds,
 };
 
 #[test]
@@ -16,10 +17,20 @@ fn reports_unavailable_capture_exclusion_for_unsupported_platforms() {
             click_through: false,
             visible: false,
             message: Some(
-                "Capture exclusion is only implemented on Windows in this build.".to_string()
+                "Capture exclusion is only implemented on Windows and macOS in this build."
+                    .to_string()
             )
         }
     );
+}
+
+#[test]
+fn reports_enabled_capture_exclusion_when_platform_api_accepts_request() {
+    let status = capture_exclusion_enabled_status(false);
+
+    assert_eq!(status.capture_exclusion, "enabled");
+    assert!(!status.visible);
+    assert!(status.message.is_none());
 }
 
 #[test]

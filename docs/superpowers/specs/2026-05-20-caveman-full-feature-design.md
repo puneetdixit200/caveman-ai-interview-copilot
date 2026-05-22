@@ -11,7 +11,7 @@ The full build covers the original MVP feature groups:
 - Audio capture: system audio, microphone audio, dual stream attribution, device selection, virtual cable support.
 - Real-time STT: local Whisper path, cloud fallback boundary, streaming transcript events, language metadata, speaker labels.
 - AI response engine: Ollama, LM Studio, OpenRouter, OpenAI-compatible providers, context window management, response streaming, prompt templates.
-- Overlay system: always-on-top transparent overlay, opacity/font controls, hotkeys, position persistence, markdown rendering, Windows capture exclusion.
+- Overlay system: always-on-top transparent overlay, opacity/font controls, hotkeys, position persistence, markdown rendering, Windows/macOS capture exclusion.
 - Conversation management: session recording, searchable history, replay-ready transcripts, Markdown/JSON export, tags, notes.
 - Settings: provider configuration, API key vault, audio settings, hotkeys, profiles.
 
@@ -72,7 +72,7 @@ Make the overlay operational during interview use.
 - Add global hotkeys for show/hide overlay, generate response, start/stop session, and panic hide.
 - Persist overlay position, opacity, lock state, font size, and theme.
 - Add markdown rendering for bullets, code blocks, and short answer sections.
-- Add Windows `SetWindowDisplayAffinity(WDA_EXCLUDEFROMCAPTURE)` for capture exclusion when supported.
+- Add Windows `SetWindowDisplayAffinity(WDA_EXCLUDEFROMCAPTURE)` and macOS `NSWindowSharingType::None` for capture exclusion when supported.
 - Add overlay status indicators so the user knows whether stealth protection is active, unsupported, or failed.
 
 Verification:
@@ -272,7 +272,7 @@ Some targets, especially STT latency under 500 ms, depend on the user machine, m
 - STT has a streaming local path, cloud configuration path, and mock/manual adapters reserved for tests and missing-runtime troubleshooting.
 - AI providers include Ollama, LM Studio/OpenAI-compatible, and OpenRouter.
 - Provider fallback is tested.
-- Overlay supports hotkeys, persistence, markdown/code rendering, and Windows capture exclusion status.
+- Overlay supports hotkeys, persistence, markdown/code rendering, and Windows/macOS capture exclusion status.
 - Sessions save transcripts, AI responses, tags, notes, and exports.
 - Settings save providers, profiles, audio settings, hotkeys, prompt templates, resume/JD context, and secret references.
 - Resume/JD context appears in generated prompts.

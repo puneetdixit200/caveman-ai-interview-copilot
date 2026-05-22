@@ -2188,7 +2188,7 @@ export function Settings() {
             />
           </label>
           <label className="toggle-row">
-            <span>Windows capture exclusion</span>
+            <span>Screen capture exclusion</span>
             <input
               type="checkbox"
               checked={config.security.captureExclusionEnabled}

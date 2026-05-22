@@ -31,6 +31,7 @@ pub fn configure_overlay_security(app: &mut tauri::App) {
         let _ = window.set_decorations(false);
         let _ = window.set_shadow(false);
         let _ = window.set_ignore_cursor_events(true);
+        let _ = window.set_content_protected(true);
         let _ = apply_capture_exclusion(&window, true);
     }
 }
@@ -178,31 +179,45 @@ fn apply_capture_exclusion(
             }
 
             let ok = unsafe { SetWindowDisplayAffinity(hwnd, WDA_EXCLUDEFROMCAPTURE) }.is_ok();
-            OverlayProtectionStatus {
-                always_on_top: true,
-                skip_taskbar: true,
-                capture_exclusion: if ok { "enabled" } else { "failed" }.to_string(),
-                click_through: false,
-                visible: false,
-                message: if ok {
-                    None
-                } else {
-                    Some("Windows rejected SetWindowDisplayAffinity.".to_string())
-                },
+            if ok {
+                capture_exclusion_enabled_status(false)
+            } else {
+                capture_exclusion_failed_status(
+                    false,
+                    "Windows rejected SetWindowDisplayAffinity.".to_string(),
+                )
             }
         }
-        Err(error) => OverlayProtectionStatus {
-            always_on_top: true,
-            skip_taskbar: true,
-            capture_exclusion: "failed".to_string(),
-            click_through: false,
-            visible: false,
-            message: Some(error.to_string()),
-        },
+        Err(error) => capture_exclusion_failed_status(false, error.to_string()),
     }
 }
 
-#[cfg(not(target_os = "windows"))]
+#[cfg(target_os = "macos")]
+fn apply_capture_exclusion(
+    window: &tauri::WebviewWindow,
+    capture_exclusion_enabled: bool,
+) -> OverlayProtectionStatus {
+    if !capture_exclusion_enabled {
+        let mut status = capture_exclusion_disabled_status(false);
+        if let Err(error) = window.set_content_protected(false) {
+            status.capture_exclusion = "failed".to_string();
+            status.message = Some(format!(
+                "macOS rejected disabling content protection: {error}"
+            ));
+        }
+        return status;
+    }
+
+    match window.set_content_protected(true) {
+        Ok(()) => capture_exclusion_enabled_status(false),
+        Err(error) => capture_exclusion_failed_status(
+            false,
+            format!("macOS rejected NSWindow content protection: {error}"),
+        ),
+    }
+}
+
+#[cfg(not(any(target_os = "macos", target_os = "windows")))]
 fn apply_capture_exclusion(
     _window: &tauri::WebviewWindow,
     capture_exclusion_enabled: bool,
@@ -211,6 +226,17 @@ fn apply_capture_exclusion(
         capture_exclusion_unavailable_status()
     } else {
         capture_exclusion_disabled_status(false)
+    }
+}
+
+pub fn capture_exclusion_enabled_status(visible: bool) -> OverlayProtectionStatus {
+    OverlayProtectionStatus {
+        always_on_top: true,
+        skip_taskbar: true,
+        capture_exclusion: "enabled".to_string(),
+        click_through: false,
+        visible,
+        message: None,
     }
 }
 
@@ -233,8 +259,19 @@ pub fn capture_exclusion_unavailable_status() -> OverlayProtectionStatus {
         click_through: false,
         visible: false,
         message: Some(
-            "Capture exclusion is only implemented on Windows in this build.".to_string(),
+            "Capture exclusion is only implemented on Windows and macOS in this build.".to_string(),
         ),
+    }
+}
+
+fn capture_exclusion_failed_status(visible: bool, message: String) -> OverlayProtectionStatus {
+    OverlayProtectionStatus {
+        always_on_top: true,
+        skip_taskbar: true,
+        capture_exclusion: "failed".to_string(),
+        click_through: false,
+        visible,
+        message: Some(message),
     }
 }
 

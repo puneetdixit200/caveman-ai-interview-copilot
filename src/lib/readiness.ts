@@ -299,7 +299,7 @@ function evaluateOverlayReadiness(
       label: "Capture exclusion disabled",
       status: "warning",
       detail: "The stealth overlay can be visible to screen capture when capture exclusion is disabled.",
-      action: "Enable Windows capture exclusion before a real screen share."
+      action: "Enable screen capture exclusion before a real screen share."
     };
   }
 
