@@ -12,28 +12,9 @@ env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
-  package:
-    name: ${{ matrix.name }}
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - name: Windows installers
-            os: windows-latest
-            build_command: npm run tauri build -- --ci --bundles nsis,msi
-            artifact_name: caveman-windows-package-smoke
-            artifact_path: |
-              src-tauri/target/release/bundle/nsis/*.exe
-              src-tauri/target/release/bundle/msi/*.msi
-          - name: macOS app and DMG
-            os: macos-13
-            build_command: npm run tauri:build:mac
-            artifact_name: caveman-macos-package-smoke
-            artifact_path: |
-              src-tauri/target/release/bundle/macos/Caveman.app
-              src-tauri/target/release/bundle/dmg/*.dmg
-
+  build-windows:
+    name: Windows installers
+    runs-on: windows-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -53,12 +34,49 @@ jobs:
       - name: Verify release packaging contracts
         run: npm run test:release
 
-      - name: Build desktop package
-        run: ${{ matrix.build_command }}
+      - name: Build Windows packages
+        run: npm run tauri build -- --ci --bundles nsis,msi
 
-      - name: Upload package artifact
+      - name: Upload Windows package artifact
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.artifact_name }}
+          name: caveman-windows-package-smoke
           if-no-files-found: error
-          path: ${{ matrix.artifact_path }}
+          path: |
+            src-tauri/target/release/bundle/nsis/*.exe
+            src-tauri/target/release/bundle/msi/*.msi
+
+  build-macos:
+    name: macOS app and DMG
+    runs-on: macos-13
+    if: ${{ github.event_name == 'workflow_dispatch' }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Verify release packaging contracts
+        run: npm run test:release
+
+      - name: Build macOS package
+        run: npm run tauri:build:mac
+
+      - name: Upload macOS package artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: caveman-macos-package-smoke
+          if-no-files-found: error
+          path: |
+            src-tauri/target/release/bundle/macos/Caveman.app
+            src-tauri/target/release/bundle/dmg/*.dmg
