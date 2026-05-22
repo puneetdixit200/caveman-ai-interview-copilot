@@ -242,6 +242,7 @@ fn serve_loop(
 }
 
 fn handle_stream(mut stream: TcpStream, state: &Arc<Mutex<CollaborationInner>>) {
+    let _ = stream.set_nonblocking(false);
     let _ = stream.set_read_timeout(Some(Duration::from_secs(2)));
     let request = match read_request(&mut stream) {
         Ok(request) => request,
