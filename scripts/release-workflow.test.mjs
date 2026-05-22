@@ -7,6 +7,8 @@ const desktopSmokeWorkflowPath = ".github/workflows/desktop-package-smoke.yml";
 
 const normalizeLineEndings = (text) => text.replace(/\r\n/g, "\n");
 const cavemanCargoLockVersionPattern = /\[\[package\]\]\nname = "caveman"\nversion = "0\.1\.1"/;
+const updaterPublicKey =
+  "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDhFREQ5MzAzMUExN0VGNkUKUldSdTd4Y2FBNVBkam9EeDJFNmpqbCtPZkpDTmZ4T05HOHVhVEo5MmNwSFdqSTl4MHdwWHZqNXcK";
 
 test("release workflow builds and publishes signed Windows updater assets", async () => {
   const workflow = await readFile(workflowPath, "utf8");
@@ -108,6 +110,26 @@ test("release workflow opts GitHub actions into the Node 24 runtime", async () =
   const workflow = await readFile(workflowPath, "utf8");
 
   assert.match(workflow, /FORCE_JAVASCRIPT_ACTIONS_TO_NODE24:\s*true/);
+});
+
+test("desktop updater config uses the committed public signing key", async () => {
+  const tauriConfig = JSON.parse(await readFile("src-tauri/tauri.conf.json", "utf8"));
+
+  assert.equal(tauriConfig.plugins.updater.pubkey, updaterPublicKey);
+  assert.deepEqual(tauriConfig.plugins.updater.endpoints, [
+    "https://github.com/puneetdixit200/caveman-ai-interview-copilot/releases/latest/download/latest.json"
+  ]);
+});
+
+test("repository includes distribution license metadata", async () => {
+  const packageJson = JSON.parse(await readFile("package.json", "utf8"));
+  const license = await readFile("LICENSE", "utf8");
+  const readme = await readFile("README.md", "utf8");
+
+  assert.equal(packageJson.license, "MIT");
+  assert.match(license, /^MIT License/);
+  assert.match(readme, /## License\s+MIT License/);
+  assert.doesNotMatch(readme, /No license has been selected/);
 });
 
 test("release workflow contract is part of the release test suite", async () => {

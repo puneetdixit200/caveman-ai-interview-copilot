@@ -180,4 +180,4 @@ coding-interview
 
 ## License
 
-No license has been selected yet. Add a license before distributing the app publicly.
+MIT License. See [LICENSE](LICENSE).

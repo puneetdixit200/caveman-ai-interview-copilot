@@ -53,7 +53,7 @@
   },
   "plugins": {
     "updater": {
-      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDgzRTE3MTVCMDY3REJDMDQKUldRRXZIMEdXM0hoZzg0MHFpWEVoZDdkUmI4LzJDNkNtZEkxSUxjTmwrUkNUNTFtUVhFTnhOdjAK",
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDhFREQ5MzAzMUExN0VGNkUKUldSdTd4Y2FBNVBkam9EeDJFNmpqbCtPZkpDTmZ4T05HOHVhVEo5MmNwSFdqSTl4MHdwWHZqNXcK",
       "endpoints": [
         "https://github.com/puneetdixit200/caveman-ai-interview-copilot/releases/latest/download/latest.json"
       ],
