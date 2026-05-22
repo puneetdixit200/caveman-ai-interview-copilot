@@ -17,15 +17,24 @@ pub struct ScreenShareStatus {
 
 const WATCHED_SCREEN_SHARE_PROCESSES: &[&str] = &[
     "zoom.exe",
+    "zoom.us",
     "teams.exe",
     "ms-teams.exe",
+    "microsoft teams",
+    "msteams",
     "obs64.exe",
     "obs32.exe",
+    "obs",
     "discord.exe",
+    "discord",
     "slack.exe",
+    "slack",
     "skype.exe",
+    "skype",
     "webexmta.exe",
+    "webex",
     "ciscocollabhost.exe",
+    "cisco webex meetings",
 ];
 
 pub fn detect_screen_share_status() -> anyhow::Result<ScreenShareStatus> {
@@ -46,13 +55,30 @@ pub fn detect_screen_share_status() -> anyhow::Result<ScreenShareStatus> {
         )));
     }
 
-    #[cfg(not(target_os = "windows"))]
+    #[cfg(target_os = "macos")]
+    {
+        let output = std::process::Command::new("ps")
+            .args(["-axo", "pid=,comm="])
+            .output()?;
+
+        if !output.status.success() {
+            return Err(anyhow::anyhow!(
+                "Could not query running processes for screen-share guard"
+            ));
+        }
+
+        return Ok(screen_share_status_for_processes(parse_unix_process_list(
+            &String::from_utf8_lossy(&output.stdout),
+        )));
+    }
+
+    #[cfg(not(any(target_os = "macos", target_os = "windows")))]
     {
         Ok(ScreenShareStatus {
             active: false,
             matched_processes: Vec::new(),
             message: Some(
-                "Screen-share process guard is only implemented on Windows in this build."
+                "Screen-share process guard is only implemented on Windows and macOS in this build."
                     .to_string(),
             ),
         })
@@ -91,6 +117,7 @@ fn normalize_process_name(name: &str) -> String {
         .to_ascii_lowercase()
 }
 
+#[cfg_attr(not(target_os = "windows"), allow(dead_code))]
 fn parse_tasklist_csv(output: &str) -> Vec<ScreenShareProcess> {
     output
         .lines()
@@ -109,6 +136,25 @@ fn parse_tasklist_csv(output: &str) -> Vec<ScreenShareProcess> {
         .collect()
 }
 
+fn parse_unix_process_list(output: &str) -> Vec<ScreenShareProcess> {
+    output
+        .lines()
+        .filter_map(|line| {
+            let (pid, name) = line.trim().split_once(char::is_whitespace)?;
+            let name = name.trim().to_string();
+            if name.is_empty() {
+                return None;
+            }
+
+            Some(ScreenShareProcess {
+                name,
+                pid: pid.trim().parse::<u32>().ok(),
+            })
+        })
+        .collect()
+}
+
+#[cfg_attr(not(target_os = "windows"), allow(dead_code))]
 fn parse_csv_line(line: &str) -> Vec<String> {
     let mut values = Vec::new();
     let mut current = String::new();
@@ -151,6 +197,24 @@ mod tests {
             status.matched_processes,
             vec![ScreenShareProcess {
                 name: "zoom.exe".to_string(),
+                pid: Some(4242)
+            }]
+        );
+    }
+
+    #[test]
+    fn detects_known_screen_share_processes_from_unix_process_list() {
+        let processes = parse_unix_process_list(
+            " 4242 /Applications/zoom.us.app/Contents/MacOS/zoom.us\n  77 /Applications/Notes.app/Contents/MacOS/Notes",
+        );
+
+        let status = screen_share_status_for_processes(processes);
+
+        assert!(status.active);
+        assert_eq!(
+            status.matched_processes,
+            vec![ScreenShareProcess {
+                name: "/Applications/zoom.us.app/Contents/MacOS/zoom.us".to_string(),
                 pid: Some(4242)
             }]
         );
