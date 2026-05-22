@@ -72,6 +72,7 @@ test("release workflow builds macOS and Linux packages before publishing one rel
   assert.match(workflow, /build-linux:/);
   assert.match(workflow, /runs-on:\s*ubuntu-24\.04/);
   assert.match(workflow, /libwebkit2gtk-4\.1-dev/);
+  assert.match(workflow, /libpipewire-0\.3-dev/);
   assert.match(workflow, /src-tauri\/target\/release\/bundle\/appimage\/\*\.AppImage/);
   assert.match(workflow, /src-tauri\/target\/release\/bundle\/appimage\/\*\.AppImage\.sig/);
   assert.match(workflow, /publish-release:/);
