@@ -759,6 +759,20 @@ fn classify_device_kind(label: &str, fallback: &str) -> String {
     fallback.to_string()
 }
 
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+enum SystemCaptureRoute {
+    OutputLoopback,
+    VirtualInput,
+}
+
+fn system_capture_route(system_device_id: &str) -> SystemCaptureRoute {
+    if classify_device_kind(system_device_id, "system") == "virtual" {
+        SystemCaptureRoute::VirtualInput
+    } else {
+        SystemCaptureRoute::OutputLoopback
+    }
+}
+
 fn stable_device_id(kind: &str, label: &str, index: usize) -> String {
     let slug = label
         .chars()
@@ -791,9 +805,10 @@ mod tests {
     use super::{
         apply_audio_level_to_state, apply_audio_processing, classify_device_kind,
         cleanup_stale_audio_cache_files, delete_capture_snapshot_file, prepare_stt_samples,
-        stable_device_id, AudioCaptureManager, AudioCaptureState, AudioChunkAccumulator,
-        AudioChunkEvent, AudioLevelEvent, AudioProcessingSettings, CaptureSourceSelection,
-        RollingAudioBuffer, TARGET_CHANNELS, TARGET_SAMPLE_RATE_HZ,
+        stable_device_id, system_capture_route, AudioCaptureManager, AudioCaptureState,
+        AudioChunkAccumulator, AudioChunkEvent, AudioLevelEvent, AudioProcessingSettings,
+        CaptureSourceSelection, RollingAudioBuffer, SystemCaptureRoute, TARGET_CHANNELS,
+        TARGET_SAMPLE_RATE_HZ,
     };
 
     #[test]
@@ -806,10 +821,7 @@ mod tests {
             classify_device_kind("VoiceMeeter Output (VB-Audio VoiceMeeter VAIO)", "system"),
             "virtual"
         );
-        assert_eq!(
-            classify_device_kind("BlackHole 2ch", "system"),
-            "virtual"
-        );
+        assert_eq!(classify_device_kind("BlackHole 2ch", "system"), "virtual");
         assert_eq!(
             classify_device_kind("USB Microphone", "microphone"),
             "microphone"
@@ -821,6 +833,26 @@ mod tests {
         assert_eq!(
             stable_device_id("microphone", "USB Microphone (Realtek)", 2),
             "microphone-2-usb-microphone-realtek"
+        );
+    }
+
+    #[test]
+    fn routes_virtual_system_selection_through_input_stream() {
+        assert_eq!(
+            system_capture_route("virtual-0-blackhole-2ch"),
+            SystemCaptureRoute::VirtualInput
+        );
+        assert_eq!(
+            system_capture_route("BlackHole 2ch"),
+            SystemCaptureRoute::VirtualInput
+        );
+        assert_eq!(
+            system_capture_route("system-0-realtek-speakers"),
+            SystemCaptureRoute::OutputLoopback
+        );
+        assert_eq!(
+            system_capture_route("system-default"),
+            SystemCaptureRoute::OutputLoopback
         );
     }
 
@@ -1370,11 +1402,61 @@ fn build_system_loopback_stream(
     shared_chunks: Arc<Mutex<AudioChunkAccumulator>>,
     app_handle: AppHandle,
 ) -> anyhow::Result<CaptureStreamSpec> {
+    if system_capture_route(system_device_id) == SystemCaptureRoute::VirtualInput {
+        return build_virtual_system_input_stream(
+            host,
+            system_device_id,
+            processing_settings,
+            shared_state,
+            shared_samples,
+            shared_chunks,
+            app_handle,
+        );
+    }
+
     // CPAL's WASAPI backend enables loopback when an output device is opened as an input stream.
     let device = resolve_output_device(host, system_device_id)
         .ok_or_else(|| anyhow::anyhow!("No system output device is available"))?;
     let selected_device_id = resolve_output_device_id(host, &device, system_device_id);
     let supported_config = device.default_output_config()?;
+    let sample_rate_hz = supported_config.sample_rate().0;
+    let channels = supported_config.channels();
+    let stream_config = supported_config.clone().into();
+    let stream = build_input_stream(
+        &device,
+        "system",
+        supported_config.sample_format(),
+        &stream_config,
+        selected_device_id.clone(),
+        sample_rate_hz,
+        channels,
+        processing_settings,
+        shared_state,
+        shared_samples,
+        shared_chunks,
+        app_handle,
+    )?;
+
+    Ok(CaptureStreamSpec {
+        stream,
+        device_id: selected_device_id,
+    })
+}
+
+fn build_virtual_system_input_stream(
+    host: &cpal::Host,
+    system_device_id: &str,
+    processing_settings: AudioProcessingSettings,
+    shared_state: Arc<Mutex<AudioCaptureState>>,
+    shared_samples: Arc<Mutex<RollingAudioBuffer>>,
+    shared_chunks: Arc<Mutex<AudioChunkAccumulator>>,
+    app_handle: AppHandle,
+) -> anyhow::Result<CaptureStreamSpec> {
+    let device = resolve_virtual_input_device(host, system_device_id).ok_or_else(|| {
+        anyhow::anyhow!("No virtual audio input device is available for selected system source")
+    })?;
+    let selected_device_id = resolve_system_input_device_id(host, &device, system_device_id);
+    let supported_config = device.default_input_config()?;
     let sample_rate_hz = supported_config.sample_rate().0;
     let channels = supported_config.channels();
     let stream_config = supported_config.clone().into();
@@ -1641,8 +1723,50 @@ fn resolve_output_device(host: &cpal::Host, requested_id: &str) -> Option<cpal::
     host.default_output_device()
 }
 
+fn resolve_virtual_input_device(host: &cpal::Host, requested_id: &str) -> Option<cpal::Device> {
+    let generic_virtual = requested_id == "virtual-cable";
+    let inputs = host.input_devices().ok()?;
+    for (index, device) in inputs.enumerate() {
+        let label = device.name().ok()?;
+        let kind = classify_device_kind(&label, "microphone");
+        if stable_device_id(&kind, &label, index) == requested_id || label == requested_id {
+            return Some(device);
+        }
+        if generic_virtual && kind == "virtual" {
+            return Some(device);
+        }
+    }
+
+    None
+}
+
 fn resolve_input_device_id(host: &cpal::Host, device: &cpal::Device, requested_id: &str) -> String {
     if requested_id != "default" && requested_id != "microphone-default" {
+        return requested_id.to_string();
+    }
+
+    let Ok(target_name) = device.name() else {
+        return requested_id.to_string();
+    };
+
+    if let Ok(inputs) = host.input_devices() {
+        for (index, candidate) in inputs.enumerate() {
+            if candidate.name().ok().as_deref() == Some(target_name.as_str()) {
+                let kind = classify_device_kind(&target_name, "microphone");
+                return stable_device_id(&kind, &target_name, index);
+            }
+        }
+    }
+
+    requested_id.to_string()
+}
+
+fn resolve_system_input_device_id(
+    host: &cpal::Host,
+    device: &cpal::Device,
+    requested_id: &str,
+) -> String {
+    if requested_id != "virtual-cable" {
         return requested_id.to_string();
     }
 
