@@ -3,6 +3,7 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 const workflowPath = ".github/workflows/release.yml";
+const desktopSmokeWorkflowPath = ".github/workflows/desktop-package-smoke.yml";
 
 test("release workflow builds and publishes signed Windows updater assets", async () => {
   const workflow = await readFile(workflowPath, "utf8");
@@ -109,4 +110,22 @@ test("release workflow contract is part of the release test suite", async () => 
 
   assert.match(packageJson.scripts["test:release"], /release-workflow\.test\.mjs/);
   assert.match(packageJson.scripts["test:release"], /create-macos-dmg\.test\.mjs/);
+});
+
+test("desktop package smoke workflow builds macOS and Windows installers without publishing releases", async () => {
+  const workflow = await readFile(desktopSmokeWorkflowPath, "utf8");
+
+  assert.match(workflow, /workflow_dispatch:/);
+  assert.match(workflow, /push:/);
+  assert.match(workflow, /branches:\s*\[\s*main\s*\]/);
+  assert.match(workflow, /matrix:/);
+  assert.match(workflow, /windows-latest/);
+  assert.match(workflow, /macos-13/);
+  assert.match(workflow, /npm ci/);
+  assert.match(workflow, /npm run test:release/);
+  assert.match(workflow, /npm run tauri build -- --ci --bundles nsis,msi/);
+  assert.match(workflow, /npm run tauri:build:mac/);
+  assert.match(workflow, /actions\/upload-artifact@v4/);
+  assert.doesNotMatch(workflow, /softprops\/action-gh-release/);
+  assert.doesNotMatch(workflow, /TAURI_SIGNING_PRIVATE_KEY/);
 });
