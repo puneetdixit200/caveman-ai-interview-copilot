@@ -9,7 +9,8 @@ test("release workflow builds and publishes signed Windows updater assets", asyn
   const workflow = await readFile(workflowPath, "utf8");
 
   assert.match(workflow, /workflow_dispatch:/);
-  assert.match(workflow, /runs-on:\s*windows-latest/);
+  assert.match(workflow, /runs-on:\s*windows-2025-vs2026/);
+  assert.doesNotMatch(workflow, /runs-on:\s*windows-latest/);
   assert.match(workflow, /contents:\s*write/);
   assert.match(workflow, /npm ci/);
   assert.match(workflow, /npm run tauri:build:signed/);
@@ -133,7 +134,8 @@ test("desktop package smoke workflow builds macOS and Windows installers without
   assert.match(workflow, /branches:\s*\[\s*main\s*\]/);
   assert.match(workflow, /build-windows:/);
   assert.match(workflow, /build-macos:/);
-  assert.match(workflow, /windows-latest/);
+  assert.match(workflow, /windows-2025-vs2026/);
+  assert.doesNotMatch(workflow, /windows-latest/);
   assert.match(workflow, /macos-15-intel/);
   assert.doesNotMatch(workflow, /macos-13/);
   assert.match(workflow, /if:\s*\$\{\{\s*github\.event_name == 'workflow_dispatch'\s*\}\}/);
