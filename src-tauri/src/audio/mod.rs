@@ -747,7 +747,12 @@ fn fallback_audio_devices() -> Vec<AudioDevice> {
 
 fn classify_device_kind(label: &str, fallback: &str) -> String {
     let lower = label.to_lowercase();
-    if lower.contains("virtual") || lower.contains("cable") || lower.contains("vb-audio") {
+    if lower.contains("virtual")
+        || lower.contains("cable")
+        || lower.contains("vb-audio")
+        || lower.contains("voicemeeter")
+        || lower.contains("blackhole")
+    {
         return "virtual".to_string();
     }
 
@@ -795,6 +800,14 @@ mod tests {
     fn classifies_virtual_audio_devices_from_name() {
         assert_eq!(
             classify_device_kind("VB-Audio Virtual Cable", "microphone"),
+            "virtual"
+        );
+        assert_eq!(
+            classify_device_kind("VoiceMeeter Output (VB-Audio VoiceMeeter VAIO)", "system"),
+            "virtual"
+        );
+        assert_eq!(
+            classify_device_kind("BlackHole 2ch", "system"),
             "virtual"
         );
         assert_eq!(
