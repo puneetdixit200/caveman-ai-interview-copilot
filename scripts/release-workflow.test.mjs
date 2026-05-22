@@ -126,6 +126,21 @@ test("package scripts expose repeatable macOS and Windows installer builds", asy
   assert.match(workflow, /npm run tauri:build:windows/);
 });
 
+test("desktop release version is aligned for v0.1.1", async () => {
+  const packageJson = JSON.parse(await readFile("package.json", "utf8"));
+  const packageLock = JSON.parse(await readFile("package-lock.json", "utf8"));
+  const tauriConfig = JSON.parse(await readFile("src-tauri/tauri.conf.json", "utf8"));
+  const cargoToml = await readFile("src-tauri/Cargo.toml", "utf8");
+  const cargoLock = await readFile("src-tauri/Cargo.lock", "utf8");
+
+  assert.equal(packageJson.version, "0.1.1");
+  assert.equal(packageLock.version, "0.1.1");
+  assert.equal(packageLock.packages[""].version, "0.1.1");
+  assert.equal(tauriConfig.version, "0.1.1");
+  assert.match(cargoToml, /^version = "0\.1\.1"$/m);
+  assert.match(cargoLock, /\[\[package\]\]\nname = "caveman"\nversion = "0\.1\.1"/);
+});
+
 test("desktop package smoke workflow builds macOS and Windows installers without publishing releases", async () => {
   const workflow = await readFile(desktopSmokeWorkflowPath, "utf8");
 
