@@ -5,6 +5,9 @@ import test from "node:test";
 const workflowPath = ".github/workflows/release.yml";
 const desktopSmokeWorkflowPath = ".github/workflows/desktop-package-smoke.yml";
 
+const normalizeLineEndings = (text) => text.replace(/\r\n/g, "\n");
+const cavemanCargoLockVersionPattern = /\[\[package\]\]\nname = "caveman"\nversion = "0\.1\.1"/;
+
 test("release workflow builds and publishes signed Windows updater assets", async () => {
   const workflow = await readFile(workflowPath, "utf8");
 
@@ -138,7 +141,13 @@ test("desktop release version is aligned for v0.1.1", async () => {
   assert.equal(packageLock.packages[""].version, "0.1.1");
   assert.equal(tauriConfig.version, "0.1.1");
   assert.match(cargoToml, /^version = "0\.1\.1"$/m);
-  assert.match(cargoLock, /\[\[package\]\]\nname = "caveman"\nversion = "0\.1\.1"/);
+  assert.match(normalizeLineEndings(cargoLock), cavemanCargoLockVersionPattern);
+});
+
+test("desktop release version check accepts Windows CRLF Cargo.lock files", () => {
+  const cargoLock = '[[package]]\r\nname = "caveman"\r\nversion = "0.1.1"\r\n';
+
+  assert.match(normalizeLineEndings(cargoLock), cavemanCargoLockVersionPattern);
 });
 
 test("desktop package smoke workflow builds macOS and Windows installers without publishing releases", async () => {
