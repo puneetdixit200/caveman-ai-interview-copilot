@@ -441,10 +441,16 @@ function deviceAvailable(audioDevices: AudioDevice[], kind: AudioDevice["kind"],
   const requested = requestedId.trim();
   const kindDefault = kind === "microphone" ? "microphone-default" : kind === "system" ? "system-default" : "virtual-default";
   if (!requested || requested === "default" || requested === kindDefault) {
-    return audioDevices.some((device) => device.kind === kind);
+    return audioDevices.some((device) => deviceMatchesRequestedKind(device, kind));
   }
 
-  return audioDevices.some((device) => device.kind === kind && (device.id === requested || device.label === requested));
+  return audioDevices.some(
+    (device) => deviceMatchesRequestedKind(device, kind) && (device.id === requested || device.label === requested)
+  );
+}
+
+function deviceMatchesRequestedKind(device: AudioDevice, kind: AudioDevice["kind"]): boolean {
+  return device.kind === kind || (device.kind === "virtual" && (kind === "system" || kind === "microphone"));
 }
 
 function missingAudioDetail(input: {

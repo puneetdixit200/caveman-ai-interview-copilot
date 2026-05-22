@@ -169,6 +169,32 @@ describe("evaluateRealUseReadiness", () => {
     });
   });
 
+  it("treats a selected virtual cable as a valid live audio source", () => {
+    const readiness = evaluateRealUseReadiness({
+      config: mergeConfig({
+        audio: {
+          ...DEFAULT_APP_CONFIG.audio,
+          captureMode: "system",
+          systemDeviceId: "virtual-blackhole"
+        }
+      }),
+      audioDevices: [
+        {
+          id: "virtual-blackhole",
+          label: "BlackHole 2ch",
+          kind: "virtual",
+          selected: true,
+          level: 0
+        }
+      ]
+    });
+
+    expect(readiness.items.find((item) => item.id === "audio")).toMatchObject({
+      status: "ready",
+      label: "System capture ready"
+    });
+  });
+
   it("warns when runtime budgets have not been measured yet", () => {
     const readiness = evaluateRealUseReadiness({
       config: mergeConfig({

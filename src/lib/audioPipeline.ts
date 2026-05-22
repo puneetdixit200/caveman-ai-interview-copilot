@@ -38,7 +38,7 @@ export function buildAudioMeters(devices: AudioDevice[], settings: AudioSettings
         : source === "system"
           ? settings.systemDeviceId
           : settings.virtualDeviceId;
-    const device = devices.find((item) => item.id === targetId && item.kind === source);
+    const device = devices.find((item) => item.id === targetId && deviceMatchesSource(item, source));
     if (!device) {
       continue;
     }
@@ -51,6 +51,10 @@ export function buildAudioMeters(devices: AudioDevice[], settings: AudioSettings
   }
 
   return state;
+}
+
+function deviceMatchesSource(device: AudioDevice, source: "system" | "microphone" | "virtual"): boolean {
+  return device.kind === source || (device.kind === "virtual" && (source === "system" || source === "microphone"));
 }
 
 function resolveActiveSources(settings: AudioSettings): AudioMeterState["activeSources"] {

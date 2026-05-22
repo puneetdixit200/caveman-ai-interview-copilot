@@ -36,4 +36,25 @@ describe("audioPipeline", () => {
       microphone: expect.objectContaining({ id: "mic-1", level: expect.closeTo(0.998, 3) })
     });
   });
+
+  it("uses a selected virtual cable as the active system meter", () => {
+    const devices: AudioDevice[] = [
+      { id: "virtual-blackhole", label: "BlackHole 2ch", kind: "virtual", selected: true, level: 0.42 }
+    ];
+
+    expect(
+      buildAudioMeters(devices, {
+        ...settings,
+        captureMode: "system",
+        systemDeviceId: "virtual-blackhole"
+      })
+    ).toEqual({
+      activeSources: ["system"],
+      system: expect.objectContaining({
+        id: "virtual-blackhole",
+        label: "BlackHole 2ch",
+        level: expect.closeTo(0.838, 3)
+      })
+    });
+  });
 });
