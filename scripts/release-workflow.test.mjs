@@ -83,6 +83,8 @@ test("release workflow builds macOS and Linux packages before publishing one rel
   assert.match(workflow, /node scripts\/generate-latest-json\.mjs/);
   assert.match(workflow, /--bundle-dir release-assets/);
   assert.match(workflow, /release-assets\/latest\.json/);
+  assert.match(workflow, /release-assets\/\*\*\/\*\.app\.tar\.gz/);
+  assert.match(workflow, /release-assets\/\*\*\/\*\.sig/);
 });
 
 test("release workflow can run from pushed version tags without manual inputs", async () => {
