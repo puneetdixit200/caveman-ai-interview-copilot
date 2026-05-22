@@ -110,15 +110,17 @@ fn detect_code_editor(
 
 fn normalized_process_name(process_name: &str, executable_path: Option<&str>) -> String {
     let raw = if process_name.trim().is_empty() {
-        executable_path
-            .and_then(|path| std::path::Path::new(path).file_name())
-            .and_then(|name| name.to_str())
-            .unwrap_or("")
+        executable_path.and_then(executable_file_name).unwrap_or("")
     } else {
         process_name
     };
 
     raw.trim().to_ascii_lowercase()
+}
+
+fn executable_file_name(path: &str) -> Option<&str> {
+    path.rsplit(['\\', '/'])
+        .find(|segment| !segment.trim().is_empty())
 }
 
 fn terminal_editor_kind(title: &str) -> Option<&'static str> {

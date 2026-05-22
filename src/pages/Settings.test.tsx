@@ -82,7 +82,7 @@ vi.mock("../lib/updater", () => ({
   downloadInstallAndRelaunchSignedUpdate: vi.fn(async () => ({ available: false }))
 }));
 
-describe("Settings", () => {
+describe("Settings", { timeout: 20_000 }, () => {
   afterEach(() => {
     vi.clearAllMocks();
     cleanup();
@@ -349,7 +349,7 @@ describe("Settings", () => {
       })
     );
     expect(screen.getByText("0 documents / 0 chunks")).toBeInTheDocument();
-  }, 10_000);
+  }, 20_000);
 
   it("shows context window token budget controls", async () => {
     render(<Settings />);

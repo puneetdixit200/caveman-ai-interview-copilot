@@ -120,7 +120,10 @@ jobs:
         run: npm ci
 
       - name: Build signed macOS updater assets
-        run: npm run tauri build -- --ci --config src-tauri/tauri.release.conf.json
+        run: npm run tauri build -- --ci --bundles app --config src-tauri/tauri.release.conf.json
+
+      - name: Create macOS DMG installer
+        run: node scripts/create-macos-dmg.mjs
 
       - name: Upload macOS build artifact
         uses: actions/upload-artifact@v4
@@ -128,7 +131,7 @@ jobs:
           name: caveman-macos-signed-release
           if-no-files-found: error
           path: |
-            src-tauri/target/release/bundle/macos/*.dmg
+            src-tauri/target/release/bundle/dmg/*.dmg
             src-tauri/target/release/bundle/macos/*.app.tar.gz
             src-tauri/target/release/bundle/macos/*.app.tar.gz.sig
 

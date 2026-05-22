@@ -56,6 +56,9 @@ test("release workflow builds macOS and Linux packages before publishing one rel
 
   assert.match(workflow, /build-macos:/);
   assert.match(workflow, /runs-on:\s*macos-13/);
+  assert.match(workflow, /npm run tauri build -- --ci --bundles app --config src-tauri\/tauri\.release\.conf\.json/);
+  assert.match(workflow, /node scripts\/create-macos-dmg\.mjs/);
+  assert.match(workflow, /src-tauri\/target\/release\/bundle\/dmg\/\*\.dmg/);
   assert.match(workflow, /src-tauri\/target\/release\/bundle\/macos\/\*\.app\.tar\.gz/);
   assert.match(workflow, /src-tauri\/target\/release\/bundle\/macos\/\*\.app\.tar\.gz\.sig/);
   assert.match(workflow, /build-linux:/);
@@ -105,4 +108,5 @@ test("release workflow contract is part of the release test suite", async () => 
   const packageJson = JSON.parse(await readFile("package.json", "utf8"));
 
   assert.match(packageJson.scripts["test:release"], /release-workflow\.test\.mjs/);
+  assert.match(packageJson.scripts["test:release"], /create-macos-dmg\.test\.mjs/);
 });

@@ -139,7 +139,13 @@ cargo test
 Build the desktop installer:
 
 ```powershell
-npm run tauri build
+npm run tauri:build:mac
+```
+
+On Windows, build the Windows installer from a Windows machine:
+
+```powershell
+npm run tauri build -- --ci
 ```
 
 ## Documentation
