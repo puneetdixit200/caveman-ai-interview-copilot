@@ -11,10 +11,20 @@
 
 ## Next Production Integrations
 
-1. Replace `src-tauri/src/audio/mod.rs` placeholder device data with `cpal` loopback and microphone streams.
-2. Attach a whisper.cpp sidecar process in `src-tauri/src/stt/mod.rs` and emit partial transcript events.
-3. Add OpenRouter, Ollama, LM Studio, and direct-provider HTTP clients behind the provider router.
-4. Store API keys through OS keychain APIs and keep secrets out of the renderer process.
-5. Apply Windows `SetWindowDisplayAffinity(WDA_EXCLUDEFROMCAPTURE)` and macOS `NSWindowSharingNone` to the overlay.
-6. Add end-to-end tests for session creation, transcript streaming, provider fallback, and export.
+The original MVP integration gaps have been closed in the current app:
 
+1. `src-tauri/src/audio/mod.rs` uses native capture paths for microphone, system, dual-stream, and virtual-cable sources.
+2. `src-tauri/src/stt/mod.rs` and `src/lib/localWhisperStreaming.ts` support local whisper.cpp sidecars and streaming transcript events.
+3. `src/lib/providerClients.ts` and `src/lib/providerRouter.ts` include Ollama, OpenRouter, LM Studio, llama.cpp, vLLM, and direct cloud provider routing.
+4. `src-tauri/src/secrets/mod.rs` stores provider keys through the operating-system keychain instead of local settings JSON.
+5. `src-tauri/src/overlay/mod.rs` applies platform capture-exclusion controls where supported, and the default config now enables screen-share auto-hide.
+6. `npm run verify`, `npm run obs:smoke`, `npm run audio:smoke`, and the `Desktop Package Smoke` workflow cover the release and live-use contracts.
+
+## Remaining Commercial Release Gates
+
+These are external release inputs, not code integrations:
+
+1. Configure `TAURI_SIGNING_PRIVATE_KEY` and optional `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` for signed updater artifacts.
+2. Configure Windows Authenticode secrets, `WINDOWS_CODESIGN_CERTIFICATE_BASE64` and `WINDOWS_CODESIGN_CERTIFICATE_PASSWORD`, before publishing redistributable Windows installers.
+3. Configure Apple Developer signing and notarization secrets before publishing macOS Intel or Apple Silicon releases.
+4. Run the signed release workflow from a version tag and verify the generated GitHub Release assets plus `latest.json`.

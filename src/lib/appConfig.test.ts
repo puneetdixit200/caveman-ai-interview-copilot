@@ -253,14 +253,15 @@ describe("appConfig", () => {
     expect(config.security).toMatchObject({
       localOnlyMode: true,
       captureExclusionEnabled: true,
-      blockCloudWhenLocalOnly: true
+      blockCloudWhenLocalOnly: true,
+      signedUpdatesRequired: true
     });
     expect(config.overlay).toMatchObject({
       opacity: 0.82,
       fontSize: 16,
       locked: false,
       hotkey: "CommandOrControl+Shift+H",
-      autoHideOnScreenShare: false,
+      autoHideOnScreenShare: true,
       bounds: {
         x: 80,
         y: 80,

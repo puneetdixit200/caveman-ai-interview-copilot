@@ -26,6 +26,11 @@ Push-Location $RepoRoot
 try {
   $WindowsCodeSignThumbprint = $env:WINDOWS_CODESIGN_CERTIFICATE_THUMBPRINT
   $WindowsCodeSignCommand = $env:WINDOWS_CODESIGN_SIGN_COMMAND
+  $RunningOnWindows = [System.Runtime.InteropServices.RuntimeInformation]::IsOSPlatform([System.Runtime.InteropServices.OSPlatform]::Windows)
+  if ($RunningOnWindows -and [string]::IsNullOrWhiteSpace($WindowsCodeSignThumbprint) -and [string]::IsNullOrWhiteSpace($WindowsCodeSignCommand)) {
+    throw "Missing Windows Authenticode signing configuration. Set WINDOWS_CODESIGN_CERTIFICATE_THUMBPRINT or WINDOWS_CODESIGN_SIGN_COMMAND before building redistributable Windows installers."
+  }
+
   if (-not [string]::IsNullOrWhiteSpace($WindowsCodeSignThumbprint) -or -not [string]::IsNullOrWhiteSpace($WindowsCodeSignCommand)) {
     $WindowsBundleConfig = @{
       digestAlgorithm = "sha256"

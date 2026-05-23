@@ -227,7 +227,7 @@ export const DEFAULT_APP_CONFIG: AppConfig = {
     fontSize: 16,
     locked: false,
     hotkey: DEFAULT_OVERLAY_SHORTCUT,
-    autoHideOnScreenShare: false,
+    autoHideOnScreenShare: true,
     bounds: {
       x: 80,
       y: 80,
@@ -245,7 +245,7 @@ export const DEFAULT_APP_CONFIG: AppConfig = {
     localOnlyMode: true,
     captureExclusionEnabled: true,
     blockCloudWhenLocalOnly: true,
-    signedUpdatesRequired: false
+    signedUpdatesRequired: true
   },
   plugins: {
     enabled: false,

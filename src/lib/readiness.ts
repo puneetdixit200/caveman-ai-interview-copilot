@@ -5,7 +5,7 @@ import type { AudioDevice, ModelProviderConfig, SttMode } from "../types/setting
 export type ReadinessStatus = "ready" | "warning" | "blocked";
 
 export interface ReadinessItem {
-  id: "audio" | "stt" | "provider" | "automation" | "overlay" | "privacy" | "performance";
+  id: "audio" | "stt" | "provider" | "automation" | "overlay" | "privacy" | "performance" | "distribution";
   label: string;
   status: ReadinessStatus;
   detail: string;
@@ -56,7 +56,8 @@ export function evaluateRealUseReadiness(input: RealUseReadinessInput): RealUseR
     evaluateAutomationReadiness(input.config),
     evaluateOverlayReadiness(input.config, input.overlayProtection),
     evaluatePrivacyReadiness(input.config),
-    evaluateRuntimeBudgetReadiness(input.runtimeBudget)
+    evaluateRuntimeBudgetReadiness(input.runtimeBudget),
+    evaluateDistributionReadiness(input.config)
   ];
   const blockedCount = items.filter((item) => item.status === "blocked").length;
   const warningCount = items.filter((item) => item.status === "warning").length;
@@ -427,6 +428,25 @@ function evaluateRuntimeBudgetReadiness(runtimeBudget?: RuntimeBudgetStatus | nu
     detail: `Startup ${Math.round(runtimeBudget.startupMs)}ms, memory ${formatMetric(
       runtimeBudget.workingSetMb
     )}MB, idle CPU ${formatMetric(runtimeBudget.processCpuPercent)}%.`
+  };
+}
+
+function evaluateDistributionReadiness(config: AppConfig): ReadinessItem {
+  if (!config.security.signedUpdatesRequired) {
+    return {
+      id: "distribution",
+      label: "Signed updates optional",
+      status: "warning",
+      detail: "Unsigned or manually distributed installers can bypass the signed-update trust path.",
+      action: "Require signed updates and ship installers only from the signed release workflow."
+    };
+  }
+
+  return {
+    id: "distribution",
+    label: "Signed updates required",
+    status: "ready",
+    detail: "Redistributable builds must use signed updater artifacts before installation."
   };
 }
 

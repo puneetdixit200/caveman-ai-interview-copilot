@@ -73,8 +73,13 @@ describe("evaluateRealUseReadiness", () => {
       "automation",
       "overlay",
       "privacy",
-      "performance"
+      "performance",
+      "distribution"
     ]);
+    expect(readiness.items.find((item) => item.id === "distribution")).toMatchObject({
+      status: "ready",
+      label: "Signed updates required"
+    });
   });
 
   it("warns when the app is still configured for manual transcript use", () => {
@@ -255,6 +260,24 @@ describe("evaluateRealUseReadiness", () => {
       label: "Runtime budget over target",
       status: "warning",
       detail: expect.stringContaining("startup 4200ms > 3000ms")
+    });
+  });
+
+  it("warns when signed updates are not required for redistributable builds", () => {
+    const readiness = evaluateRealUseReadiness({
+      config: mergeConfig({
+        security: {
+          ...DEFAULT_APP_CONFIG.security,
+          signedUpdatesRequired: false
+        }
+      }),
+      audioDevices: devices
+    });
+
+    expect(readiness.items.find((item) => item.id === "distribution")).toMatchObject({
+      label: "Signed updates optional",
+      status: "warning",
+      action: "Require signed updates and ship installers only from the signed release workflow."
     });
   });
 });

@@ -52,6 +52,12 @@ jobs:
           if ([string]::IsNullOrWhiteSpace($env:TAURI_SIGNING_PRIVATE_KEY)) {
             throw "Missing TAURI_SIGNING_PRIVATE_KEY repository secret. Generate an updater key with npm run tauri signer generate and save the private key in GitHub Actions secrets."
           }
+          if ([string]::IsNullOrWhiteSpace($env:WINDOWS_CODESIGN_CERTIFICATE_BASE64)) {
+            throw "Missing WINDOWS_CODESIGN_CERTIFICATE_BASE64 repository secret. Export the Windows Authenticode PFX as base64 before publishing commercial Windows installers."
+          }
+          if ([string]::IsNullOrWhiteSpace($env:WINDOWS_CODESIGN_CERTIFICATE_PASSWORD)) {
+            throw "Missing WINDOWS_CODESIGN_CERTIFICATE_PASSWORD repository secret. Save the PFX password before publishing commercial Windows installers."
+          }
 
       - name: Install dependencies
         run: npm ci
