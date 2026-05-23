@@ -98,6 +98,27 @@ test("release workflow wires Apple notarization credentials for macOS builds", a
   assert.match(workflow, /APPLE_API_PRIVATE_KEY_BASE64/);
 });
 
+test("release workflow notarizes generated macOS DMGs before upload", async () => {
+  const workflow = await readFile(workflowPath, "utf8");
+  const notarizeScript = await readFile("scripts/notarize-macos-dmg.mjs", "utf8");
+
+  const notarizationSteps = [...workflow.matchAll(/Notarize macOS DMG installer/g)];
+  assert.equal(notarizationSteps.length, 2);
+  assert.match(workflow, /node scripts\/notarize-macos-dmg\.mjs/);
+  assert.match(notarizeScript, /runChecked\(spawn,\s*"xcrun",\s*buildStaplerArgs\("staple"/);
+  assert.match(notarizeScript, /runChecked\(spawn,\s*"xcrun",\s*buildStaplerArgs\("validate"/);
+  assert.match(notarizeScript, /runChecked\(spawn,\s*"spctl",\s*buildSpctlAssessArgs/);
+  assert.match(notarizeScript, /"context:primary-signature"/);
+  assert.ok(
+    workflow.indexOf("Create macOS DMG installer") < workflow.indexOf("Notarize macOS DMG installer"),
+    "DMG should be created before notarization"
+  );
+  assert.ok(
+    workflow.indexOf("Notarize macOS DMG installer") < workflow.indexOf("Upload macOS Intel build artifact"),
+    "DMG should be notarized before artifact upload"
+  );
+});
+
 test("macOS bundle declares privacy usage descriptions for audio capture", async () => {
   const tauriConfig = JSON.parse(await readFile("src-tauri/tauri.conf.json", "utf8"));
   const infoPlist = await readFile("src-tauri/Info.plist", "utf8");
@@ -205,6 +226,7 @@ test("release workflow contract is part of the release test suite", async () => 
   assert.match(packageJson.scripts["test:release"], /ollama-smoke\.test\.mjs/);
   assert.match(packageJson.scripts["test:release"], /openrouter-smoke\.test\.mjs/);
   assert.match(packageJson.scripts["test:release"], /configure-commercial-secrets\.test\.mjs/);
+  assert.match(packageJson.scripts["test:release"], /notarize-macos-dmg\.test\.mjs/);
   assert.match(packageJson.scripts["test:release"], /obs-stealth-smoke\.test\.mjs/);
   assert.match(packageJson.scripts["test:release"], /audio-environment-smoke\.test\.mjs/);
   assert.match(packageJson.scripts["test:release"], /commercial-readiness\.test\.mjs/);

@@ -200,6 +200,9 @@ jobs:
       - name: Create macOS DMG installer
         run: node scripts/create-macos-dmg.mjs
 
+      - name: Notarize macOS DMG installer
+        run: node scripts/notarize-macos-dmg.mjs
+
       - name: Verify bundled Whisper sidecar
         run: npm run package:verify-sidecar
 
@@ -312,6 +315,9 @@ jobs:
 
       - name: Create macOS DMG installer
         run: node scripts/create-macos-dmg.mjs
+
+      - name: Notarize macOS DMG installer
+        run: node scripts/notarize-macos-dmg.mjs
 
       - name: Verify bundled Whisper sidecar
         run: npm run package:verify-sidecar
