@@ -214,15 +214,15 @@ test("package scripts expose repeatable macOS and Windows installer builds", asy
 
   assert.equal(
     packageJson.scripts["tauri:build:mac"],
-    "npm run sidecars:prepare && tauri build --ci --bundles app --config src-tauri/target/tauri.sidecars.generated.conf.json && node scripts/create-macos-dmg.mjs"
+    "npm run sidecars:prepare && tauri build --ci --bundles app --config src-tauri/target/tauri.sidecars.generated.conf.json && node scripts/create-macos-dmg.mjs && npm run package:verify-sidecar"
   );
   assert.equal(
     packageJson.scripts["tauri:build:windows"],
-    "npm run sidecars:prepare && tauri build --ci --bundles nsis,msi --config src-tauri/target/tauri.sidecars.generated.conf.json"
+    "npm run sidecars:prepare && tauri build --ci --bundles nsis,msi --config src-tauri/target/tauri.sidecars.generated.conf.json && npm run package:verify-sidecar"
   );
   assert.equal(
     packageJson.scripts["tauri:build:linux"],
-    "npm run sidecars:prepare && tauri build --ci --bundles appimage,deb --config src-tauri/target/tauri.sidecars.generated.conf.json"
+    "npm run sidecars:prepare && tauri build --ci --bundles appimage,deb --config src-tauri/target/tauri.sidecars.generated.conf.json && npm run package:verify-sidecar"
   );
   assert.match(readme, /npm run tauri:build:mac/);
   assert.match(readme, /npm run tauri:build:windows/);

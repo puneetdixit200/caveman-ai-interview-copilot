@@ -14,7 +14,8 @@ import {
   mergeSidecarConfig,
   resolveCurrentTarget,
   renderSidecarConfig,
-  resolveTargets
+  resolveTargets,
+  sourceBuildCmakeArgs
 } from "./prepare-whisper-sidecars.mjs";
 
 test("maps supported commercial desktop targets to Tauri sidecar filenames", () => {
@@ -48,6 +49,10 @@ test("renders a Tauri sidecar config without forcing Windows DLL resources on Un
       resources: ["binaries/whisper-runtime/*.dll"]
     }
   });
+});
+
+test("builds source sidecars as self-contained executables", () => {
+  assert.ok(sourceBuildCmakeArgs("/src", "/build").includes("-DBUILD_SHARED_LIBS=OFF"));
 });
 
 test("merges sidecar config into release config without dropping signing settings", () => {

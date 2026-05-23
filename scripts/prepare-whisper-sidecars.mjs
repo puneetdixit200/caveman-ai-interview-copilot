@@ -129,6 +129,19 @@ export async function copyPreparedSidecar({ sourcePath, target, tauriDir = DEFAU
   return outputPath;
 }
 
+export function sourceBuildCmakeArgs(sourceDir, buildDir) {
+  return [
+    "-S",
+    sourceDir,
+    "-B",
+    buildDir,
+    "-DCMAKE_BUILD_TYPE=Release",
+    "-DBUILD_SHARED_LIBS=OFF",
+    "-DWHISPER_BUILD_TESTS=OFF",
+    "-DWHISPER_BUILD_EXAMPLES=ON"
+  ];
+}
+
 export async function assertPreparedSidecars(targets, tauriDir = DEFAULT_TAURI_DIR) {
   for (const target of targets) {
     const sidecarPath = expectedSidecarPath(target, tauriDir);
@@ -238,15 +251,7 @@ async function prepareSourceBuiltSidecar({ target, tauriDir, cacheDir, whisperTa
   const buildDir = path.join(sourceDir, "build-caveman");
   await ensureWhisperSource({ sourceDir, whisperTag });
 
-  await execFileLogged("cmake", [
-    "-S",
-    sourceDir,
-    "-B",
-    buildDir,
-    "-DCMAKE_BUILD_TYPE=Release",
-    "-DWHISPER_BUILD_TESTS=OFF",
-    "-DWHISPER_BUILD_EXAMPLES=ON"
-  ]);
+  await execFileLogged("cmake", sourceBuildCmakeArgs(sourceDir, buildDir));
   await execFileLogged("cmake", ["--build", buildDir, "--config", "Release", "--target", "whisper-cli"]);
 
   const builtBinary = await findFirstExisting([

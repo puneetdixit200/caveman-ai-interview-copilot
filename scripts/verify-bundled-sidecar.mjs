@@ -58,7 +58,7 @@ export async function verifyBundledSidecar({
   const target = resolvePackageTarget(targetSelector);
 
   if (target.startsWith("macos-")) {
-    return verifyMacosPackage({ target, releaseDir, appName });
+    return verifyMacosPackage({ target, releaseDir, appName, commandRunner });
   }
   if (target === "windows-x64") {
     return verifyWindowsPackage({ releaseDir, commandRunner });
@@ -70,7 +70,12 @@ export async function verifyBundledSidecar({
   throw new Error(`Unsupported package target: ${target}`);
 }
 
-export async function verifyMacosPackage({ target, releaseDir, appName = DEFAULT_APP_NAME }) {
+export async function verifyMacosPackage({
+  target,
+  releaseDir,
+  appName = DEFAULT_APP_NAME,
+  commandRunner = runCommand
+}) {
   const bundleDir = path.join(releaseDir, "bundle");
   const appBundle = path.join(bundleDir, "macos", `${appName}.app`);
   const sidecarPath = path.join(appBundle, "Contents", "MacOS", runtimeSidecarName(target));
@@ -78,12 +83,24 @@ export async function verifyMacosPackage({ target, releaseDir, appName = DEFAULT
 
   await assertDirectory(appBundle, "macOS app bundle");
   await assertNonEmptyFile(sidecarPath, "macOS bundled Whisper sidecar");
+  await assertSidecarLaunches(sidecarPath, commandRunner);
   assertAny(dmgFiles, "macOS DMG");
 
   return {
     target,
     checked: [appBundle, sidecarPath, ...dmgFiles]
   };
+}
+
+async function assertSidecarLaunches(sidecarPath, commandRunner) {
+  try {
+    await commandRunner(sidecarPath, ["--help"], { maxBuffer: COMMAND_MAX_BUFFER });
+  } catch (error) {
+    const details = [error?.stderr, error?.stdout, error?.message].filter(Boolean).join("\n");
+    throw new Error(`macOS bundled Whisper sidecar did not launch: ${sidecarPath}${details ? `\n${details}` : ""}`, {
+      cause: error
+    });
+  }
 }
 
 export async function verifyWindowsPackage({ releaseDir, commandRunner = runCommand }) {

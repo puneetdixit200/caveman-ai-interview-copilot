@@ -31,14 +31,39 @@ test("resolves current package target from platform and architecture", () => {
 test("verifies macOS app bundle contains the runtime sidecar and a DMG", async () => {
   const tempDir = await mkdtemp(path.join(tmpdir(), "caveman-macos-package-"));
   const releaseDir = path.join(tempDir, "release");
-  await touchFile(path.join(releaseDir, "bundle", "macos", "Caveman.app", "Contents", "MacOS", "caveman-whisper"));
-  await chmod(path.join(releaseDir, "bundle", "macos", "Caveman.app", "Contents", "MacOS", "caveman-whisper"), 0o755);
+  await touchFile(
+    path.join(releaseDir, "bundle", "macos", "Caveman.app", "Contents", "MacOS", "caveman-whisper"),
+    "#!/bin/sh\nprintf 'usage: caveman-whisper\\n'\n"
+  );
+  await chmod(
+    path.join(releaseDir, "bundle", "macos", "Caveman.app", "Contents", "MacOS", "caveman-whisper"),
+    0o755
+  );
   await touchFile(path.join(releaseDir, "bundle", "dmg", "Caveman_0.1.1_aarch64.dmg"));
 
   const result = await verifyMacosPackage({ target: "macos-arm64", releaseDir });
 
   assert.equal(result.target, "macos-arm64");
   assert.ok(result.checked.some((checkedPath) => checkedPath.endsWith("caveman-whisper")));
+});
+
+test("fails when macOS bundled sidecar cannot launch from inside the app bundle", async () => {
+  const tempDir = await mkdtemp(path.join(tmpdir(), "caveman-macos-broken-sidecar-"));
+  const releaseDir = path.join(tempDir, "release");
+  await touchFile(
+    path.join(releaseDir, "bundle", "macos", "Caveman.app", "Contents", "MacOS", "caveman-whisper"),
+    "#!/bin/sh\necho 'dyld: Library not loaded: @rpath/libwhisper.1.dylib' >&2\nexit 86\n"
+  );
+  await chmod(
+    path.join(releaseDir, "bundle", "macos", "Caveman.app", "Contents", "MacOS", "caveman-whisper"),
+    0o755
+  );
+  await touchFile(path.join(releaseDir, "bundle", "dmg", "Caveman_0.1.1_aarch64.dmg"));
+
+  await assert.rejects(
+    () => verifyMacosPackage({ target: "macos-arm64", releaseDir }),
+    /macOS bundled Whisper sidecar did not launch/
+  );
 });
 
 test("extracts Windows MSI and verifies sidecar plus runtime DLLs", async () => {
@@ -102,7 +127,11 @@ test("fails when a required package sidecar is missing", async () => {
 test("dispatches by explicit target selector", async () => {
   const tempDir = await mkdtemp(path.join(tmpdir(), "caveman-dispatch-sidecar-"));
   const releaseDir = path.join(tempDir, "release");
-  await touchFile(path.join(releaseDir, "bundle", "macos", "Caveman.app", "Contents", "MacOS", "caveman-whisper"));
+  await touchFile(
+    path.join(releaseDir, "bundle", "macos", "Caveman.app", "Contents", "MacOS", "caveman-whisper"),
+    "#!/bin/sh\nprintf 'usage: caveman-whisper\\n'\n"
+  );
+  await chmod(path.join(releaseDir, "bundle", "macos", "Caveman.app", "Contents", "MacOS", "caveman-whisper"), 0o755);
   await touchFile(path.join(releaseDir, "bundle", "dmg", "Caveman_0.1.1_x64.dmg"));
 
   const result = await verifyBundledSidecar({ targetSelector: "macos-x64", releaseDir });
