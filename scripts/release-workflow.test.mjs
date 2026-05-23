@@ -73,6 +73,7 @@ test("release workflow builds macOS and Linux packages before publishing one rel
   assert.match(workflow, /npm run sidecars:prepare -- --target current --base-config src-tauri\/tauri\.release\.conf\.json --output-config src-tauri\/target\/tauri\.release\.sidecars\.generated\.conf\.json/);
   assert.match(workflow, /npm run tauri build -- --ci --bundles app --config src-tauri\/target\/tauri\.release\.sidecars\.generated\.conf\.json/);
   assert.match(workflow, /node scripts\/create-macos-dmg\.mjs/);
+  assert.match(workflow, /npm run package:verify-sidecar/);
   assert.match(workflow, /src-tauri\/target\/release\/bundle\/dmg\/\*\.dmg/);
   assert.match(workflow, /src-tauri\/target\/release\/bundle\/macos\/\*\.app\.tar\.gz/);
   assert.match(workflow, /src-tauri\/target\/release\/bundle\/macos\/\*\.app\.tar\.gz\.sig/);
@@ -151,10 +152,12 @@ test("release workflow contract is part of the release test suite", async () => 
   assert.match(packageJson.scripts["test:release"], /release-workflow\.test\.mjs/);
   assert.match(packageJson.scripts["test:release"], /create-macos-dmg\.test\.mjs/);
   assert.match(packageJson.scripts["test:release"], /prepare-whisper-sidecars\.test\.mjs/);
+  assert.match(packageJson.scripts["test:release"], /verify-bundled-sidecar\.test\.mjs/);
   assert.match(packageJson.scripts["test:release"], /obs-stealth-smoke\.test\.mjs/);
   assert.match(packageJson.scripts["test:release"], /audio-environment-smoke\.test\.mjs/);
   assert.equal(packageJson.scripts["sidecars:prepare"], "node scripts/prepare-whisper-sidecars.mjs --target current --output-config src-tauri/target/tauri.sidecars.generated.conf.json");
   assert.equal(packageJson.scripts["sidecars:check"], "node scripts/prepare-whisper-sidecars.mjs --target current --check");
+  assert.equal(packageJson.scripts["package:verify-sidecar"], "node scripts/verify-bundled-sidecar.mjs --target current");
   assert.equal(packageJson.scripts["obs:smoke"], "node scripts/obs-stealth-smoke.mjs");
   assert.equal(packageJson.scripts["audio:smoke"], "node scripts/audio-environment-smoke.mjs");
 });
@@ -229,6 +232,7 @@ test("desktop package smoke workflow builds macOS and Windows installers without
   assert.match(workflow, /npm run tauri:build:windows/);
   assert.match(workflow, /npm run tauri:build:mac/);
   assert.match(workflow, /npm run tauri:build:linux/);
+  assert.match(workflow, /npm run package:verify-sidecar/);
   assert.match(workflow, /actions\/upload-artifact@v7\.0\.1/);
   assert.doesNotMatch(workflow, /actions\/(?:checkout|setup-node|upload-artifact)@v4/);
   assert.doesNotMatch(workflow, /softprops\/action-gh-release/);

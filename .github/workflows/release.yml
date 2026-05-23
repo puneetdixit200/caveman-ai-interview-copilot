@@ -79,6 +79,9 @@ jobs:
           -ReleaseBaseUrl "https://github.com/${{ github.repository }}/releases/download/${{ env.RELEASE_TAG }}"
           -ReleaseNotes "${{ env.RELEASE_NOTES }}"
 
+      - name: Verify bundled Whisper sidecar
+        run: npm run package:verify-sidecar
+
       - name: Upload Windows build artifact
         uses: actions/upload-artifact@v7.0.1
         with:
@@ -128,6 +131,9 @@ jobs:
       - name: Create macOS DMG installer
         run: node scripts/create-macos-dmg.mjs
 
+      - name: Verify bundled Whisper sidecar
+        run: npm run package:verify-sidecar
+
       - name: Upload macOS Intel build artifact
         uses: actions/upload-artifact@v7.0.1
         with:
@@ -174,6 +180,9 @@ jobs:
 
       - name: Create macOS DMG installer
         run: node scripts/create-macos-dmg.mjs
+
+      - name: Verify bundled Whisper sidecar
+        run: npm run package:verify-sidecar
 
       - name: Upload macOS Apple Silicon build artifact
         uses: actions/upload-artifact@v7.0.1
@@ -223,6 +232,9 @@ jobs:
 
       - name: Build signed Linux updater assets
         run: npm run tauri build -- --ci --config src-tauri/target/tauri.release.sidecars.generated.conf.json
+
+      - name: Verify bundled Whisper sidecar
+        run: npm run package:verify-sidecar
 
       - name: Upload Linux build artifact
         uses: actions/upload-artifact@v7.0.1

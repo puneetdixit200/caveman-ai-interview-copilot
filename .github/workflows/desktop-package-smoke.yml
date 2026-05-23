@@ -37,6 +37,9 @@ jobs:
       - name: Build Windows packages
         run: npm run tauri:build:windows
 
+      - name: Verify bundled Whisper sidecar
+        run: npm run package:verify-sidecar
+
       - name: Upload Windows package artifact
         uses: actions/upload-artifact@v7.0.1
         with:
@@ -72,6 +75,9 @@ jobs:
       - name: Build macOS package
         run: npm run tauri:build:mac
 
+      - name: Verify bundled Whisper sidecar
+        run: npm run package:verify-sidecar
+
       - name: Upload macOS package artifact
         uses: actions/upload-artifact@v7.0.1
         with:
@@ -106,6 +112,9 @@ jobs:
 
       - name: Build macOS package
         run: npm run tauri:build:mac
+
+      - name: Verify bundled Whisper sidecar
+        run: npm run package:verify-sidecar
 
       - name: Upload macOS package artifact
         uses: actions/upload-artifact@v7.0.1
@@ -145,6 +154,9 @@ jobs:
 
       - name: Build Linux packages
         run: npm run tauri:build:linux
+
+      - name: Verify bundled Whisper sidecar
+        run: npm run package:verify-sidecar
 
       - name: Upload Linux package artifact
         uses: actions/upload-artifact@v7.0.1
