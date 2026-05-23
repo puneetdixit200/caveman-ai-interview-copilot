@@ -62,6 +62,51 @@ test("release workflow imports optional Windows code-signing certificates before
   assert.match(workflow, /GITHUB_ENV/);
 });
 
+test("release workflow imports Apple Developer certificates before macOS builds", async () => {
+  const workflow = await readFile(workflowPath, "utf8");
+
+  assert.match(workflow, /APPLE_CERTIFICATE:\s*\$\{\{\s*secrets\.APPLE_CERTIFICATE\s*\}\}/);
+  assert.match(workflow, /APPLE_CERTIFICATE_PASSWORD:\s*\$\{\{\s*secrets\.APPLE_CERTIFICATE_PASSWORD\s*\}\}/);
+  assert.match(workflow, /APPLE_SIGNING_IDENTITY:\s*\$\{\{\s*secrets\.APPLE_SIGNING_IDENTITY\s*\}\}/);
+  assert.match(workflow, /KEYCHAIN_PASSWORD:\s*\$\{\{\s*secrets\.KEYCHAIN_PASSWORD\s*\}\}/);
+
+  const importSteps = [...workflow.matchAll(/Import Apple Developer certificate/g)];
+  assert.equal(importSteps.length, 2);
+  assert.match(workflow, /security create-keychain/);
+  assert.match(workflow, /security import/);
+  assert.match(workflow, /security set-key-partition-list/);
+  assert.match(workflow, /security find-identity -v -p codesigning/);
+});
+
+test("release workflow wires Apple notarization credentials for macOS builds", async () => {
+  const workflow = await readFile(workflowPath, "utf8");
+
+  assert.match(workflow, /APPLE_ID:\s*\$\{\{\s*secrets\.APPLE_ID\s*\}\}/);
+  assert.match(workflow, /APPLE_PASSWORD:\s*\$\{\{\s*secrets\.APPLE_PASSWORD\s*\}\}/);
+  assert.match(workflow, /APPLE_TEAM_ID:\s*\$\{\{\s*secrets\.APPLE_TEAM_ID\s*\}\}/);
+  assert.match(workflow, /APPLE_API_ISSUER:\s*\$\{\{\s*secrets\.APPLE_API_ISSUER\s*\}\}/);
+  assert.match(workflow, /APPLE_API_KEY:\s*\$\{\{\s*secrets\.APPLE_API_KEY\s*\}\}/);
+  assert.match(workflow, /APPLE_API_PRIVATE_KEY_BASE64:\s*\$\{\{\s*secrets\.APPLE_API_PRIVATE_KEY_BASE64\s*\}\}/);
+
+  const apiKeySteps = [...workflow.matchAll(/Prepare Apple notarization API key/g)];
+  assert.equal(apiKeySteps.length, 2);
+  assert.match(workflow, /APPLE_API_KEY_PATH=.*AuthKey_\$\{APPLE_API_KEY\}\.p8/);
+  assert.match(workflow, /APPLE_API_PRIVATE_KEY_BASE64/);
+});
+
+test("macOS bundle declares privacy usage descriptions for audio capture", async () => {
+  const tauriConfig = JSON.parse(await readFile("src-tauri/tauri.conf.json", "utf8"));
+  const infoPlist = await readFile("src-tauri/Info.plist", "utf8");
+  const entitlements = await readFile("src-tauri/Entitlements.plist", "utf8");
+
+  assert.equal(tauriConfig.bundle.macOS.infoPlist, "Info.plist");
+  assert.equal(tauriConfig.bundle.macOS.hardenedRuntime, true);
+  assert.equal(tauriConfig.bundle.macOS.entitlements, "Entitlements.plist");
+  assert.match(infoPlist, /NSMicrophoneUsageDescription/);
+  assert.match(infoPlist, /NSAudioCaptureUsageDescription/);
+  assert.match(entitlements, /com\.apple\.security\.device\.audio-input/);
+});
+
 test("release workflow builds macOS and Linux packages before publishing one release", async () => {
   const workflow = await readFile(workflowPath, "utf8");
 

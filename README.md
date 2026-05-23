@@ -45,7 +45,7 @@ Implemented now:
 
 Planned full build:
 
-- Platform notarization, store distribution, and installer polish beyond GitHub Releases
+- Store distribution and installer polish beyond GitHub Releases
 
 ## Core Features
 
@@ -84,6 +84,8 @@ Dashboard helper links run from the desktop app on localhost by default. A trust
 Use `npm run tauri:build:signed` after creating a Tauri updater signing key. The script prepares the matching local Whisper sidecar, builds updater artifacts, verifies signed Windows bundles exist, and writes `latest.json` for GitHub Releases at `src-tauri/target/release/bundle/latest.json`. The `Release Signed Desktop Builds` GitHub Actions workflow can build Windows x64, macOS Intel, macOS Apple Silicon, and Linux x64 packages, generate a combined multi-platform `latest.json`, and publish all assets to a GitHub Release when `TAURI_SIGNING_PRIVATE_KEY` is configured as a repository secret. Add `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` too when the updater key is password-protected.
 
 Windows Authenticode signing is optional. Add `WINDOWS_CODESIGN_CERTIFICATE_BASE64` and `WINDOWS_CODESIGN_CERTIFICATE_PASSWORD` repository secrets to import a `.pfx` certificate during the release workflow, or set `WINDOWS_CODESIGN_CERTIFICATE_THUMBPRINT`/`WINDOWS_CODESIGN_SIGN_COMMAND` before running `npm run tauri:build:signed` locally. The build script injects Tauri's Windows signing config before updater artifacts are created so installer signatures and updater signatures are generated in the same release pass.
+
+macOS release jobs expect Apple Developer signing and notarization secrets before they publish signed updater archives. Add `APPLE_CERTIFICATE`, `APPLE_CERTIFICATE_PASSWORD`, `APPLE_SIGNING_IDENTITY`, and `KEYCHAIN_PASSWORD` for certificate import. For notarization, either add Apple ID credentials with `APPLE_ID`, `APPLE_PASSWORD`, and `APPLE_TEAM_ID`, or use App Store Connect API credentials with `APPLE_API_ISSUER`, `APPLE_API_KEY`, and `APPLE_API_PRIVATE_KEY_BASE64`. The macOS bundle includes audio privacy usage descriptions for microphone and system-audio capture.
 
 ### Bundled Local Whisper Sidecars
 

@@ -99,6 +99,16 @@ jobs:
     env:
       TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
       TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+      APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+      APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+      APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+      KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
+      APPLE_ID: ${{ secrets.APPLE_ID }}
+      APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+      APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+      APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
+      APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
+      APPLE_API_PRIVATE_KEY_BASE64: ${{ secrets.APPLE_API_PRIVATE_KEY_BASE64 }}
     steps:
       - name: Checkout
         uses: actions/checkout@v6.0.2
@@ -113,14 +123,67 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
 
       - name: Validate release signing secrets
-        shell: pwsh
+        shell: bash
         run: |
-          if ([string]::IsNullOrWhiteSpace($env:TAURI_SIGNING_PRIVATE_KEY)) {
-            throw "Missing TAURI_SIGNING_PRIVATE_KEY repository secret. Generate an updater key with npm run tauri signer generate and save the private key in GitHub Actions secrets."
-          }
+          missing=()
+          for name in TAURI_SIGNING_PRIVATE_KEY APPLE_CERTIFICATE APPLE_CERTIFICATE_PASSWORD APPLE_SIGNING_IDENTITY KEYCHAIN_PASSWORD; do
+            if [[ -z "${!name}" ]]; then
+              missing+=("$name")
+            fi
+          done
+
+          if [[ -n "$APPLE_API_PRIVATE_KEY_BASE64" ]]; then
+            for name in APPLE_API_ISSUER APPLE_API_KEY; do
+              if [[ -z "${!name}" ]]; then
+                missing+=("$name")
+              fi
+            done
+          elif [[ -z "$APPLE_ID" || -z "$APPLE_PASSWORD" || -z "$APPLE_TEAM_ID" ]]; then
+            missing+=("APPLE_ID/APPLE_PASSWORD/APPLE_TEAM_ID or APPLE_API_ISSUER/APPLE_API_KEY/APPLE_API_PRIVATE_KEY_BASE64")
+          fi
+
+          if (( ${#missing[@]} > 0 )); then
+            printf 'Missing macOS release signing secrets: %s\n' "${missing[*]}" >&2
+            printf 'Generate a Tauri updater key with npm run tauri signer generate and configure Apple Developer signing/notarization secrets.\n' >&2
+            exit 1
+          fi
 
       - name: Install dependencies
         run: npm ci
+
+      - name: Import Apple Developer certificate
+        shell: bash
+        run: |
+          CERTIFICATE_PATH="$RUNNER_TEMP/caveman-apple-certificate.p12"
+          KEYCHAIN_PATH="$RUNNER_TEMP/caveman-signing.keychain-db"
+          IDENTITIES_PATH="$RUNNER_TEMP/caveman-codesigning-identities.txt"
+
+          decode_base64() {
+            local value="$1"
+            local output="$2"
+            printf '%s' "$value" | base64 --decode > "$output" 2>/dev/null || printf '%s' "$value" | base64 -D > "$output"
+          }
+
+          decode_base64 "$APPLE_CERTIFICATE" "$CERTIFICATE_PATH"
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security import "$CERTIFICATE_PATH" -P "$APPLE_CERTIFICATE_PASSWORD" -A -t cert -f pkcs12 -k "$KEYCHAIN_PATH"
+          security list-keychains -d user -s "$KEYCHAIN_PATH"
+          security default-keychain -d user -s "$KEYCHAIN_PATH"
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security find-identity -v -p codesigning "$KEYCHAIN_PATH" | tee "$IDENTITIES_PATH"
+          grep -F "$APPLE_SIGNING_IDENTITY" "$IDENTITIES_PATH"
+          echo "APPLE_SIGNING_IDENTITY=$APPLE_SIGNING_IDENTITY" >> "$GITHUB_ENV"
+
+      - name: Prepare Apple notarization API key
+        if: ${{ env.APPLE_API_PRIVATE_KEY_BASE64 != '' }}
+        shell: bash
+        run: |
+          APPLE_API_KEY_PATH="$RUNNER_TEMP/AuthKey_${APPLE_API_KEY}.p8"
+          printf '%s' "$APPLE_API_PRIVATE_KEY_BASE64" | base64 --decode > "$APPLE_API_KEY_PATH" 2>/dev/null || printf '%s' "$APPLE_API_PRIVATE_KEY_BASE64" | base64 -D > "$APPLE_API_KEY_PATH"
+          chmod 600 "$APPLE_API_KEY_PATH"
+          echo "APPLE_API_KEY_PATH=$APPLE_API_KEY_PATH" >> "$GITHUB_ENV"
 
       - name: Prepare Whisper sidecar
         run: npm run sidecars:prepare -- --target current --base-config src-tauri/tauri.release.conf.json --output-config src-tauri/target/tauri.release.sidecars.generated.conf.json
@@ -149,6 +212,16 @@ jobs:
     env:
       TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
       TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+      APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+      APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+      APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+      KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
+      APPLE_ID: ${{ secrets.APPLE_ID }}
+      APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+      APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+      APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
+      APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
+      APPLE_API_PRIVATE_KEY_BASE64: ${{ secrets.APPLE_API_PRIVATE_KEY_BASE64 }}
     steps:
       - name: Checkout
         uses: actions/checkout@v6.0.2
@@ -163,14 +236,67 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
 
       - name: Validate release signing secrets
-        shell: pwsh
+        shell: bash
         run: |
-          if ([string]::IsNullOrWhiteSpace($env:TAURI_SIGNING_PRIVATE_KEY)) {
-            throw "Missing TAURI_SIGNING_PRIVATE_KEY repository secret. Generate an updater key with npm run tauri signer generate and save the private key in GitHub Actions secrets."
-          }
+          missing=()
+          for name in TAURI_SIGNING_PRIVATE_KEY APPLE_CERTIFICATE APPLE_CERTIFICATE_PASSWORD APPLE_SIGNING_IDENTITY KEYCHAIN_PASSWORD; do
+            if [[ -z "${!name}" ]]; then
+              missing+=("$name")
+            fi
+          done
+
+          if [[ -n "$APPLE_API_PRIVATE_KEY_BASE64" ]]; then
+            for name in APPLE_API_ISSUER APPLE_API_KEY; do
+              if [[ -z "${!name}" ]]; then
+                missing+=("$name")
+              fi
+            done
+          elif [[ -z "$APPLE_ID" || -z "$APPLE_PASSWORD" || -z "$APPLE_TEAM_ID" ]]; then
+            missing+=("APPLE_ID/APPLE_PASSWORD/APPLE_TEAM_ID or APPLE_API_ISSUER/APPLE_API_KEY/APPLE_API_PRIVATE_KEY_BASE64")
+          fi
+
+          if (( ${#missing[@]} > 0 )); then
+            printf 'Missing macOS release signing secrets: %s\n' "${missing[*]}" >&2
+            printf 'Generate a Tauri updater key with npm run tauri signer generate and configure Apple Developer signing/notarization secrets.\n' >&2
+            exit 1
+          fi
 
       - name: Install dependencies
         run: npm ci
+
+      - name: Import Apple Developer certificate
+        shell: bash
+        run: |
+          CERTIFICATE_PATH="$RUNNER_TEMP/caveman-apple-certificate.p12"
+          KEYCHAIN_PATH="$RUNNER_TEMP/caveman-signing.keychain-db"
+          IDENTITIES_PATH="$RUNNER_TEMP/caveman-codesigning-identities.txt"
+
+          decode_base64() {
+            local value="$1"
+            local output="$2"
+            printf '%s' "$value" | base64 --decode > "$output" 2>/dev/null || printf '%s' "$value" | base64 -D > "$output"
+          }
+
+          decode_base64 "$APPLE_CERTIFICATE" "$CERTIFICATE_PATH"
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security import "$CERTIFICATE_PATH" -P "$APPLE_CERTIFICATE_PASSWORD" -A -t cert -f pkcs12 -k "$KEYCHAIN_PATH"
+          security list-keychains -d user -s "$KEYCHAIN_PATH"
+          security default-keychain -d user -s "$KEYCHAIN_PATH"
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security find-identity -v -p codesigning "$KEYCHAIN_PATH" | tee "$IDENTITIES_PATH"
+          grep -F "$APPLE_SIGNING_IDENTITY" "$IDENTITIES_PATH"
+          echo "APPLE_SIGNING_IDENTITY=$APPLE_SIGNING_IDENTITY" >> "$GITHUB_ENV"
+
+      - name: Prepare Apple notarization API key
+        if: ${{ env.APPLE_API_PRIVATE_KEY_BASE64 != '' }}
+        shell: bash
+        run: |
+          APPLE_API_KEY_PATH="$RUNNER_TEMP/AuthKey_${APPLE_API_KEY}.p8"
+          printf '%s' "$APPLE_API_PRIVATE_KEY_BASE64" | base64 --decode > "$APPLE_API_KEY_PATH" 2>/dev/null || printf '%s' "$APPLE_API_PRIVATE_KEY_BASE64" | base64 -D > "$APPLE_API_KEY_PATH"
+          chmod 600 "$APPLE_API_KEY_PATH"
+          echo "APPLE_API_KEY_PATH=$APPLE_API_KEY_PATH" >> "$GITHUB_ENV"
 
       - name: Prepare Whisper sidecar
         run: npm run sidecars:prepare -- --target current --base-config src-tauri/tauri.release.conf.json --output-config src-tauri/target/tauri.release.sidecars.generated.conf.json

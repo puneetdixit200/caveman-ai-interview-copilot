@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "https://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>NSMicrophoneUsageDescription</key>
+  <string>Caveman records selected interview audio so local speech-to-text can transcribe a session.</string>
+  <key>NSAudioCaptureUsageDescription</key>
+  <string>Caveman can capture selected system audio so local speech-to-text can transcribe the other side of a live interview.</string>
+</dict>
+</plist>
