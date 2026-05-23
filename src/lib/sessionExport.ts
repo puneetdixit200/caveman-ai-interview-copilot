@@ -20,7 +20,7 @@ export function exportSessionMarkdown({ session, transcripts, responses, practic
   ];
 
   const transcriptLines = transcripts.map((segment) => {
-    return `- [${formatTimestampMs(segment.timestampMs)}] ${segment.speaker.toUpperCase()}: ${segment.content}`;
+    return `- ${formatTranscriptLine(segment)}`;
   });
 
   const responseLines = responses.map((response) => {
@@ -93,7 +93,7 @@ export function exportSessionJson({ session, transcripts, responses, practiceSco
 function buildTranscriptMarkdown(transcripts: TranscriptSegment[]): string {
   return transcripts.length > 0
     ? transcripts
-        .map((segment) => `- [${formatTimestampMs(segment.timestampMs)}] ${segment.speaker.toUpperCase()}: ${segment.content}`)
+        .map((segment) => `- ${formatTranscriptLine(segment)}`)
         .join("\n")
     : "_No transcript captured._";
 }
@@ -101,9 +101,15 @@ function buildTranscriptMarkdown(transcripts: TranscriptSegment[]): string {
 function buildTranscriptPlain(transcripts: TranscriptSegment[]): string {
   return transcripts.length > 0
     ? transcripts
-        .map((segment) => `[${formatTimestampMs(segment.timestampMs)}] ${segment.speaker.toUpperCase()}: ${segment.content}`)
+        .map(formatTranscriptLine)
         .join("\n")
     : "No transcript captured.";
+}
+
+function formatTranscriptLine(segment: TranscriptSegment): string {
+  const metadata = [segment.source, segment.language].filter(Boolean).join(", ");
+  const metadataLabel = metadata ? ` (${metadata})` : "";
+  return `[${formatTimestampMs(segment.timestampMs)}] ${segment.speaker.toUpperCase()}${metadataLabel}: ${segment.content}`;
 }
 
 function buildResponsesMarkdown(responses: AIResponseRecord[]): string {
@@ -185,12 +191,7 @@ export function buildSessionPdfLines({ session, transcripts, responses, practice
     `Tokens: ${session.totalTokens}`,
     "",
     "Transcript",
-    ...(transcripts.length > 0
-      ? transcripts.map(
-          (segment) =>
-            `[${formatTimestampMs(segment.timestampMs)}] ${segment.speaker.toUpperCase()}: ${segment.content}`
-        )
-      : ["No transcript captured."]),
+    ...(transcripts.length > 0 ? transcripts.map(formatTranscriptLine) : ["No transcript captured."]),
     "",
     "AI Responses",
     ...(responses.length > 0

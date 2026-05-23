@@ -66,7 +66,9 @@ describe("liveTranscription", () => {
       speaker: "interviewer",
       content: "How would you design a cache?",
       timestampMs: 200,
-      confidence: 0.91
+      confidence: 0.91,
+      source: "microphone",
+      language: "en"
     });
     expect(saved).toHaveLength(1);
   });
@@ -177,14 +179,18 @@ describe("liveTranscription", () => {
       speaker: "interviewer",
       content: "Explain database indexes.",
       timestampMs: 100,
-      confidence: 0.88
+      confidence: 0.88,
+      source: "system",
+      language: "en"
     });
     expect(addTranscript).toHaveBeenNthCalledWith(2, {
       sessionId: "s1",
       speaker: "candidate",
       content: "I would start with the query pattern.",
       timestampMs: 120,
-      confidence: 0.86
+      confidence: 0.86,
+      source: "microphone",
+      language: "en"
     });
     expect(saved).toHaveLength(2);
   });
@@ -245,7 +251,9 @@ describe("liveTranscription", () => {
       speaker: "interviewer",
       content: "Walk me through your API design.",
       timestampMs: 115500,
-      confidence: 0.9
+      confidence: 0.9,
+      source: "system",
+      language: "en"
     });
   });
 
@@ -402,7 +410,9 @@ describe("liveTranscription", () => {
       speaker: "candidate",
       content: "I want to add one constraint.",
       timestampMs: 0,
-      confidence: 0.82
+      confidence: 0.82,
+      source: "system",
+      language: "en"
     });
   });
 

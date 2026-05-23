@@ -24,6 +24,8 @@ fn session_and_transcript_records_round_trip_through_sqlite() {
         "Explain HashMap internals",
         1500,
         Some(0.98),
+        Some("system".to_string()),
+        Some("en-US".to_string()),
     )
     .expect("add transcript");
 
@@ -36,6 +38,8 @@ fn session_and_transcript_records_round_trip_through_sqlite() {
     assert_eq!(transcripts.len(), 1);
     assert_eq!(transcripts[0].speaker, "interviewer");
     assert_eq!(transcripts[0].content, "Explain HashMap internals");
+    assert_eq!(transcripts[0].source.as_deref(), Some("system"));
+    assert_eq!(transcripts[0].language.as_deref(), Some("en-US"));
 }
 
 #[test]
@@ -104,6 +108,8 @@ fn transcript_records_can_be_corrected_and_deleted() {
             "How do retrys work?",
             900,
             Some(0.72),
+            Some("microphone".to_string()),
+            Some("en".to_string()),
         )
         .expect("add transcript");
 
@@ -121,6 +127,8 @@ fn transcript_records_can_be_corrected_and_deleted() {
     assert_eq!(updated.content, "How do retries work?");
     assert_eq!(updated.timestamp_ms, 1200);
     assert_eq!(updated.confidence, Some(0.94));
+    assert_eq!(updated.source.as_deref(), Some("microphone"));
+    assert_eq!(updated.language.as_deref(), Some("en"));
 
     db.delete_transcript(transcript.id)
         .expect("delete transcript");
@@ -146,13 +154,37 @@ fn transcript_records_page_by_timestamp_cursor() {
         .expect("create session");
 
     let first = db
-        .add_transcript(&session.id, "interviewer", "Question one?", 1000, None)
+        .add_transcript(
+            &session.id,
+            "interviewer",
+            "Question one?",
+            1000,
+            None,
+            None,
+            None,
+        )
         .expect("add first transcript");
     let second = db
-        .add_transcript(&session.id, "candidate", "Answer one.", 2000, None)
+        .add_transcript(
+            &session.id,
+            "candidate",
+            "Answer one.",
+            2000,
+            None,
+            None,
+            None,
+        )
         .expect("add second transcript");
     let third = db
-        .add_transcript(&session.id, "interviewer", "Question two?", 3000, None)
+        .add_transcript(
+            &session.id,
+            "interviewer",
+            "Question two?",
+            3000,
+            None,
+            None,
+            None,
+        )
         .expect("add third transcript");
 
     let first_page = db

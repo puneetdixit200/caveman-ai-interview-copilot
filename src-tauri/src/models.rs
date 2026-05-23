@@ -27,6 +27,8 @@ pub struct Transcript {
     pub speaker: String,
     pub content: String,
     pub confidence: Option<f64>,
+    pub source: Option<String>,
+    pub language: Option<String>,
     pub timestamp_ms: i64,
     pub created_at: String,
 }

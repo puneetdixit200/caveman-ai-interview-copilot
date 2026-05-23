@@ -97,7 +97,9 @@ export async function runLiveTranscriptionPass(input: {
               sessionStartedAt: input.sessionStartedAt,
               now: input.now ?? new Date()
             }),
-            confidence: event.confidence
+            confidence: event.confidence,
+            source: snapshot.source,
+            language: event.language
           })
         );
       }

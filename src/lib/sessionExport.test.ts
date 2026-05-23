@@ -14,7 +14,7 @@ describe("exportSessionMarkdown", () => {
 
     expect(markdown).toContain("# Backend Interview");
     expect(markdown).toContain("Company: Acme");
-    expect(markdown).toContain("[00:05.000] INTERVIEWER: Design a URL shortener");
+    expect(markdown).toContain("[00:05.000] INTERVIEWER (system, en-US): Design a URL shortener");
     expect(markdown).toContain("OpenRouter / gpt-4o");
     expect(markdown).toContain("Start with requirements and scale.");
     expect(markdown).toContain("## Practice Scores");
@@ -44,7 +44,7 @@ describe("exportSessionMarkdown", () => {
       expect.arrayContaining([
         "Backend Interview",
         "Company: Acme",
-        "[00:05.000] INTERVIEWER: Design a URL shortener",
+        "[00:05.000] INTERVIEWER (system, en-US): Design a URL shortener",
         "OpenRouter / gpt-4o",
         "Start with requirements and scale.",
         "Practice Scores",
@@ -70,7 +70,7 @@ describe("exportSessionMarkdown", () => {
 
     expect(rendered).toContain("Title=Backend Interview");
     expect(rendered).toContain("Company=Acme");
-    expect(rendered).toContain("INTERVIEWER: Design a URL shortener");
+    expect(rendered).toContain("INTERVIEWER (system, en-US): Design a URL shortener");
     expect(rendered).toContain("OpenRouter / gpt-4o");
   });
 });
@@ -101,7 +101,9 @@ function makeExportInput(): {
         speaker: "interviewer",
         content: "Design a URL shortener",
         timestampMs: 5000,
-        confidence: 0.99
+        confidence: 0.99,
+        source: "system",
+        language: "en-US"
       }
     ],
     responses: [

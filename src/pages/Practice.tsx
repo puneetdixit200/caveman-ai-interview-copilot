@@ -235,14 +235,16 @@ export function Practice() {
       speaker: "interviewer",
       content: activeQuestion.question,
       timestampMs: 0,
-      confidence: 1
+      confidence: 1,
+      source: "practice"
     });
     await addTranscript({
       sessionId: created.id,
       speaker: "candidate",
       content: input.answer,
       timestampMs: 60_000,
-      confidence: 1
+      confidence: 1,
+      source: "practice"
     });
     await addPracticeScore({
       sessionId: created.id,

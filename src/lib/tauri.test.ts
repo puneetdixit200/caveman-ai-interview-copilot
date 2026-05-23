@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it } from "vitest";
 import {
+  addTranscript,
   addPracticeScore,
   clearKnowledgeBaseNative,
   deleteProviderApiKey,
@@ -89,6 +90,25 @@ describe("tauri fallback practice scores", () => {
         score: 4
       })
     ]);
+  });
+});
+
+describe("tauri fallback transcripts", () => {
+  it("keeps live STT source and language metadata on saved transcript fallbacks", async () => {
+    await expect(
+      addTranscript({
+        sessionId: "s1",
+        speaker: "interviewer",
+        content: "Explain quorum writes.",
+        timestampMs: 1200,
+        confidence: 0.92,
+        source: "system",
+        language: "en-US"
+      })
+    ).resolves.toMatchObject({
+      source: "system",
+      language: "en-US"
+    });
   });
 });
 

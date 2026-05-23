@@ -55,6 +55,8 @@ export interface TranscriptSegment {
   content: string;
   timestampMs: number;
   confidence?: number;
+  source?: "microphone" | "system" | "manual" | "practice" | string;
+  language?: string;
   createdAt?: string;
 }
 

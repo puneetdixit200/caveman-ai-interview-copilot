@@ -325,6 +325,8 @@ export async function addTranscript(input: {
   content: string;
   timestampMs: number;
   confidence?: number;
+  source?: TranscriptSegment["source"];
+  language?: string;
 }): Promise<TranscriptSegment> {
   return invokeOrFallback<TranscriptSegment>(
     "add_transcript",
@@ -333,7 +335,9 @@ export async function addTranscript(input: {
       speaker: input.speaker,
       content: input.content,
       timestampMs: input.timestampMs,
-      confidence: input.confidence
+      confidence: input.confidence,
+      source: input.source,
+      language: input.language
     },
     () => ({
       id: Date.now(),
@@ -342,6 +346,8 @@ export async function addTranscript(input: {
       content: input.content,
       timestampMs: input.timestampMs,
       confidence: input.confidence,
+      source: input.source,
+      language: input.language,
       createdAt: new Date().toISOString()
     })
   );

@@ -49,9 +49,19 @@ pub fn add_transcript(
     content: String,
     timestamp_ms: i64,
     confidence: Option<f64>,
+    source: Option<String>,
+    language: Option<String>,
 ) -> Result<Transcript, String> {
     database
-        .add_transcript(&session_id, &speaker, &content, timestamp_ms, confidence)
+        .add_transcript(
+            &session_id,
+            &speaker,
+            &content,
+            timestamp_ms,
+            confidence,
+            source,
+            language,
+        )
         .map_err(to_command_error)
 }
 

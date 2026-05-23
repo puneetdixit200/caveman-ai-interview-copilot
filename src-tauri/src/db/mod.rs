@@ -242,13 +242,27 @@ impl Database {
         content: &str,
         timestamp_ms: i64,
         confidence: Option<f64>,
+        source: Option<String>,
+        language: Option<String>,
     ) -> Result<Transcript> {
         let now = Utc::now().to_rfc3339();
+        let source = normalize_optional_text(source);
+        let language = normalize_optional_text(language);
         let connection = self.lock()?;
         connection.execute(
-            "INSERT INTO transcripts (session_id, speaker, content, confidence, timestamp_ms, created_at)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
-            params![session_id, speaker, content, confidence, timestamp_ms, now],
+            "INSERT INTO transcripts (
+                session_id, speaker, content, confidence, source, language, timestamp_ms, created_at
+             ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+            params![
+                session_id,
+                speaker,
+                content,
+                confidence,
+                source,
+                language,
+                timestamp_ms,
+                now
+            ],
         )?;
         let id = connection.last_insert_rowid();
         drop(connection);
@@ -258,7 +272,7 @@ impl Database {
     pub fn list_transcripts(&self, session_id: &str) -> Result<Vec<Transcript>> {
         let connection = self.lock()?;
         let mut statement = connection.prepare(
-            "SELECT id, session_id, speaker, content, confidence, timestamp_ms, created_at
+            "SELECT id, session_id, speaker, content, confidence, source, language, timestamp_ms, created_at
              FROM transcripts
              WHERE session_id = ?1
              ORDER BY timestamp_ms ASC, id ASC",
@@ -292,7 +306,7 @@ impl Database {
         let mut items = match (direction, cursor.as_ref()) {
             ("before", Some(cursor)) => {
                 let mut statement = connection.prepare(
-                    "SELECT id, session_id, speaker, content, confidence, timestamp_ms, created_at
+                    "SELECT id, session_id, speaker, content, confidence, source, language, timestamp_ms, created_at
                      FROM transcripts
                      WHERE session_id = ?1
                        AND (timestamp_ms < ?2 OR (timestamp_ms = ?2 AND id < ?3))
@@ -309,7 +323,7 @@ impl Database {
             }
             ("after", Some(cursor)) => {
                 let mut statement = connection.prepare(
-                    "SELECT id, session_id, speaker, content, confidence, timestamp_ms, created_at
+                    "SELECT id, session_id, speaker, content, confidence, source, language, timestamp_ms, created_at
                      FROM transcripts
                      WHERE session_id = ?1
                        AND (timestamp_ms > ?2 OR (timestamp_ms = ?2 AND id > ?3))
@@ -324,7 +338,7 @@ impl Database {
             }
             _ => {
                 let mut statement = connection.prepare(
-                    "SELECT id, session_id, speaker, content, confidence, timestamp_ms, created_at
+                    "SELECT id, session_id, speaker, content, confidence, source, language, timestamp_ms, created_at
                      FROM transcripts
                      WHERE session_id = ?1
                      ORDER BY timestamp_ms ASC, id ASC
@@ -816,7 +830,7 @@ impl Database {
         let connection = self.lock()?;
         connection
             .query_row(
-                "SELECT id, session_id, speaker, content, confidence, timestamp_ms, created_at
+                "SELECT id, session_id, speaker, content, confidence, source, language, timestamp_ms, created_at
                  FROM transcripts WHERE id = ?1",
                 params![id],
                 map_transcript,
@@ -891,6 +905,8 @@ impl Database {
                 speaker TEXT NOT NULL CHECK(speaker IN ('interviewer','candidate','unknown')),
                 content TEXT NOT NULL,
                 confidence REAL,
+                source TEXT,
+                language TEXT,
                 timestamp_ms INTEGER NOT NULL,
                 created_at TEXT NOT NULL
             );
@@ -981,7 +997,22 @@ impl Database {
             CREATE INDEX IF NOT EXISTS idx_knowledge_chunks_document ON knowledge_chunks(document_id, rank_order);
             ",
         )?;
+        Self::ensure_optional_transcript_metadata_columns(&connection)?;
         Self::migrate_session_interview_types(&connection)?;
+        Ok(())
+    }
+
+    fn ensure_optional_transcript_metadata_columns(connection: &Connection) -> Result<()> {
+        let columns = table_columns(connection, "transcripts")?;
+        for column in ["source", "language"] {
+            if !columns.iter().any(|existing| existing == column) {
+                connection.execute(
+                    &format!("ALTER TABLE transcripts ADD COLUMN {column} TEXT"),
+                    [],
+                )?;
+            }
+        }
+
         Ok(())
     }
 
@@ -1102,6 +1133,13 @@ fn current_timestamp_ms() -> i64 {
     Utc::now().timestamp_millis()
 }
 
+fn table_columns(connection: &Connection, table: &str) -> Result<Vec<String>> {
+    let mut statement = connection.prepare(&format!("PRAGMA table_info({table})"))?;
+    let rows = statement.query_map([], |row| row.get::<_, String>(1))?;
+    rows.collect::<rusqlite::Result<Vec<_>>>()
+        .map_err(Into::into)
+}
+
 fn normalize_chunk_id(id: String, document_id: &str, index: usize) -> String {
     let id = id.trim().to_string();
     if id.is_empty() {
@@ -1145,8 +1183,10 @@ fn map_transcript(row: &rusqlite::Row<'_>) -> rusqlite::Result<Transcript> {
         speaker: row.get(2)?,
         content: row.get(3)?,
         confidence: row.get(4)?,
-        timestamp_ms: row.get(5)?,
-        created_at: row.get(6)?,
+        source: row.get(5)?,
+        language: row.get(6)?,
+        timestamp_ms: row.get(7)?,
+        created_at: row.get(8)?,
     })
 }
 

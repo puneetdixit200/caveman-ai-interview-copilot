@@ -1,5 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
-import { LocalWhisperChunkTranscriber, type LocalWhisperPcmTranscribeInput } from "./localWhisperStreaming";
+import {
+  LocalWhisperChunkTranscriber,
+  LocalWhisperJsonlStreamTranscriber,
+  parseLocalWhisperJsonlEvent,
+  type LocalWhisperJsonlSidecarTransport,
+  type LocalWhisperPcmTranscribeInput
+} from "./localWhisperStreaming";
 import type { AudioChunkEvent } from "./audioEvents";
 
 describe("localWhisperStreaming", () => {
@@ -114,6 +120,131 @@ describe("localWhisperStreaming", () => {
 
     expect(transcribePcm).not.toHaveBeenCalled();
   });
+
+  it("streams live PCM chunks to a JSONL stdin sidecar transport", async () => {
+    const transport = createJsonlTransport();
+    const transcriber = new LocalWhisperJsonlStreamTranscriber({
+      source: "system",
+      binaryPath: "/opt/whisper.cpp/stream",
+      modelPath: "/models/ggml-base.en.bin",
+      language: "auto",
+      diarizationEnabled: true,
+      transport,
+      onTranscript: vi.fn()
+    });
+
+    await transcriber.sendChunk(makeChunk("system", 7, [1, 2, 3, 4]));
+    await transcriber.sendChunk(makeChunk("microphone", 8, [9, 10]));
+
+    expect(transport.started).toEqual({
+      binaryPath: "/opt/whisper.cpp/stream",
+      modelPath: "/models/ggml-base.en.bin",
+      source: "system",
+      sampleRateHz: 16000,
+      channels: 1,
+      language: "auto",
+      diarizationEnabled: true
+    });
+    expect(transport.lines.map((line) => JSON.parse(line))).toEqual([
+      {
+        type: "audio",
+        source: "system",
+        sequence: 7,
+        sampleRateHz: 16000,
+        channels: 1,
+        durationMs: 250,
+        sampleCount: 2,
+        pcm16Base64: bytesToBase64([1, 2, 3, 4]),
+        timestampMs: 2750
+      }
+    ]);
+  });
+
+  it("parses JSONL sidecar partial and final transcript events", async () => {
+    const transport = createJsonlTransport();
+    const onTranscript = vi.fn();
+    const onInterimTranscript = vi.fn();
+    const transcriber = new LocalWhisperJsonlStreamTranscriber({
+      source: "system",
+      binaryPath: "/opt/whisper.cpp/stream",
+      modelPath: "/models/ggml-base.en.bin",
+      language: "en",
+      diarizationEnabled: true,
+      transport,
+      onTranscript,
+      onInterimTranscript
+    });
+
+    await transcriber.sendChunk(makeChunk("system", 1, [1, 2]));
+    transport.emitLine(
+      JSON.stringify({
+        type: "partial",
+        speaker: "INTERVIEWER",
+        text: "Explain hash",
+        startMs: 100,
+        endMs: 500,
+        confidence: 0.62,
+        language: "en"
+      })
+    );
+    transport.emitLine(
+      JSON.stringify({
+        type: "transcript",
+        speaker: "INTERVIEWER",
+        text: "Explain hash maps.",
+        startMs: 100,
+        endMs: 900,
+        confidence: 0.91,
+        language: "en",
+        isFinal: true
+      })
+    );
+
+    expect(onInterimTranscript).toHaveBeenCalledWith(
+      expect.objectContaining({
+        speaker: "interviewer",
+        text: "Explain hash",
+        startMs: 100,
+        endMs: 500,
+        isFinal: false
+      })
+    );
+    expect(onTranscript).toHaveBeenCalledWith({
+      speaker: "interviewer",
+      text: "Explain hash maps.",
+      startMs: 100,
+      endMs: 900,
+      confidence: 0.91,
+      language: "en",
+      providerSpeaker: "INTERVIEWER"
+    });
+  });
+
+  it("normalizes Caveman-compatible JSONL transcript samples from sidecars", () => {
+    expect(
+      parseLocalWhisperJsonlEvent(
+        JSON.stringify({
+          speaker: "YOU",
+          text: "I would use consistent hashing.",
+          ts: 4.2,
+          confidence: 0.84,
+          language: "en"
+        }),
+        "microphone"
+      )
+    ).toEqual({
+      isFinal: true,
+      transcript: {
+        speaker: "candidate",
+        providerSpeaker: "YOU",
+        text: "I would use consistent hashing.",
+        startMs: 4200,
+        endMs: 4200,
+        confidence: 0.84,
+        language: "en"
+      }
+    });
+  });
 });
 
 function makeChunk(source: "microphone" | "system", sequence: number, bytes: number[]): AudioChunkEvent {
@@ -132,4 +263,28 @@ function makeChunk(source: "microphone" | "system", sequence: number, bytes: num
 
 function bytesToBase64(bytes: number[]): string {
   return btoa(String.fromCharCode(...bytes));
+}
+
+function createJsonlTransport(): LocalWhisperJsonlSidecarTransport & {
+  started?: unknown;
+  lines: string[];
+  emitLine: (line: string) => void;
+} {
+  let onLine: ((line: string) => void) | undefined;
+  return {
+    lines: [],
+    async start(input, callback) {
+      this.started = input;
+      onLine = callback;
+    },
+    async writeLine(line) {
+      this.lines.push(line);
+    },
+    async close() {
+      this.lines.push(JSON.stringify({ type: "closed" }));
+    },
+    emitLine(line) {
+      onLine?.(line);
+    }
+  };
 }

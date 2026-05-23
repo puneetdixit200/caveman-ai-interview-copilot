@@ -576,7 +576,9 @@ export function Dashboard() {
           speaker,
           content: text,
           timestampMs: sessionOffsetMs + event.startMs,
-          confidence: event.confidence
+          confidence: event.confidence,
+          source,
+          language: event.language
         });
 
         if (disposed) {
@@ -728,7 +730,9 @@ export function Dashboard() {
           speaker,
           content: text,
           timestampMs: sessionOffsetMs + event.startMs,
-          confidence: event.confidence
+          confidence: event.confidence,
+          source,
+          language: event.language
         });
 
         if (disposed) {
@@ -1013,7 +1017,9 @@ export function Dashboard() {
       speaker: manualSpeaker,
       content,
       timestampMs: nextTranscriptTimestampMs(new Date(session.createdAt)),
-      confidence: 1
+      confidence: 1,
+      source: "manual",
+      language: config.stt.language && config.stt.language !== "auto" ? config.stt.language : undefined
     });
     const nextTranscripts = [...transcripts, saved];
     setTranscripts(nextTranscripts);
