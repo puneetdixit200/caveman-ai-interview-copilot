@@ -6,6 +6,8 @@ import test from "node:test";
 import {
   buildCommercialSecretEntries,
   ghSecretSetInvocation,
+  loadOptionsFromEnvFile,
+  parseEnvFileContent,
   validateCommercialSecretEntries
 } from "./configure-commercial-secrets.mjs";
 
@@ -101,6 +103,54 @@ test("accepts Apple ID notarization instead of App Store Connect API key credent
       entries.slice(-3).map((entry) => entry.name),
       ["APPLE_ID", "APPLE_PASSWORD", "APPLE_TEAM_ID"]
     );
+  });
+});
+
+test("loads commercial signing inputs from a local env file", async () => {
+  await withTempFiles(async (root) => {
+    const envFile = path.join(root, "commercial-release.env");
+    await writeFile(
+      envFile,
+      [
+        "# Local-only commercial release inputs.",
+        `WINDOWS_CODESIGN_CERTIFICATE_PATH=${path.join(root, "windows.pfx")}`,
+        'WINDOWS_CODESIGN_CERTIFICATE_PASSWORD="win pass # stays secret"',
+        `APPLE_CERTIFICATE_PATH=${path.join(root, "apple.p12")}`,
+        "APPLE_CERTIFICATE_PASSWORD=apple-pass",
+        "APPLE_SIGNING_IDENTITY='Developer ID Application: Example Corp (TEAMID1234)'",
+        "KEYCHAIN_PASSWORD=keychain-pass",
+        "export APPLE_ID=release@example.com",
+        "APPLE_PASSWORD=app-specific-password",
+        "APPLE_TEAM_ID=TEAMID1234"
+      ].join("\n")
+    );
+
+    const entries = await buildCommercialSecretEntries(await loadOptionsFromEnvFile(envFile));
+
+    assert.doesNotThrow(() => validateCommercialSecretEntries(entries));
+    assert.equal(
+      entries.find((entry) => entry.name === "WINDOWS_CODESIGN_CERTIFICATE_PASSWORD")?.value,
+      "win pass # stays secret"
+    );
+    assert.equal(
+      entries.find((entry) => entry.name === "APPLE_SIGNING_IDENTITY")?.value,
+      "Developer ID Application: Example Corp (TEAMID1234)"
+    );
+  });
+});
+
+test("parses dotenv-style commercial release files without exposing values", () => {
+  const parsed = parseEnvFileContent(`
+# comments are ignored
+export WINDOWS_CODESIGN_CERTIFICATE_PASSWORD="win pass # not a comment"
+APPLE_SIGNING_IDENTITY='Developer ID Application: Example Corp (TEAMID1234)'
+KEYCHAIN_PASSWORD=plain-value
+`);
+
+  assert.deepEqual(parsed, {
+    WINDOWS_CODESIGN_CERTIFICATE_PASSWORD: "win pass # not a comment",
+    APPLE_SIGNING_IDENTITY: "Developer ID Application: Example Corp (TEAMID1234)",
+    KEYCHAIN_PASSWORD: "plain-value"
   });
 });
 

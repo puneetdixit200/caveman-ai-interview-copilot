@@ -110,6 +110,38 @@ export async function applyGitHubSecrets(entries, options = {}) {
   return results;
 }
 
+export function parseEnvFileContent(content) {
+  const env = {};
+  for (const rawLine of String(content).split(/\r?\n/)) {
+    const line = rawLine.trim();
+    if (!line || line.startsWith("#")) {
+      continue;
+    }
+
+    const assignment = line.startsWith("export ") ? line.slice("export ".length).trim() : line;
+    const equalsIndex = assignment.indexOf("=");
+    if (equalsIndex === -1) {
+      continue;
+    }
+
+    const key = assignment.slice(0, equalsIndex).trim();
+    if (!/^[A-Z0-9_]+$/.test(key)) {
+      continue;
+    }
+
+    env[key] = parseEnvFileValue(assignment.slice(equalsIndex + 1).trim());
+  }
+  return env;
+}
+
+export async function loadOptionsFromEnvFile(filePath) {
+  const envFilePath = filePath?.trim();
+  if (!envFilePath) {
+    throw new Error("Missing env file path.");
+  }
+  return optionsFromEnv(parseEnvFileContent(await readFile(envFilePath, "utf8")));
+}
+
 async function pushOptionalFileSecret(entries, name, filePath, label, { base64 = false } = {}) {
   if (!filePath?.trim()) {
     return;
@@ -128,6 +160,22 @@ function pushOptionalSecret(entries, name, value, label) {
     return;
   }
   entries.push({ name, value: trimmed, label });
+}
+
+function parseEnvFileValue(value) {
+  if (value.length >= 2 && value.startsWith('"') && value.endsWith('"')) {
+    return value
+      .slice(1, -1)
+      .replace(/\\n/g, "\n")
+      .replace(/\\r/g, "\r")
+      .replace(/\\t/g, "\t")
+      .replace(/\\"/g, '"')
+      .replace(/\\\\/g, "\\");
+  }
+  if (value.length >= 2 && value.startsWith("'") && value.endsWith("'")) {
+    return value.slice(1, -1).replace(/\\'/g, "'");
+  }
+  return value.trim();
 }
 
 async function runSecretSet({ command, args, stdin }) {
@@ -221,6 +269,9 @@ function parseArgs(argv) {
       case "--from-env":
         Object.assign(options, optionsFromEnv(process.env));
         break;
+      case "--env-file":
+        options.envFile = next();
+        break;
       case "--allow-partial":
         options.allowPartial = true;
         break;
@@ -237,7 +288,7 @@ function parseArgs(argv) {
   return options;
 }
 
-function optionsFromEnv(env) {
+export function optionsFromEnv(env) {
   return {
     tauriSigningPrivateKey: env.TAURI_SIGNING_PRIVATE_KEY,
     tauriSigningPrivateKeyPassword: env.TAURI_SIGNING_PRIVATE_KEY_PASSWORD,
@@ -279,6 +330,7 @@ Choose one notarization set:
 
 Optional:
   --from-env                           Read values from matching environment variables.
+  --env-file <path>                    Read matching variables from a local dotenv-style file.
   --repo <owner/repo>                  Apply secrets to a specific repository.
   --openrouter-api-key <key>           Store optional OpenRouter API key.
   --allow-partial                      Allow setting only the provided secrets.
@@ -293,19 +345,21 @@ export async function main(argv = process.argv.slice(2)) {
     return;
   }
 
-  const entries = await buildCommercialSecretEntries(options);
-  validateCommercialSecretEntries(entries, { allowPartial: options.allowPartial });
+  const envFileOptions = options.envFile ? await loadOptionsFromEnvFile(options.envFile) : {};
+  const effectiveOptions = { ...envFileOptions, ...options };
+  const entries = await buildCommercialSecretEntries(effectiveOptions);
+  validateCommercialSecretEntries(entries, { allowPartial: effectiveOptions.allowPartial });
   if (entries.length === 0) {
     throw new Error("No commercial release secret inputs were provided.");
   }
 
-  console.log(options.apply ? "APPLY" : "DRY RUN");
+  console.log(effectiveOptions.apply ? "APPLY" : "DRY RUN");
   for (const entry of entries) {
     console.log(`- ${entry.name}: ${entry.label}`);
   }
 
-  if (options.apply) {
-    await applyGitHubSecrets(entries, { repo: options.repo });
+  if (effectiveOptions.apply) {
+    await applyGitHubSecrets(entries, { repo: effectiveOptions.repo });
     console.log("");
     console.log(`Stored ${entries.length} GitHub secrets.`);
   } else {
