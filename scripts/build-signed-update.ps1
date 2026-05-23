@@ -57,12 +57,11 @@ try {
     $BuildConfigPath = $GeneratedConfigPath
   }
 
-  if ($BuildConfigPath -eq "src-tauri/tauri.release.conf.json") {
-    npm run tauri build -- --ci --config src-tauri/tauri.release.conf.json
-  }
-  else {
-    npm run tauri build -- --ci --config $BuildConfigPath
-  }
+  $SidecarConfigPath = Join-Path $RepoRoot "src-tauri\target\tauri.release.sidecars.generated.conf.json"
+  node "scripts/prepare-whisper-sidecars.mjs" "--target" "current" "--base-config" $BuildConfigPath "--output-config" $SidecarConfigPath
+  $BuildConfigPath = $SidecarConfigPath
+
+  npm run tauri build -- --ci --config $BuildConfigPath
 
   $ManifestArgs = @(
     "scripts/generate-latest-json.mjs",

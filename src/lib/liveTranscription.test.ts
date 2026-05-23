@@ -229,6 +229,10 @@ describe("liveTranscription", () => {
       now: new Date("2026-05-20T00:02:00.000Z"),
       config: {
         ...DEFAULT_APP_CONFIG,
+        security: {
+          ...DEFAULT_APP_CONFIG.security,
+          localOnlyMode: false
+        },
         audio: {
           ...DEFAULT_APP_CONFIG.audio,
           captureMode: "system"
@@ -289,6 +293,10 @@ describe("liveTranscription", () => {
       sessionId: "s1",
       config: {
         ...DEFAULT_APP_CONFIG,
+        security: {
+          ...DEFAULT_APP_CONFIG.security,
+          localOnlyMode: false
+        },
         audio: {
           ...DEFAULT_APP_CONFIG.audio,
           captureMode: "system"
@@ -384,6 +392,10 @@ describe("liveTranscription", () => {
       sessionId: "s1",
       config: {
         ...DEFAULT_APP_CONFIG,
+        security: {
+          ...DEFAULT_APP_CONFIG.security,
+          localOnlyMode: false
+        },
         audio: {
           ...DEFAULT_APP_CONFIG.audio,
           captureMode: "system"

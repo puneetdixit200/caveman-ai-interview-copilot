@@ -26,7 +26,7 @@ Implemented now:
 - Raw audio cache cleanup that purges stale live-capture and local Whisper temporary artifacts on startup
 - Local Whisper chunk-driven streaming from 250 ms PCM audio, Deepgram live WebSocket streaming with interim word preview, AssemblyAI and Google STT fallback commands, and first-class STT auto language detection
 - Speaker diarization calibration for microphone, system audio, and provider speaker slots from Whisper, Deepgram, AssemblyAI, and Google STT
-- Local Whisper setup helpers that scan for `whisper-cli`/`main` binaries, detect local `ggml` models, and download the official `base.en` model with SHA-1 verification
+- Local Whisper setup helpers that scan for `whisper-cli`, `main`, or bundled `caveman-whisper` sidecars, detect local `ggml` models, and download the official `base.en` model with SHA-1 verification
 - Automatic interviewer question detection and answer triggering from live transcript updates
 - Guarded auto-answer mode that can type saved AI answers into the active app after a configurable delay
 - Token-budgeted context window management with history turn limits, supplemental context trimming, and reserved answer tokens
@@ -39,7 +39,7 @@ Implemented now:
 - Resume, job description, OCR, and local knowledge-base context injection with stale-document cleanup controls
 - Syntax-highlighted code answer extraction with clipboard copy and active-window typing for code/editor/chat handoff
 - Practice interview mode with local scoring and AI follow-up question generation
-- Analytics, TTS queue/playback, plugin manifests for prompt templates, practice packs, and custom session export templates, OS keychain API key storage, sensitive-action event logging, signed-update configuration, and GitHub `latest.json` release manifest generation
+- Analytics, TTS queue/playback, plugin manifests for prompt templates, practice packs, and custom session export templates, OS keychain API key storage, sensitive-action event logging, signed-update configuration, Whisper sidecar bundling, and GitHub `latest.json` release manifest generation
 - SQLite-backed Rust command layer for sessions, transcripts, responses, settings, screenshots, secrets, and native actions
 - Unit tests for audio, STT parsing, provider fallback, overlay safety, exports, analytics, plugins, hotkeys, OCR, practice, RAG, TTS, collaboration, preflight reports, runtime budgets, and persistence
 
@@ -59,7 +59,7 @@ The overlay is designed for interview use: always on top, adjustable opacity, ad
 
 ### Local-First AI Workflow
 
-The architecture supports offline-first use with local Whisper and local LLM providers such as Ollama, LM Studio, llama.cpp, or vLLM. Cloud providers such as OpenRouter can be enabled when the user chooses to send context to a cloud model.
+The architecture supports offline-first use with local Whisper and local LLM providers such as Ollama, LM Studio, llama.cpp, or vLLM. Ollama is the default AI provider. OpenRouter is included as an optional disabled cloud route for users who choose to add a key and send context to a cloud model.
 
 Raw audio is treated as temporary cache data. Live-capture WAV snapshots and local Whisper chunk files are removed after use, and stale cache artifacts are purged automatically during desktop startup.
 
@@ -81,9 +81,15 @@ Dashboard helper links run from the desktop app on localhost by default. A trust
 
 ### Signed Updates
 
-Use `npm run tauri:build:signed` after creating a Tauri updater signing key. The script builds updater artifacts, verifies signed Windows bundles exist, and writes `latest.json` for GitHub Releases at `src-tauri/target/release/bundle/latest.json`. The `Release Signed Desktop Builds` GitHub Actions workflow can build Windows, macOS, and Linux packages, generate a combined multi-platform `latest.json`, and publish all assets to a GitHub Release when `TAURI_SIGNING_PRIVATE_KEY` is configured as a repository secret. Add `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` too when the updater key is password-protected.
+Use `npm run tauri:build:signed` after creating a Tauri updater signing key. The script prepares the matching local Whisper sidecar, builds updater artifacts, verifies signed Windows bundles exist, and writes `latest.json` for GitHub Releases at `src-tauri/target/release/bundle/latest.json`. The `Release Signed Desktop Builds` GitHub Actions workflow can build Windows x64, macOS Intel, macOS Apple Silicon, and Linux x64 packages, generate a combined multi-platform `latest.json`, and publish all assets to a GitHub Release when `TAURI_SIGNING_PRIVATE_KEY` is configured as a repository secret. Add `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` too when the updater key is password-protected.
 
 Windows Authenticode signing is optional. Add `WINDOWS_CODESIGN_CERTIFICATE_BASE64` and `WINDOWS_CODESIGN_CERTIFICATE_PASSWORD` repository secrets to import a `.pfx` certificate during the release workflow, or set `WINDOWS_CODESIGN_CERTIFICATE_THUMBPRINT`/`WINDOWS_CODESIGN_SIGN_COMMAND` before running `npm run tauri:build:signed` locally. The build script injects Tauri's Windows signing config before updater artifacts are created so installer signatures and updater signatures are generated in the same release pass.
+
+### Bundled Local Whisper Sidecars
+
+Packaging commands call `npm run sidecars:prepare` before Tauri builds. The sidecar script pins whisper.cpp `v1.8.4`, downloads the official Windows x64 archive, builds macOS/Linux sidecars from the same tag on their native runners, and writes a generated Tauri config at `src-tauri/target/tauri.sidecars.generated.conf.json` or `src-tauri/target/tauri.release.sidecars.generated.conf.json`.
+
+The generated sidecar files live under `src-tauri/binaries/whisper-runtime/` and follow Tauri's target-triple naming. Generated binaries and Windows DLLs are ignored by git; rebuild them with `npm run sidecars:prepare` on each target platform.
 
 ## Architecture
 
@@ -136,6 +142,12 @@ cd src-tauri
 cargo test
 ```
 
+Prepare the current platform's bundled Whisper sidecar and generated Tauri config:
+
+```powershell
+npm run sidecars:prepare
+```
+
 Build the macOS app and DMG on macOS:
 
 ```powershell
@@ -146,6 +158,12 @@ Build the Windows NSIS and MSI installers on Windows:
 
 ```powershell
 npm run tauri:build:windows
+```
+
+Build the Linux AppImage and DEB packages on Linux:
+
+```powershell
+npm run tauri:build:linux
 ```
 
 ## Documentation

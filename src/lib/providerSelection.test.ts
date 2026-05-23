@@ -25,6 +25,7 @@ describe("providerSelection", () => {
     const providers = selectRunnableProviders({
       ...DEFAULT_APP_CONFIG,
       selectedProviderId: "openrouter",
+      security: { ...DEFAULT_APP_CONFIG.security, localOnlyMode: false },
       providers: DEFAULT_APP_CONFIG.providers.map((provider) => ({
         ...provider,
         enabled: provider.id === "ollama" || provider.id === "openrouter"

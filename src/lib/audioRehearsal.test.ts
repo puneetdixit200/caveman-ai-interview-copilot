@@ -8,7 +8,19 @@ describe("runAudioCaptureRehearsal", () => {
     const startCapture = vi.fn();
 
     const result = await runAudioCaptureRehearsal({
-      config: DEFAULT_APP_CONFIG,
+      config: {
+        ...DEFAULT_APP_CONFIG,
+        audio: {
+          ...DEFAULT_APP_CONFIG.audio,
+          captureMode: "manual",
+          dualStreamEnabled: false,
+          sttMode: "manual"
+        },
+        stt: {
+          ...DEFAULT_APP_CONFIG.stt,
+          selectedMode: "manual"
+        }
+      },
       deps: {
         startCapture
       }

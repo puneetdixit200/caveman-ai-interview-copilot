@@ -247,7 +247,9 @@ struct PcmAudioSnapshot {
 }
 
 const WHISPER_MODEL_BASE_URL: &str = "https://huggingface.co/ggerganov/whisper.cpp/resolve/main";
-const WHISPER_BINARY_NAMES: [&str; 8] = [
+const WHISPER_BINARY_NAMES: [&str; 10] = [
+    "caveman-whisper.exe",
+    "caveman-whisper",
     "whisper-cli.exe",
     "whisper-cli",
     "main.exe",
@@ -1532,6 +1534,32 @@ mod tests {
             .unwrap()
             .ends_with("ggml-base.en.bin"));
         assert_eq!(status.models_dir, root.join("models").display().to_string());
+
+        std::fs::remove_dir_all(root).expect("clean temp dir");
+    }
+
+    #[test]
+    fn detects_bundled_caveman_whisper_sidecar_under_search_roots() {
+        let root = std::env::temp_dir().join(format!(
+            "caveman-whisper-bundled-detect-{}",
+            uuid::Uuid::new_v4()
+        ));
+        let runtime_dir = root.join("binaries").join("whisper-runtime");
+        let model_dir = root.join("models");
+        std::fs::create_dir_all(&runtime_dir).expect("create runtime dir");
+        std::fs::create_dir_all(&model_dir).expect("create model dir");
+        std::fs::write(runtime_dir.join("caveman-whisper"), b"fake binary")
+            .expect("write bundled sidecar");
+        std::fs::write(model_dir.join("ggml-base.en.bin"), b"fake model").expect("write model");
+
+        let status = detect_local_whisper_setup_in_roots(vec![root.clone()], root.join("models"));
+
+        assert!(status.ready);
+        assert!(status
+            .binary_path
+            .as_deref()
+            .unwrap()
+            .ends_with("caveman-whisper"));
 
         std::fs::remove_dir_all(root).expect("clean temp dir");
     }

@@ -35,10 +35,10 @@ jobs:
       WINDOWS_CODESIGN_TIMESTAMP_URL: http://timestamp.digicert.com
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6.0.2
 
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6.4.0
         with:
           node-version: 22
           cache: npm
@@ -80,7 +80,7 @@ jobs:
           -ReleaseNotes "${{ env.RELEASE_NOTES }}"
 
       - name: Upload Windows build artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7.0.1
         with:
           name: caveman-windows-signed-release
           if-no-files-found: error
@@ -91,17 +91,17 @@ jobs:
             src-tauri/target/release/bundle/msi/*.msi
             src-tauri/target/release/bundle/msi/*.sig
 
-  build-macos:
+  build-macos-intel:
     runs-on: macos-15-intel
     env:
       TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
       TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6.0.2
 
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6.4.0
         with:
           node-version: 22
           cache: npm
@@ -119,16 +119,66 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Prepare Whisper sidecar
+        run: npm run sidecars:prepare -- --target current --base-config src-tauri/tauri.release.conf.json --output-config src-tauri/target/tauri.release.sidecars.generated.conf.json
+
       - name: Build signed macOS updater assets
-        run: npm run tauri build -- --ci --bundles app --config src-tauri/tauri.release.conf.json
+        run: npm run tauri build -- --ci --bundles app --config src-tauri/target/tauri.release.sidecars.generated.conf.json
 
       - name: Create macOS DMG installer
         run: node scripts/create-macos-dmg.mjs
 
-      - name: Upload macOS build artifact
-        uses: actions/upload-artifact@v4
+      - name: Upload macOS Intel build artifact
+        uses: actions/upload-artifact@v7.0.1
         with:
-          name: caveman-macos-signed-release
+          name: caveman-macos-intel-signed-release
+          if-no-files-found: error
+          path: |
+            src-tauri/target/release/bundle/dmg/*.dmg
+            src-tauri/target/release/bundle/macos/*.app.tar.gz
+            src-tauri/target/release/bundle/macos/*.app.tar.gz.sig
+
+  build-macos-arm64:
+    runs-on: macos-15
+    env:
+      TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+      TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6.0.2
+
+      - name: Setup Node
+        uses: actions/setup-node@v6.4.0
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Validate release signing secrets
+        shell: pwsh
+        run: |
+          if ([string]::IsNullOrWhiteSpace($env:TAURI_SIGNING_PRIVATE_KEY)) {
+            throw "Missing TAURI_SIGNING_PRIVATE_KEY repository secret. Generate an updater key with npm run tauri signer generate and save the private key in GitHub Actions secrets."
+          }
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Prepare Whisper sidecar
+        run: npm run sidecars:prepare -- --target current --base-config src-tauri/tauri.release.conf.json --output-config src-tauri/target/tauri.release.sidecars.generated.conf.json
+
+      - name: Build signed macOS updater assets
+        run: npm run tauri build -- --ci --bundles app --config src-tauri/target/tauri.release.sidecars.generated.conf.json
+
+      - name: Create macOS DMG installer
+        run: node scripts/create-macos-dmg.mjs
+
+      - name: Upload macOS Apple Silicon build artifact
+        uses: actions/upload-artifact@v7.0.1
+        with:
+          name: caveman-macos-arm64-signed-release
           if-no-files-found: error
           path: |
             src-tauri/target/release/bundle/dmg/*.dmg
@@ -142,10 +192,10 @@ jobs:
       TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6.0.2
 
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6.4.0
         with:
           node-version: 22
           cache: npm
@@ -168,11 +218,14 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Prepare Whisper sidecar
+        run: npm run sidecars:prepare -- --target current --base-config src-tauri/tauri.release.conf.json --output-config src-tauri/target/tauri.release.sidecars.generated.conf.json
+
       - name: Build signed Linux updater assets
-        run: npm run tauri build -- --ci --config src-tauri/tauri.release.conf.json
+        run: npm run tauri build -- --ci --config src-tauri/target/tauri.release.sidecars.generated.conf.json
 
       - name: Upload Linux build artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7.0.1
         with:
           name: caveman-linux-signed-release
           if-no-files-found: error
@@ -183,19 +236,19 @@ jobs:
             src-tauri/target/release/bundle/deb/*.deb.sig
 
   publish-release:
-    needs: [build-windows, build-macos, build-linux]
+    needs: [build-windows, build-macos-intel, build-macos-arm64, build-linux]
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6.0.2
 
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6.4.0
         with:
           node-version: 22
 
       - name: Download signed build artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8.0.1
         with:
           path: release-assets
 

@@ -79,7 +79,26 @@ describe("evaluateRealUseReadiness", () => {
 
   it("warns when the app is still configured for manual transcript use", () => {
     const readiness = evaluateRealUseReadiness({
-      config: DEFAULT_APP_CONFIG,
+      config: mergeConfig({
+        audio: {
+          ...DEFAULT_APP_CONFIG.audio,
+          captureMode: "manual",
+          dualStreamEnabled: false,
+          sttMode: "manual"
+        },
+        stt: {
+          ...DEFAULT_APP_CONFIG.stt,
+          selectedMode: "manual"
+        },
+        autoTrigger: {
+          ...DEFAULT_APP_CONFIG.autoTrigger,
+          mode: "manual"
+        },
+        security: {
+          ...DEFAULT_APP_CONFIG.security,
+          localOnlyMode: false
+        }
+      }),
       audioDevices: devices
     });
 
@@ -154,6 +173,10 @@ describe("evaluateRealUseReadiness", () => {
           selectedMode: "google",
           apiKeyStored: false,
           apiKey: ""
+        },
+        security: {
+          ...DEFAULT_APP_CONFIG.security,
+          localOnlyMode: false
         }
       }),
       audioDevices: devices

@@ -33,7 +33,9 @@ test("signed build script can use CI-provided Tauri signing secrets", async () =
   assert.match(script, /\$env:TAURI_SIGNING_PRIVATE_KEY/);
   assert.match(script, /IsNullOrWhiteSpace\(\$env:TAURI_SIGNING_PRIVATE_KEY\)/);
   assert.match(script, /Missing Tauri signing key/);
-  assert.match(script, /npm run tauri build -- --ci --config src-tauri\/tauri\.release\.conf\.json/);
+  assert.match(script, /prepare-whisper-sidecars\.mjs/);
+  assert.match(script, /tauri\.release\.sidecars\.generated\.conf\.json/);
+  assert.match(script, /npm run tauri build -- --ci --config \$BuildConfigPath/);
 });
 
 test("signed build script can inject optional Windows Authenticode signing config", async () => {
@@ -45,6 +47,8 @@ test("signed build script can inject optional Windows Authenticode signing confi
   assert.match(script, /digestAlgorithm/);
   assert.match(script, /timestampUrl/);
   assert.match(script, /tauri\.release\.generated\.conf\.json/);
+  assert.match(script, /--base-config/);
+  assert.match(script, /--output-config/);
 });
 
 test("release workflow imports optional Windows code-signing certificates before building", async () => {
@@ -61,10 +65,13 @@ test("release workflow imports optional Windows code-signing certificates before
 test("release workflow builds macOS and Linux packages before publishing one release", async () => {
   const workflow = await readFile(workflowPath, "utf8");
 
-  assert.match(workflow, /build-macos:/);
+  assert.match(workflow, /build-macos-intel:/);
   assert.match(workflow, /runs-on:\s*macos-15-intel/);
   assert.doesNotMatch(workflow, /runs-on:\s*macos-13/);
-  assert.match(workflow, /npm run tauri build -- --ci --bundles app --config src-tauri\/tauri\.release\.conf\.json/);
+  assert.match(workflow, /build-macos-arm64:/);
+  assert.match(workflow, /runs-on:\s*macos-15/);
+  assert.match(workflow, /npm run sidecars:prepare -- --target current --base-config src-tauri\/tauri\.release\.conf\.json --output-config src-tauri\/target\/tauri\.release\.sidecars\.generated\.conf\.json/);
+  assert.match(workflow, /npm run tauri build -- --ci --bundles app --config src-tauri\/target\/tauri\.release\.sidecars\.generated\.conf\.json/);
   assert.match(workflow, /node scripts\/create-macos-dmg\.mjs/);
   assert.match(workflow, /src-tauri\/target\/release\/bundle\/dmg\/\*\.dmg/);
   assert.match(workflow, /src-tauri\/target\/release\/bundle\/macos\/\*\.app\.tar\.gz/);
@@ -78,8 +85,9 @@ test("release workflow builds macOS and Linux packages before publishing one rel
   assert.match(workflow, /src-tauri\/target\/release\/bundle\/appimage\/\*\.AppImage/);
   assert.match(workflow, /src-tauri\/target\/release\/bundle\/appimage\/\*\.AppImage\.sig/);
   assert.match(workflow, /publish-release:/);
-  assert.match(workflow, /needs:\s*\[build-windows,\s*build-macos,\s*build-linux\]/);
-  assert.match(workflow, /actions\/download-artifact@v4/);
+  assert.match(workflow, /needs:\s*\[build-windows,\s*build-macos-intel,\s*build-macos-arm64,\s*build-linux\]/);
+  assert.match(workflow, /actions\/download-artifact@v8\.0\.1/);
+  assert.doesNotMatch(workflow, /actions\/(?:checkout|setup-node|download-artifact|upload-artifact)@v4/);
   assert.match(workflow, /node scripts\/generate-latest-json\.mjs/);
   assert.match(workflow, /--bundle-dir release-assets/);
   assert.match(workflow, /release-assets\/latest\.json/);
@@ -105,7 +113,7 @@ test("release workflow fails fast when updater signing secrets are missing", asy
   const workflow = await readFile(workflowPath, "utf8");
 
   const validationSteps = [...workflow.matchAll(/Validate release signing secrets/g)];
-  assert.equal(validationSteps.length, 3);
+  assert.equal(validationSteps.length, 4);
   assert.match(workflow, /IsNullOrWhiteSpace\(\$env:TAURI_SIGNING_PRIVATE_KEY\)/);
   assert.match(workflow, /Missing TAURI_SIGNING_PRIVATE_KEY repository secret/);
   assert.match(workflow, /npm run tauri signer generate/);
@@ -142,6 +150,13 @@ test("release workflow contract is part of the release test suite", async () => 
 
   assert.match(packageJson.scripts["test:release"], /release-workflow\.test\.mjs/);
   assert.match(packageJson.scripts["test:release"], /create-macos-dmg\.test\.mjs/);
+  assert.match(packageJson.scripts["test:release"], /prepare-whisper-sidecars\.test\.mjs/);
+  assert.match(packageJson.scripts["test:release"], /obs-stealth-smoke\.test\.mjs/);
+  assert.match(packageJson.scripts["test:release"], /audio-environment-smoke\.test\.mjs/);
+  assert.equal(packageJson.scripts["sidecars:prepare"], "node scripts/prepare-whisper-sidecars.mjs --target current --output-config src-tauri/target/tauri.sidecars.generated.conf.json");
+  assert.equal(packageJson.scripts["sidecars:check"], "node scripts/prepare-whisper-sidecars.mjs --target current --check");
+  assert.equal(packageJson.scripts["obs:smoke"], "node scripts/obs-stealth-smoke.mjs");
+  assert.equal(packageJson.scripts["audio:smoke"], "node scripts/audio-environment-smoke.mjs");
 });
 
 test("package scripts expose repeatable macOS and Windows installer builds", async () => {
@@ -149,11 +164,24 @@ test("package scripts expose repeatable macOS and Windows installer builds", asy
   const readme = await readFile("README.md", "utf8");
   const workflow = await readFile(desktopSmokeWorkflowPath, "utf8");
 
-  assert.equal(packageJson.scripts["tauri:build:mac"], "tauri build --ci --bundles app && node scripts/create-macos-dmg.mjs");
-  assert.equal(packageJson.scripts["tauri:build:windows"], "tauri build --ci --bundles nsis,msi");
+  assert.equal(
+    packageJson.scripts["tauri:build:mac"],
+    "npm run sidecars:prepare && tauri build --ci --bundles app --config src-tauri/target/tauri.sidecars.generated.conf.json && node scripts/create-macos-dmg.mjs"
+  );
+  assert.equal(
+    packageJson.scripts["tauri:build:windows"],
+    "npm run sidecars:prepare && tauri build --ci --bundles nsis,msi --config src-tauri/target/tauri.sidecars.generated.conf.json"
+  );
+  assert.equal(
+    packageJson.scripts["tauri:build:linux"],
+    "npm run sidecars:prepare && tauri build --ci --bundles appimage,deb --config src-tauri/target/tauri.sidecars.generated.conf.json"
+  );
   assert.match(readme, /npm run tauri:build:mac/);
   assert.match(readme, /npm run tauri:build:windows/);
+  assert.match(readme, /npm run tauri:build:linux/);
+  assert.match(readme, /npm run sidecars:prepare/);
   assert.match(workflow, /npm run tauri:build:windows/);
+  assert.match(workflow, /npm run tauri:build:linux/);
 });
 
 test("desktop release version is aligned for v0.1.1", async () => {
@@ -184,17 +212,25 @@ test("desktop package smoke workflow builds macOS and Windows installers without
   assert.match(workflow, /push:/);
   assert.match(workflow, /branches:\s*\[\s*main\s*\]/);
   assert.match(workflow, /build-windows:/);
-  assert.match(workflow, /build-macos:/);
+  assert.match(workflow, /build-macos-intel:/);
+  assert.match(workflow, /build-macos-arm64:/);
+  assert.match(workflow, /build-linux:/);
   assert.match(workflow, /windows-2025-vs2026/);
   assert.doesNotMatch(workflow, /windows-latest/);
   assert.match(workflow, /macos-15-intel/);
+  assert.match(workflow, /macos-15/);
+  assert.match(workflow, /ubuntu-24\.04/);
+  assert.match(workflow, /libwebkit2gtk-4\.1-dev/);
+  assert.match(workflow, /libpipewire-0\.3-dev/);
   assert.doesNotMatch(workflow, /macos-13/);
   assert.match(workflow, /if:\s*\$\{\{\s*github\.event_name == 'workflow_dispatch'\s*\}\}/);
   assert.match(workflow, /npm ci/);
   assert.match(workflow, /npm run test:release/);
   assert.match(workflow, /npm run tauri:build:windows/);
   assert.match(workflow, /npm run tauri:build:mac/);
-  assert.match(workflow, /actions\/upload-artifact@v4/);
+  assert.match(workflow, /npm run tauri:build:linux/);
+  assert.match(workflow, /actions\/upload-artifact@v7\.0\.1/);
+  assert.doesNotMatch(workflow, /actions\/(?:checkout|setup-node|upload-artifact)@v4/);
   assert.doesNotMatch(workflow, /softprops\/action-gh-release/);
   assert.doesNotMatch(workflow, /TAURI_SIGNING_PRIVATE_KEY/);
 });

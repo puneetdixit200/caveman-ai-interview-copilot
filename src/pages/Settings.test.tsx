@@ -109,10 +109,10 @@ describe("Settings", { timeout: 20_000 }, () => {
   it("shows preflight actions for settings that are not interview-ready", async () => {
     render(<Settings />);
 
-    expect(await screen.findByText("Manual audio capture")).toBeInTheDocument();
-    expect(screen.getByText("Manual transcript mode")).toBeInTheDocument();
-    expect(screen.getByText("Manual answer trigger")).toBeInTheDocument();
-    expect(screen.getByText("Switch Audio capture mode to Microphone, System, or Dual before a live call.")).toBeInTheDocument();
+    expect(await screen.findByText("Audio device missing")).toBeInTheDocument();
+    expect(screen.getByText("Local Whisper incomplete")).toBeInTheDocument();
+    expect(screen.getByText("Question automation ready")).toBeInTheDocument();
+    expect(screen.getByText("Set both Whisper binary and ggml model paths, or run Auto Detect Whisper.")).toBeInTheDocument();
   });
 
   it("saves a timestamped real-use preflight report from Settings", async () => {
@@ -124,7 +124,7 @@ describe("Settings", { timeout: 20_000 }, () => {
     const report = localStorage.getItem(PREFLIGHT_REPORT_SETTING_KEY) ?? "";
     expect(report).toContain("# Caveman Preflight Report");
     expect(report).toContain("Overall:");
-    expect(report).toContain("Manual audio capture");
+    expect(report).toContain("Local Whisper incomplete");
     expect(await screen.findByText("Preflight report saved")).toBeInTheDocument();
     expect(screen.getByRole("textbox", { name: "Latest preflight report" })).toHaveValue(report);
   });

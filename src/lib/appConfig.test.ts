@@ -202,21 +202,22 @@ describe("appConfig", () => {
     });
   });
 
-  it("defaults live interview features to safe local-first settings", () => {
+  it("defaults live interview features to commercial local-first settings", () => {
     const config = parseAppConfig(undefined);
 
     expect(config.audio).toMatchObject({
-      captureMode: "manual",
-      dualStreamEnabled: false,
+      captureMode: "dual",
+      dualStreamEnabled: true,
       microphoneDeviceId: "default",
       systemDeviceId: "default",
       applicationTargetId: "all-system-audio",
       applicationTargetLabel: "All system audio",
+      sttMode: "local_whisper",
       gainDb: 0,
       noiseGateDb: -45
     });
     expect(config.stt).toMatchObject({
-      selectedMode: "manual",
+      selectedMode: "local_whisper",
       diarizationEnabled: true,
       language: "auto",
       speakerCalibration: {
@@ -228,7 +229,7 @@ describe("appConfig", () => {
       }
     });
     expect(config.autoTrigger).toMatchObject({
-      mode: "manual",
+      mode: "suggest_on_question",
       silenceTimeoutMs: 1200,
       duplicateWindowMs: 30000,
       requireInterviewerSpeaker: true
@@ -250,7 +251,7 @@ describe("appConfig", () => {
       reviewBeforeSend: true
     });
     expect(config.security).toMatchObject({
-      localOnlyMode: false,
+      localOnlyMode: true,
       captureExclusionEnabled: true,
       blockCloudWhenLocalOnly: true
     });

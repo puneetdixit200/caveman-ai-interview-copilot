@@ -165,8 +165,8 @@ export const DEFAULT_APP_CONFIG: AppConfig = {
     }
   ],
   audio: {
-    captureMode: "manual",
-    dualStreamEnabled: false,
+    captureMode: "dual",
+    dualStreamEnabled: true,
     systemDeviceId: "default",
     microphoneDeviceId: "default",
     virtualDeviceId: "default",
@@ -174,11 +174,11 @@ export const DEFAULT_APP_CONFIG: AppConfig = {
     applicationTargetLabel: "All system audio",
     noiseGateDb: -45,
     gainDb: 0,
-    sttMode: "manual",
+    sttMode: "local_whisper",
     meterSmoothing: 0.35
   },
   stt: {
-    selectedMode: "manual",
+    selectedMode: "local_whisper",
     language: "auto",
     diarizationEnabled: true,
     speakerCalibration: DEFAULT_SPEAKER_CALIBRATION,
@@ -188,7 +188,7 @@ export const DEFAULT_APP_CONFIG: AppConfig = {
     apiKeyStored: false
   },
   autoTrigger: {
-    mode: "manual",
+    mode: "suggest_on_question",
     silenceTimeoutMs: 1200,
     duplicateWindowMs: 30000,
     minQuestionCharacters: 12,
@@ -242,7 +242,7 @@ export const DEFAULT_APP_CONFIG: AppConfig = {
     typeLatestAnswer: DEFAULT_TYPE_LATEST_SHORTCUT
   },
   security: {
-    localOnlyMode: false,
+    localOnlyMode: true,
     captureExclusionEnabled: true,
     blockCloudWhenLocalOnly: true,
     signedUpdatesRequired: false

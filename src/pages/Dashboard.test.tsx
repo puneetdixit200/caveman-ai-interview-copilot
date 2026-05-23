@@ -286,6 +286,24 @@ describe("Dashboard collaboration helper", () => {
   });
 
   it("keeps manual transcript mode active without opening native audio streams", async () => {
+    vi.mocked(tauri.getSetting)
+      .mockResolvedValueOnce(
+        serializeAppConfig({
+          ...DEFAULT_APP_CONFIG,
+          audio: {
+            ...DEFAULT_APP_CONFIG.audio,
+            captureMode: "manual",
+            dualStreamEnabled: false,
+            sttMode: "manual"
+          },
+          stt: {
+            ...DEFAULT_APP_CONFIG.stt,
+            selectedMode: "manual"
+          }
+        })
+      )
+      .mockResolvedValueOnce(undefined)
+      .mockResolvedValueOnce(undefined);
     const user = userEvent.setup();
     render(<Dashboard />);
 
@@ -369,6 +387,20 @@ describe("Dashboard collaboration helper", () => {
       )
       .mockResolvedValueOnce(undefined)
       .mockResolvedValueOnce(undefined);
+    vi.mocked(tauri.startCapture).mockResolvedValueOnce({
+      running: true,
+      systemDeviceId: "default",
+      microphoneDeviceId: "default",
+      applicationTargetId: "all-system-audio",
+      applicationTargetLabel: "All system audio",
+      sampleRateHz: 16000,
+      channels: 1,
+      microphoneLevel: 0,
+      systemLevel: 0,
+      gainDb: 0,
+      noiseGateDb: -45,
+      systemCaptureSupported: true
+    });
     const user = userEvent.setup();
     render(<Dashboard />);
 

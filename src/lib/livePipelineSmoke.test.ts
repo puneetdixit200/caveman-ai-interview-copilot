@@ -96,7 +96,19 @@ describe("runLivePipelineSmokeCheck", () => {
     const startCapture = vi.fn();
 
     const result = await runLivePipelineSmokeCheck({
-      config: DEFAULT_APP_CONFIG,
+      config: {
+        ...DEFAULT_APP_CONFIG,
+        audio: {
+          ...DEFAULT_APP_CONFIG.audio,
+          captureMode: "manual",
+          dualStreamEnabled: false,
+          sttMode: "manual"
+        },
+        stt: {
+          ...DEFAULT_APP_CONFIG.stt,
+          selectedMode: "manual"
+        }
+      },
       deps: {
         startCapture
       }
@@ -150,6 +162,7 @@ function localWhisperConfig(): AppConfig {
     audio: {
       ...DEFAULT_APP_CONFIG.audio,
       captureMode: "microphone",
+      dualStreamEnabled: false,
       microphoneDeviceId: "microphone-default",
       sttMode: "local_whisper"
     },
