@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { chmod, mkdir, mkdtemp, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
@@ -31,37 +31,35 @@ test("resolves current package target from platform and architecture", () => {
 test("verifies macOS app bundle contains the runtime sidecar and a DMG", async () => {
   const tempDir = await mkdtemp(path.join(tmpdir(), "caveman-macos-package-"));
   const releaseDir = path.join(tempDir, "release");
-  await touchFile(
-    path.join(releaseDir, "bundle", "macos", "Caveman.app", "Contents", "MacOS", "caveman-whisper"),
-    "#!/bin/sh\nprintf 'usage: caveman-whisper\\n'\n"
-  );
-  await chmod(
-    path.join(releaseDir, "bundle", "macos", "Caveman.app", "Contents", "MacOS", "caveman-whisper"),
-    0o755
-  );
+  await touchFile(path.join(releaseDir, "bundle", "macos", "Caveman.app", "Contents", "MacOS", "caveman-whisper"));
   await touchFile(path.join(releaseDir, "bundle", "dmg", "Caveman_0.1.1_aarch64.dmg"));
+  const commands = [];
+  const commandRunner = async (command, args) => {
+    commands.push([command, args]);
+    return { stdout: "usage: caveman-whisper" };
+  };
 
-  const result = await verifyMacosPackage({ target: "macos-arm64", releaseDir });
+  const result = await verifyMacosPackage({ target: "macos-arm64", releaseDir, commandRunner });
 
   assert.equal(result.target, "macos-arm64");
+  assert.equal(commands[0][0], path.join(releaseDir, "bundle", "macos", "Caveman.app", "Contents", "MacOS", "caveman-whisper"));
+  assert.deepEqual(commands[0][1], ["--help"]);
   assert.ok(result.checked.some((checkedPath) => checkedPath.endsWith("caveman-whisper")));
 });
 
 test("fails when macOS bundled sidecar cannot launch from inside the app bundle", async () => {
   const tempDir = await mkdtemp(path.join(tmpdir(), "caveman-macos-broken-sidecar-"));
   const releaseDir = path.join(tempDir, "release");
-  await touchFile(
-    path.join(releaseDir, "bundle", "macos", "Caveman.app", "Contents", "MacOS", "caveman-whisper"),
-    "#!/bin/sh\necho 'dyld: Library not loaded: @rpath/libwhisper.1.dylib' >&2\nexit 86\n"
-  );
-  await chmod(
-    path.join(releaseDir, "bundle", "macos", "Caveman.app", "Contents", "MacOS", "caveman-whisper"),
-    0o755
-  );
+  await touchFile(path.join(releaseDir, "bundle", "macos", "Caveman.app", "Contents", "MacOS", "caveman-whisper"));
   await touchFile(path.join(releaseDir, "bundle", "dmg", "Caveman_0.1.1_aarch64.dmg"));
+  const commandRunner = async () => {
+    const error = new Error("sidecar failed");
+    error.stderr = "dyld: Library not loaded: @rpath/libwhisper.1.dylib";
+    throw error;
+  };
 
   await assert.rejects(
-    () => verifyMacosPackage({ target: "macos-arm64", releaseDir }),
+    () => verifyMacosPackage({ target: "macos-arm64", releaseDir, commandRunner }),
     /macOS bundled Whisper sidecar did not launch/
   );
 });
@@ -127,14 +125,14 @@ test("fails when a required package sidecar is missing", async () => {
 test("dispatches by explicit target selector", async () => {
   const tempDir = await mkdtemp(path.join(tmpdir(), "caveman-dispatch-sidecar-"));
   const releaseDir = path.join(tempDir, "release");
-  await touchFile(
-    path.join(releaseDir, "bundle", "macos", "Caveman.app", "Contents", "MacOS", "caveman-whisper"),
-    "#!/bin/sh\nprintf 'usage: caveman-whisper\\n'\n"
-  );
-  await chmod(path.join(releaseDir, "bundle", "macos", "Caveman.app", "Contents", "MacOS", "caveman-whisper"), 0o755);
+  await touchFile(path.join(releaseDir, "bundle", "macos", "Caveman.app", "Contents", "MacOS", "caveman-whisper"));
   await touchFile(path.join(releaseDir, "bundle", "dmg", "Caveman_0.1.1_x64.dmg"));
 
-  const result = await verifyBundledSidecar({ targetSelector: "macos-x64", releaseDir });
+  const result = await verifyBundledSidecar({
+    targetSelector: "macos-x64",
+    releaseDir,
+    commandRunner: async () => ({ stdout: "usage: caveman-whisper" })
+  });
 
   assert.equal(result.target, "macos-x64");
 });
