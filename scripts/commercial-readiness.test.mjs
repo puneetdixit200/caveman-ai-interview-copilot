@@ -3,6 +3,7 @@ import test from "node:test";
 import {
   REQUIRED_ARTIFACTS,
   evaluateArtifactReadiness,
+  evaluateOpenRouterOptionalReadiness,
   evaluateSecretReadiness,
   formatReadinessReport,
   parseGhSecretList
@@ -97,4 +98,33 @@ test("formats a concise readiness report with blocked and ready checks", () => {
   assert.match(report, /Windows Authenticode signing: blocked/);
   assert.match(report, /Redistributable package artifacts: ready/);
   assert.match(report, /Ollama default model: ready/);
+});
+
+test("keeps OpenRouter optional unless a live key is supplied", () => {
+  const withoutKey = evaluateOpenRouterOptionalReadiness({
+    secretNames: [],
+    env: {}
+  });
+  const withRepoSecret = evaluateOpenRouterOptionalReadiness({
+    secretNames: ["OPENROUTER_API_KEY"],
+    env: {}
+  });
+  const withLiveKey = evaluateOpenRouterOptionalReadiness({
+    secretNames: [],
+    env: { OPENROUTER_API_KEY: "sk-or-test" }
+  });
+
+  assert.deepEqual(withoutKey, {
+    id: "openrouter",
+    label: "OpenRouter optional provider",
+    status: "ready",
+    liveKeyAvailable: false,
+    detail: "Optional route is configured; add OPENROUTER_API_KEY to live-test it."
+  });
+  assert.equal(withRepoSecret.status, "ready");
+  assert.equal(withRepoSecret.liveKeyAvailable, false);
+  assert.match(withRepoSecret.detail, /repository secret is configured/);
+  assert.equal(withLiveKey.status, "ready");
+  assert.equal(withLiveKey.liveKeyAvailable, true);
+  assert.match(withLiveKey.detail, /live smoke will run/);
 });

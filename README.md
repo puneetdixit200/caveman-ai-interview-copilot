@@ -154,6 +154,12 @@ Verify the configured local Ollama model is installed and can answer locally:
 npm run ai:smoke
 ```
 
+Live-test the optional OpenRouter route after exporting `OPENROUTER_API_KEY`:
+
+```powershell
+npm run ai:smoke:openrouter
+```
+
 Audit commercial release readiness against signing secrets, package artifacts, Ollama, OBS, and audio:
 
 ```powershell

@@ -7,6 +7,7 @@ import { promisify } from "node:util";
 import { runAudioEnvironmentSmoke } from "./audio-environment-smoke.mjs";
 import { runObsStealthSmoke } from "./obs-stealth-smoke.mjs";
 import { runOllamaSmoke } from "./ollama-smoke.mjs";
+import { runOpenRouterSmoke } from "./openrouter-smoke.mjs";
 
 const execFileAsync = promisify(execFile);
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -175,6 +176,37 @@ export function evaluateArtifactReadiness(files) {
   };
 }
 
+export function evaluateOpenRouterOptionalReadiness({ secretNames = [], env = process.env } = {}) {
+  const hasLiveKey = typeof env.OPENROUTER_API_KEY === "string" && env.OPENROUTER_API_KEY.trim().length > 0;
+  if (hasLiveKey) {
+    return {
+      id: "openrouter",
+      label: "OpenRouter optional provider",
+      status: "ready",
+      liveKeyAvailable: true,
+      detail: "OPENROUTER_API_KEY is available; live smoke will run."
+    };
+  }
+
+  if (secretNames.includes("OPENROUTER_API_KEY")) {
+    return {
+      id: "openrouter",
+      label: "OpenRouter optional provider",
+      status: "ready",
+      liveKeyAvailable: false,
+      detail: "OPENROUTER_API_KEY repository secret is configured; export it locally to live-test this optional route."
+    };
+  }
+
+  return {
+    id: "openrouter",
+    label: "OpenRouter optional provider",
+    status: "ready",
+    liveKeyAvailable: false,
+    detail: "Optional route is configured; add OPENROUTER_API_KEY to live-test it."
+  };
+}
+
 export function formatReadinessReport({ secretReadiness, artifactReadiness, liveChecks }) {
   const checks = [
     ...secretReadiness.checks,
@@ -214,7 +246,7 @@ export async function runCommercialReadiness({
   const artifactReadiness = evaluateArtifactReadiness(files);
   const resolvedSecretNames = secretNames ?? (await listGitHubSecretNames());
   const secretReadiness = evaluateSecretReadiness(resolvedSecretNames);
-  const liveChecks = skipLive ? skippedLiveChecks() : await runLiveChecks();
+  const liveChecks = skipLive ? skippedLiveChecks() : await runLiveChecks({ secretNames: resolvedSecretNames });
 
   return {
     artifactDir: resolvedArtifactDir,
@@ -239,7 +271,7 @@ async function listGitHubSecretNames() {
   return parseGhSecretList(stdout);
 }
 
-async function runLiveChecks() {
+async function runLiveChecks({ secretNames = [] } = {}) {
   const results = [];
   results.push(await captureLiveCheck("ollama", "Ollama default model", async () => {
     const result = await runOllamaSmoke();
@@ -248,6 +280,18 @@ async function runLiveChecks() {
       detail: `${result.model} answered locally. Installed models: ${result.installedModels.join(", ")}.`
     };
   }));
+  const openRouterReadiness = evaluateOpenRouterOptionalReadiness({ secretNames });
+  if (openRouterReadiness.liveKeyAvailable) {
+    results.push(await captureLiveCheck("openrouter", "OpenRouter optional provider", async () => {
+      const result = await runOpenRouterSmoke();
+      return {
+        status: "ready",
+        detail: `${result.model} answered through OpenRouter. Available models seen: ${result.availableModels.length}.`
+      };
+    }));
+  } else {
+    results.push(openRouterReadiness);
+  }
   results.push(await captureLiveCheck("obs", "OBS screen-share stealth validation", async () => {
     const result = await runObsStealthSmoke();
     return {
@@ -281,6 +325,7 @@ async function captureLiveCheck(id, label, callback) {
 function skippedLiveChecks() {
   return [
     { id: "ollama", label: "Ollama default model", status: "skipped", detail: "Live check skipped by flag." },
+    { id: "openrouter", label: "OpenRouter optional provider", status: "skipped", detail: "Live check skipped by flag." },
     { id: "obs", label: "OBS screen-share stealth validation", status: "skipped", detail: "Live check skipped by flag." },
     { id: "audio", label: "Audio test environment", status: "skipped", detail: "Live check skipped by flag." }
   ];
