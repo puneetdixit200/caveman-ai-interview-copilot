@@ -94,7 +94,7 @@ describe("Settings", { timeout: 20_000 }, () => {
     render(<Settings />);
 
     expect(await screen.findByText("Real-Use Readiness")).toBeInTheDocument();
-    expect(screen.getByText("Runtime Budget")).toBeInTheDocument();
+    expect(screen.getByText("Checks")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Refresh Runtime Budget" })).toBeInTheDocument();
     expect(await screen.findByText("Audio And STT")).toBeInTheDocument();
     expect(screen.getByText("Automatic Answering")).toBeInTheDocument();
@@ -397,7 +397,6 @@ describe("Settings", { timeout: 20_000 }, () => {
   });
 
   it("saves and applies a reusable interview profile", async () => {
-    const user = userEvent.setup();
     render(<Settings />);
 
     fireEvent.change(await screen.findByLabelText("Primary provider"), { target: { value: "openrouter" } });
@@ -407,12 +406,12 @@ describe("Settings", { timeout: 20_000 }, () => {
     fireEvent.change(screen.getByRole("textbox", { name: "Profile name" }), {
       target: { value: "System Design Profile" }
     });
-    await user.click(screen.getByRole("button", { name: "Save Profile" }));
+    fireEvent.click(screen.getByRole("button", { name: "Save Profile" }));
     fireEvent.change(screen.getByLabelText("Primary provider"), { target: { value: "ollama" } });
 
-    await user.click(await screen.findByRole("button", { name: "Apply Profile" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Apply Profile" }));
 
-    expect(screen.getByLabelText("Primary provider")).toHaveValue("openrouter");
+    await waitFor(() => expect(screen.getByLabelText("Primary provider")).toHaveValue("openrouter"));
     expect(screen.getByRole("textbox", { name: "Generate answer hotkey" })).toHaveValue("Ctrl+Alt+G");
   });
 

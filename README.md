@@ -146,6 +146,12 @@ cd src-tauri
 cargo test
 ```
 
+Verify the configured local Ollama model is installed and can answer locally:
+
+```powershell
+npm run ai:smoke
+```
+
 Prepare the current platform's bundled Whisper sidecar and generated Tauri config:
 
 ```powershell

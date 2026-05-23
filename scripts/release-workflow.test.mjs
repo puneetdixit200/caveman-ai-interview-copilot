@@ -202,11 +202,13 @@ test("release workflow contract is part of the release test suite", async () => 
   assert.match(packageJson.scripts["test:release"], /create-macos-dmg\.test\.mjs/);
   assert.match(packageJson.scripts["test:release"], /prepare-whisper-sidecars\.test\.mjs/);
   assert.match(packageJson.scripts["test:release"], /verify-bundled-sidecar\.test\.mjs/);
+  assert.match(packageJson.scripts["test:release"], /ollama-smoke\.test\.mjs/);
   assert.match(packageJson.scripts["test:release"], /obs-stealth-smoke\.test\.mjs/);
   assert.match(packageJson.scripts["test:release"], /audio-environment-smoke\.test\.mjs/);
   assert.equal(packageJson.scripts["sidecars:prepare"], "node scripts/prepare-whisper-sidecars.mjs --target current --output-config src-tauri/target/tauri.sidecars.generated.conf.json");
   assert.equal(packageJson.scripts["sidecars:check"], "node scripts/prepare-whisper-sidecars.mjs --target current --check");
   assert.equal(packageJson.scripts["package:verify-sidecar"], "node scripts/verify-bundled-sidecar.mjs --target current");
+  assert.equal(packageJson.scripts["ai:smoke"], "node scripts/ollama-smoke.mjs");
   assert.equal(packageJson.scripts["obs:smoke"], "node scripts/obs-stealth-smoke.mjs");
   assert.equal(packageJson.scripts["audio:smoke"], "node scripts/audio-environment-smoke.mjs");
 });
