@@ -6,7 +6,8 @@ import {
   evaluateOpenRouterOptionalReadiness,
   evaluateSecretReadiness,
   formatReadinessReport,
-  parseGhSecretList
+  parseGhSecretList,
+  skippedLiveChecks
 } from "./commercial-readiness.mjs";
 
 const completeSecrets = [
@@ -91,12 +92,16 @@ test("formats a concise readiness report with blocked and ready checks", () => {
   const report = formatReadinessReport({
     secretReadiness: evaluateSecretReadiness(["TAURI_SIGNING_PRIVATE_KEY"]),
     artifactReadiness: evaluateArtifactReadiness(REQUIRED_ARTIFACTS.map((artifact) => artifact.examplePath)),
-    liveChecks: [{ id: "ollama", label: "Ollama default model", status: "ready", detail: "llama3.1:8b answered." }]
+    liveChecks: [
+      { id: "local-whisper", label: "Local Whisper STT smoke", status: "ready", detail: "Hello World." },
+      { id: "ollama", label: "Ollama default model", status: "ready", detail: "llama3.1:8b answered." }
+    ]
   });
 
   assert.match(report, /^BLOCKED/m);
   assert.match(report, /Windows Authenticode signing: blocked/);
   assert.match(report, /Redistributable package artifacts: ready/);
+  assert.match(report, /Local Whisper STT smoke: ready/);
   assert.match(report, /Ollama default model: ready/);
 });
 
@@ -127,4 +132,11 @@ test("keeps OpenRouter optional unless a live key is supplied", () => {
   assert.equal(withLiveKey.status, "ready");
   assert.equal(withLiveKey.liveKeyAvailable, true);
   assert.match(withLiveKey.detail, /live smoke will run/);
+});
+
+test("skip-live mode still reports the local Whisper STT check as skipped", () => {
+  assert.deepEqual(
+    skippedLiveChecks().map((check) => check.id),
+    ["local-whisper", "ollama", "openrouter", "obs", "audio"]
+  );
 });

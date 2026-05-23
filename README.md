@@ -156,6 +156,12 @@ Verify the configured local Ollama model is installed and can answer locally:
 npm run ai:smoke
 ```
 
+Verify the bundled local Whisper sidecar can load the downloaded model and transcribe generated speech:
+
+```bash
+npm run stt:smoke:local
+```
+
 Live-test the optional OpenRouter route after exporting `OPENROUTER_API_KEY`:
 
 ```powershell

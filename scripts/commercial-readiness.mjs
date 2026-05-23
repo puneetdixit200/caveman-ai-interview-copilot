@@ -5,6 +5,7 @@ import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { promisify } from "node:util";
 import { runAudioEnvironmentSmoke } from "./audio-environment-smoke.mjs";
+import { runLocalWhisperSmoke } from "./local-whisper-smoke.mjs";
 import { runObsStealthSmoke } from "./obs-stealth-smoke.mjs";
 import { runOllamaSmoke } from "./ollama-smoke.mjs";
 import { runOpenRouterSmoke } from "./openrouter-smoke.mjs";
@@ -273,6 +274,13 @@ async function listGitHubSecretNames() {
 
 async function runLiveChecks({ secretNames = [] } = {}) {
   const results = [];
+  results.push(await captureLiveCheck("local-whisper", "Local Whisper STT smoke", async () => {
+    const result = await runLocalWhisperSmoke();
+    return {
+      status: result.status,
+      detail: result.detail
+    };
+  }));
   results.push(await captureLiveCheck("ollama", "Ollama default model", async () => {
     const result = await runOllamaSmoke();
     return {
@@ -322,8 +330,9 @@ async function captureLiveCheck(id, label, callback) {
   }
 }
 
-function skippedLiveChecks() {
+export function skippedLiveChecks() {
   return [
+    { id: "local-whisper", label: "Local Whisper STT smoke", status: "skipped", detail: "Live check skipped by flag." },
     { id: "ollama", label: "Ollama default model", status: "skipped", detail: "Live check skipped by flag." },
     { id: "openrouter", label: "OpenRouter optional provider", status: "skipped", detail: "Live check skipped by flag." },
     { id: "obs", label: "OBS screen-share stealth validation", status: "skipped", detail: "Live check skipped by flag." },
