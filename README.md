@@ -87,6 +87,8 @@ Windows Authenticode signing is required for redistributable commercial Windows 
 
 macOS release jobs expect Apple Developer signing and notarization secrets before they publish signed updater archives. Add `APPLE_CERTIFICATE`, `APPLE_CERTIFICATE_PASSWORD`, `APPLE_SIGNING_IDENTITY`, and `KEYCHAIN_PASSWORD` for certificate import. For notarization, either add Apple ID credentials with `APPLE_ID`, `APPLE_PASSWORD`, and `APPLE_TEAM_ID`, or use App Store Connect API credentials with `APPLE_API_ISSUER`, `APPLE_API_KEY`, and `APPLE_API_PRIVATE_KEY_BASE64`. The macOS bundle includes audio privacy usage descriptions for microphone and system-audio capture.
 
+Run `npm run commercial:check` after downloading package smoke artifacts to audit the current commercial release state. It checks configured GitHub secret names, the downloaded Windows/macOS/Linux redistributable artifacts, the default local Ollama model, OBS screen-share stealth validation, and the local audio test environment.
+
 ### Bundled Local Whisper Sidecars
 
 Packaging commands call `npm run sidecars:prepare` before Tauri builds. The sidecar script pins whisper.cpp `v1.8.4`, downloads the official Windows x64 archive, builds macOS/Linux sidecars from the same tag on their native runners, and writes a generated Tauri config at `src-tauri/target/tauri.sidecars.generated.conf.json` or `src-tauri/target/tauri.release.sidecars.generated.conf.json`.
@@ -150,6 +152,12 @@ Verify the configured local Ollama model is installed and can answer locally:
 
 ```powershell
 npm run ai:smoke
+```
+
+Audit commercial release readiness against signing secrets, package artifacts, Ollama, OBS, and audio:
+
+```powershell
+npm run commercial:check
 ```
 
 Prepare the current platform's bundled Whisper sidecar and generated Tauri config:
