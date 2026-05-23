@@ -204,6 +204,7 @@ test("release workflow contract is part of the release test suite", async () => 
   assert.match(packageJson.scripts["test:release"], /verify-bundled-sidecar\.test\.mjs/);
   assert.match(packageJson.scripts["test:release"], /ollama-smoke\.test\.mjs/);
   assert.match(packageJson.scripts["test:release"], /openrouter-smoke\.test\.mjs/);
+  assert.match(packageJson.scripts["test:release"], /configure-commercial-secrets\.test\.mjs/);
   assert.match(packageJson.scripts["test:release"], /obs-stealth-smoke\.test\.mjs/);
   assert.match(packageJson.scripts["test:release"], /audio-environment-smoke\.test\.mjs/);
   assert.match(packageJson.scripts["test:release"], /commercial-readiness\.test\.mjs/);
@@ -215,6 +216,7 @@ test("release workflow contract is part of the release test suite", async () => 
   assert.equal(packageJson.scripts["obs:smoke"], "node scripts/obs-stealth-smoke.mjs");
   assert.equal(packageJson.scripts["audio:smoke"], "node scripts/audio-environment-smoke.mjs");
   assert.equal(packageJson.scripts["commercial:check"], "node scripts/commercial-readiness.mjs");
+  assert.equal(packageJson.scripts["commercial:secrets"], "node scripts/configure-commercial-secrets.mjs");
 });
 
 test("package scripts expose repeatable macOS and Windows installer builds", async () => {

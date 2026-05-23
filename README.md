@@ -89,6 +89,8 @@ macOS release jobs expect Apple Developer signing and notarization secrets befor
 
 Run `npm run commercial:check` after downloading package smoke artifacts to audit the current commercial release state. It checks configured GitHub secret names, the downloaded Windows/macOS/Linux redistributable artifacts, the default local Ollama model, OBS screen-share stealth validation, and the local audio test environment.
 
+Use `npm run commercial:secrets -- --from-env --apply` to install commercial release secrets after placing certificate paths and passwords in the environment. The helper base64-encodes certificate files, validates that Windows signing, Apple signing, and one Apple notarization credential set are complete, and passes secret values to `gh secret set` over stdin. Without `--apply`, it performs a dry run and prints only secret names.
+
 ### Bundled Local Whisper Sidecars
 
 Packaging commands call `npm run sidecars:prepare` before Tauri builds. The sidecar script pins whisper.cpp `v1.8.4`, downloads the official Windows x64 archive, builds macOS/Linux sidecars from the same tag on their native runners, and writes a generated Tauri config at `src-tauri/target/tauri.sidecars.generated.conf.json` or `src-tauri/target/tauri.release.sidecars.generated.conf.json`.
@@ -164,6 +166,12 @@ Audit commercial release readiness against signing secrets, package artifacts, O
 
 ```powershell
 npm run commercial:check
+```
+
+Validate and optionally store commercial signing secrets from environment variables:
+
+```powershell
+npm run commercial:secrets -- --from-env
 ```
 
 Prepare the current platform's bundled Whisper sidecar and generated Tauri config:
