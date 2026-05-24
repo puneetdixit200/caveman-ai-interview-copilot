@@ -226,6 +226,7 @@ test("release workflow contract is part of the release test suite", async () => 
   assert.match(packageJson.scripts["test:release"], /ollama-smoke\.test\.mjs/);
   assert.match(packageJson.scripts["test:release"], /openrouter-smoke\.test\.mjs/);
   assert.match(packageJson.scripts["test:release"], /configure-commercial-secrets\.test\.mjs/);
+  assert.match(packageJson.scripts["test:release"], /dispatch-signed-release\.test\.mjs/);
   assert.match(packageJson.scripts["test:release"], /notarize-macos-dmg\.test\.mjs/);
   assert.match(packageJson.scripts["test:release"], /obs-stealth-smoke\.test\.mjs/);
   assert.match(packageJson.scripts["test:release"], /audio-environment-smoke\.test\.mjs/);
@@ -239,6 +240,7 @@ test("release workflow contract is part of the release test suite", async () => 
   assert.equal(packageJson.scripts["audio:smoke"], "node scripts/audio-environment-smoke.mjs");
   assert.equal(packageJson.scripts["commercial:check"], "node scripts/commercial-readiness.mjs");
   assert.equal(packageJson.scripts["commercial:secrets"], "node scripts/configure-commercial-secrets.mjs");
+  assert.equal(packageJson.scripts["release:dispatch"], "node scripts/dispatch-signed-release.mjs");
 });
 
 test("package scripts expose repeatable macOS and Windows installer builds", async () => {
@@ -262,6 +264,7 @@ test("package scripts expose repeatable macOS and Windows installer builds", asy
   assert.match(readme, /npm run tauri:build:windows/);
   assert.match(readme, /npm run tauri:build:linux/);
   assert.match(readme, /npm run sidecars:prepare/);
+  assert.match(readme, /npm run release:dispatch -- --tag v0\.1\.1/);
   assert.match(workflow, /npm run tauri:build:windows/);
   assert.match(workflow, /npm run tauri:build:linux/);
 });

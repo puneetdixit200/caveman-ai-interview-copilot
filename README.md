@@ -98,6 +98,13 @@ npm run commercial:secrets -- --env-file /absolute/path/to/commercial-release.en
 npm run commercial:secrets -- --env-file /absolute/path/to/commercial-release.env --apply
 ```
 
+After `npm run commercial:check` reports all signing checks ready, dry-run the signed release dispatch and then launch the workflow:
+
+```bash
+npm run release:dispatch -- --tag v0.1.1 --release-notes "Caveman v0.1.1 signed desktop update."
+npm run release:dispatch -- --tag v0.1.1 --release-notes "Caveman v0.1.1 signed desktop update." --apply
+```
+
 ### Bundled Local Whisper Sidecars
 
 Packaging commands call `npm run sidecars:prepare` before Tauri builds. The sidecar script pins whisper.cpp `v1.8.4`, downloads the official Windows x64 archive, builds macOS/Linux sidecars from the same tag on their native runners, and writes a generated Tauri config at `src-tauri/target/tauri.sidecars.generated.conf.json` or `src-tauri/target/tauri.release.sidecars.generated.conf.json`.
@@ -191,6 +198,12 @@ Validate and optionally store commercial signing secrets from a private env file
 
 ```bash
 npm run commercial:secrets -- --env-file /absolute/path/to/commercial-release.env
+```
+
+Dry-run the signed GitHub Release workflow after secrets are configured:
+
+```bash
+npm run release:dispatch -- --tag v0.1.1
 ```
 
 Prepare the current platform's bundled Whisper sidecar and generated Tauri config:
