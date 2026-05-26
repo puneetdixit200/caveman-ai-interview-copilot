@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { DEFAULT_APP_CONFIG, serializeAppConfig } from "../lib/appConfig";
 import * as tauri from "../lib/tauri";
+import { useOverlayStore } from "../stores/overlayStore";
 import { Dashboard } from "./Dashboard";
 
 const ttsMocks = vi.hoisted(() => ({
@@ -436,6 +437,56 @@ describe("Dashboard collaboration helper", () => {
     expect(await screen.findByText("Live Interview Session")).toBeInTheDocument();
     await waitFor(() => expect(tauri.setOverlayWindowVisible).toHaveBeenCalledWith(false, true));
     await waitFor(() => expect(tauri.setCompanionWindowsVisible).toHaveBeenCalledWith(false, true));
+  });
+
+  it("does not show the overlay when manual show finds an active screen share", async () => {
+    useOverlayStore.setState({ visible: false });
+    vi.mocked(tauri.getSetting)
+      .mockResolvedValueOnce(
+        serializeAppConfig({
+          ...DEFAULT_APP_CONFIG,
+          overlay: {
+            ...DEFAULT_APP_CONFIG.overlay,
+            autoHideOnScreenShare: true
+          }
+        })
+      )
+      .mockResolvedValueOnce(undefined)
+      .mockResolvedValueOnce(undefined);
+    vi.mocked(tauri.protectOverlayWindow).mockResolvedValue({
+      alwaysOnTop: true,
+      skipTaskbar: true,
+      captureExclusion: "enabled",
+      clickThrough: true,
+      visible: false
+    });
+    vi.mocked(tauri.detectScreenShareStatus)
+      .mockResolvedValueOnce({
+        active: false,
+        matchedProcesses: []
+      })
+      .mockResolvedValueOnce({
+        active: true,
+        matchedProcesses: [{ name: "Google Meet", pid: 9001 }]
+      });
+    const user = userEvent.setup();
+
+    render(<Dashboard />);
+
+    expect(await screen.findByText("Live Interview Session")).toBeInTheDocument();
+    await waitFor(() => expect(tauri.detectScreenShareStatus).toHaveBeenCalledTimes(1));
+    vi.mocked(tauri.setOverlayWindowVisible).mockClear();
+    vi.mocked(tauri.setCompanionWindowsVisible).mockClear();
+
+    await user.click(screen.getByRole("button", { name: "Show Overlay" }));
+
+    await waitFor(() => expect(tauri.detectScreenShareStatus).toHaveBeenCalledTimes(2));
+    expect(tauri.setOverlayWindowVisible).not.toHaveBeenCalledWith(true, true);
+    expect(tauri.setOverlayWindowVisible).toHaveBeenCalledWith(false, true);
+    expect(tauri.setCompanionWindowsVisible).toHaveBeenCalledWith(false, true);
+    expect(
+      await screen.findByText("Overlay hidden because screen sharing process is running: Google Meet.")
+    ).toBeInTheDocument();
   });
 
   it("auto-hides the overlay when screen sharing detection fails closed", async () => {

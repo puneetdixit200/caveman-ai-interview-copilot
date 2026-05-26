@@ -172,27 +172,26 @@ export function Dashboard() {
     async (nextVisible: boolean) => {
       if (nextVisible) {
         await setOverlayWindowBounds(config.overlay.bounds, config.security.captureExclusionEnabled);
+        const status = await protectOverlayWindow(config.security.captureExclusionEnabled);
+        const guardStatus = await detectScreenShareStatusFailClosed();
+        setScreenShareStatus(guardStatus);
+
+        if (
+          shouldHideForPrivacyShield({
+            captureExclusion: status.captureExclusion,
+            screenShareDetected: guardStatus.active
+          })
+        ) {
+          const hiddenStatus = await setOverlayWindowVisible(false, config.security.captureExclusionEnabled);
+          await setCompanionWindowsVisible(false, config.security.captureExclusionEnabled);
+          setOverlayProtection(hiddenStatus);
+          setOverlayMessage(overlayAutoHideMessage(guardStatus));
+          setVisible(false);
+          return;
+        }
       }
       setVisible(nextVisible);
       const status = await setOverlayWindowVisible(nextVisible, config.security.captureExclusionEnabled);
-      const guardStatus = nextVisible ? await detectScreenShareStatusFailClosed() : null;
-      if (guardStatus) {
-        setScreenShareStatus(guardStatus);
-      }
-      if (
-        nextVisible &&
-        shouldHideForPrivacyShield({
-          captureExclusion: status.captureExclusion,
-          screenShareDetected: guardStatus?.active ?? false
-        })
-      ) {
-        const hiddenStatus = await setOverlayWindowVisible(false, config.security.captureExclusionEnabled);
-        await setCompanionWindowsVisible(false, config.security.captureExclusionEnabled);
-        setOverlayProtection(hiddenStatus);
-        setOverlayMessage(overlayAutoHideMessage(guardStatus));
-        setVisible(false);
-        return;
-      }
 
       if (nextVisible) {
         await setCompanionWindowsVisible(true, config.security.captureExclusionEnabled);
