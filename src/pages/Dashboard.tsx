@@ -56,6 +56,7 @@ import {
   protectOverlayWindow,
   publishCollaborationSnapshot,
   startCollaborationServer,
+  setCompanionWindowsVisible,
   setOverlayWindowBounds,
   setOverlayWindowVisible,
   startCapture,
@@ -186,12 +187,16 @@ export function Dashboard() {
         })
       ) {
         const hiddenStatus = await setOverlayWindowVisible(false, config.security.captureExclusionEnabled);
+        await setCompanionWindowsVisible(false, config.security.captureExclusionEnabled);
         setOverlayProtection(hiddenStatus);
         setOverlayMessage(overlayAutoHideMessage(guardStatus));
         setVisible(false);
         return;
       }
 
+      if (nextVisible) {
+        await setCompanionWindowsVisible(true, config.security.captureExclusionEnabled);
+      }
       setOverlayProtection(status);
       setOverlayMessage(status.message ?? (nextVisible ? "Overlay shown" : "Overlay hidden"));
 
@@ -349,6 +354,7 @@ export function Dashboard() {
         })
       ) {
         const hiddenStatus = await setOverlayWindowVisible(false, config.security.captureExclusionEnabled);
+        await setCompanionWindowsVisible(false, config.security.captureExclusionEnabled);
         if (!cancelled) {
           setOverlayProtection(hiddenStatus);
           setOverlayMessage(overlayAutoHideMessage(guardStatus));
@@ -357,6 +363,10 @@ export function Dashboard() {
         return;
       }
 
+      await setCompanionWindowsVisible(true, config.security.captureExclusionEnabled);
+      if (cancelled) {
+        return;
+      }
       setOverlayProtection(status);
       setOverlayMessage(status.message ?? null);
       if (isRunningInTauri()) {

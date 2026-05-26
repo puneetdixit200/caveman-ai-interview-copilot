@@ -440,6 +440,19 @@ pub fn set_overlay_window_visible(
 }
 
 #[tauri::command]
+pub fn set_companion_windows_visible(
+    app_handle: AppHandle,
+    visible: bool,
+    capture_exclusion_enabled: Option<bool>,
+) -> OverlayProtectionStatus {
+    crate::overlay::set_companion_windows_visible(
+        &app_handle,
+        visible,
+        capture_exclusion_enabled.unwrap_or(true),
+    )
+}
+
+#[tauri::command]
 pub fn get_overlay_window_bounds(app_handle: AppHandle) -> Result<OverlayWindowBounds, String> {
     crate::overlay::get_overlay_window_bounds(&app_handle).map_err(to_command_error)
 }

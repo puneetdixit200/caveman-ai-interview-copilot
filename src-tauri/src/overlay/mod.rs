@@ -32,6 +32,10 @@ pub fn is_overlay_window_label(label: &str) -> bool {
     label == "overlay"
 }
 
+pub fn is_companion_window_label(label: &str) -> bool {
+    !is_overlay_window_label(label)
+}
+
 pub fn configure_overlay_security(app: &mut tauri::App) {
     use tauri::Manager;
 
@@ -154,13 +158,10 @@ fn apply_capture_exclusion_to_companion_windows(
     use tauri::Manager;
 
     let mut failures = Vec::new();
-    let mut missing_required_windows = protected_window_labels()
-        .into_iter()
-        .filter(|label| !is_overlay_window_label(label))
-        .collect::<Vec<_>>();
+    let mut missing_required_windows = required_companion_window_labels();
 
     for (label, window) in app.webview_windows() {
-        if is_overlay_window_label(&label) {
+        if !is_companion_window_label(&label) {
             continue;
         }
 
@@ -186,6 +187,66 @@ fn apply_capture_exclusion_to_companion_windows(
     } else {
         Some(failures.join(" "))
     }
+}
+
+pub fn set_companion_windows_visible(
+    app: &tauri::AppHandle,
+    visible: bool,
+    capture_exclusion_enabled: bool,
+) -> OverlayProtectionStatus {
+    use tauri::Manager;
+
+    let mut failures = Vec::new();
+    let mut missing_required_windows = required_companion_window_labels();
+
+    for (label, window) in app.webview_windows() {
+        if !is_companion_window_label(&label) {
+            continue;
+        }
+
+        missing_required_windows.retain(|required| *required != label.as_str());
+
+        let protection = apply_capture_exclusion(&window, capture_exclusion_enabled);
+        if protection.capture_exclusion == "failed" {
+            failures.push(format!(
+                "{label} window capture exclusion failed: {}",
+                protection
+                    .message
+                    .unwrap_or_else(|| "unknown error".to_string())
+            ));
+        }
+
+        let visibility_result = if visible {
+            window.show()
+        } else {
+            window.hide()
+        };
+        if let Err(error) = visibility_result {
+            failures.push(format!("{label} window visibility update failed: {error}"));
+        }
+    }
+
+    for label in missing_required_windows {
+        failures.push(format!("{label} window was not found."));
+    }
+
+    if !failures.is_empty() {
+        return capture_exclusion_failed_status(visible, failures.join(" "));
+    }
+
+    let mut status = if capture_exclusion_enabled {
+        capture_exclusion_enabled_status(visible)
+    } else {
+        capture_exclusion_disabled_status(visible)
+    };
+    status.always_on_top = false;
+    status.skip_taskbar = false;
+    status.click_through = false;
+    if !visible {
+        status.message =
+            Some("Companion app windows hidden because screen-share risk is active.".to_string());
+    }
+    status
 }
 
 pub fn set_overlay_window_visible(
@@ -221,13 +282,20 @@ pub fn set_overlay_window_visible(
     status
 }
 
+fn required_companion_window_labels() -> Vec<&'static str> {
+    protected_window_labels()
+        .into_iter()
+        .filter(|label| is_companion_window_label(label))
+        .collect::<Vec<_>>()
+}
+
 #[cfg(target_os = "windows")]
 fn apply_capture_exclusion(
     window: &tauri::WebviewWindow,
     capture_exclusion_enabled: bool,
 ) -> OverlayProtectionStatus {
     use windows::Win32::UI::WindowsAndMessaging::{
-        SetWindowDisplayAffinity, WDA_EXCLUDEFROMCAPTURE, WDA_NONE,
+        SetWindowDisplayAffinity, WDA_EXCLUDEFROMCAPTURE, WDA_MONITOR, WDA_NONE,
     };
 
     match window.hwnd() {
@@ -243,18 +311,42 @@ fn apply_capture_exclusion(
                 return status;
             }
 
-            let ok = unsafe { SetWindowDisplayAffinity(hwnd, WDA_EXCLUDEFROMCAPTURE) }.is_ok();
-            if ok {
-                capture_exclusion_enabled_status(false)
-            } else {
-                capture_exclusion_failed_status(
-                    false,
-                    "Windows rejected SetWindowDisplayAffinity.".to_string(),
-                )
+            let exclude_from_capture_ok =
+                unsafe { SetWindowDisplayAffinity(hwnd, WDA_EXCLUDEFROMCAPTURE) }.is_ok();
+            if exclude_from_capture_ok {
+                return windows_capture_exclusion_status(false, true, false);
             }
+
+            let monitor_fallback_ok =
+                unsafe { SetWindowDisplayAffinity(hwnd, WDA_MONITOR) }.is_ok();
+            windows_capture_exclusion_status(false, false, monitor_fallback_ok)
         }
         Err(error) => capture_exclusion_failed_status(false, error.to_string()),
     }
+}
+
+pub fn windows_capture_exclusion_status(
+    visible: bool,
+    exclude_from_capture_ok: bool,
+    monitor_fallback_ok: bool,
+) -> OverlayProtectionStatus {
+    if exclude_from_capture_ok {
+        return capture_exclusion_enabled_status(visible);
+    }
+
+    if monitor_fallback_ok {
+        let mut status = capture_exclusion_enabled_status(visible);
+        status.message = Some(
+            "Windows applied legacy WDA_MONITOR fallback; screen captures should blank the window instead of showing content."
+                .to_string(),
+        );
+        return status;
+    }
+
+    capture_exclusion_failed_status(
+        visible,
+        "Windows rejected WDA_EXCLUDEFROMCAPTURE and legacy WDA_MONITOR fallback.".to_string(),
+    )
 }
 
 #[cfg(target_os = "macos")]

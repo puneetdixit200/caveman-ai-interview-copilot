@@ -76,6 +76,7 @@ pub fn run() {
             commands::transcribe_with_cloud_stt,
             commands::protect_overlay_window,
             commands::set_overlay_window_visible,
+            commands::set_companion_windows_visible,
             commands::get_overlay_window_bounds,
             commands::set_overlay_window_bounds,
             commands::detect_screen_share_status,

@@ -1,7 +1,8 @@
 use super::{
     capture_exclusion_disabled_status, capture_exclusion_enabled_status,
-    capture_exclusion_unavailable_status, is_overlay_window_label, protected_window_labels,
-    sanitize_overlay_bounds, OverlayProtectionStatus, OverlayWindowBounds,
+    capture_exclusion_unavailable_status, is_companion_window_label, is_overlay_window_label,
+    protected_window_labels, sanitize_overlay_bounds, windows_capture_exclusion_status,
+    OverlayProtectionStatus, OverlayWindowBounds,
 };
 
 #[test]
@@ -74,4 +75,22 @@ fn applies_overlay_specific_chrome_only_to_overlay_window() {
     assert!(is_overlay_window_label("overlay"));
     assert!(!is_overlay_window_label("main"));
     assert!(!is_overlay_window_label("settings"));
+}
+
+#[test]
+fn treats_every_non_overlay_window_as_sensitive_companion_window() {
+    assert!(is_companion_window_label("main"));
+    assert!(is_companion_window_label("settings"));
+    assert!(!is_companion_window_label("overlay"));
+}
+
+#[test]
+fn reports_enabled_capture_exclusion_when_windows_uses_legacy_monitor_fallback() {
+    let status = windows_capture_exclusion_status(false, false, true);
+
+    assert_eq!(status.capture_exclusion, "enabled");
+    assert!(status
+        .message
+        .unwrap()
+        .contains("legacy WDA_MONITOR fallback"));
 }

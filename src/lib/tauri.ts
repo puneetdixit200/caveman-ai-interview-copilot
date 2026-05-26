@@ -768,6 +768,26 @@ export async function setOverlayWindowVisible(
   );
 }
 
+export async function setCompanionWindowsVisible(
+  visible: boolean,
+  captureExclusionEnabled = true
+): Promise<OverlayProtectionStatus> {
+  return invokeOrFallback<OverlayProtectionStatus>(
+    "set_companion_windows_visible",
+    { visible, captureExclusionEnabled },
+    () => ({
+      alwaysOnTop: false,
+      skipTaskbar: false,
+      captureExclusion: captureExclusionEnabled ? "unsupported" : "disabled",
+      clickThrough: false,
+      visible,
+      message: captureExclusionEnabled
+        ? "Native companion window visibility is available only inside the Tauri desktop app."
+        : "Capture exclusion is disabled in Security settings."
+    })
+  );
+}
+
 export async function getOverlayWindowBounds(): Promise<OverlayWindowBounds> {
   return invokeOrFallback<OverlayWindowBounds>("get_overlay_window_bounds", {}, () => ({
     x: 80,

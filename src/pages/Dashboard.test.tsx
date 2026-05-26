@@ -120,6 +120,13 @@ vi.mock("../lib/tauri", () => ({
     clickThrough: false,
     visible: false
   })),
+  setCompanionWindowsVisible: vi.fn(async (visible, captureExclusionEnabled = true) => ({
+    alwaysOnTop: false,
+    skipTaskbar: false,
+    captureExclusion: captureExclusionEnabled ? "unsupported" : "disabled",
+    clickThrough: false,
+    visible
+  })),
   setOverlayWindowBounds: vi.fn(async (bounds) => bounds),
   setOverlayWindowVisible: vi.fn(async (visible, captureExclusionEnabled = true) => ({
     alwaysOnTop: false,
@@ -366,6 +373,37 @@ describe("Dashboard collaboration helper", () => {
     await waitFor(() => expect(tauri.detectScreenShareStatus).toHaveBeenCalled());
     expect(await screen.findByText("Overlay hidden because screen sharing process is running: zoom.exe.")).toBeInTheDocument();
     expect(tauri.setOverlayWindowVisible).toHaveBeenCalledWith(false, true);
+  });
+
+  it("hides companion app windows when a screen sharing process is detected", async () => {
+    vi.mocked(tauri.getSetting)
+      .mockResolvedValueOnce(
+        serializeAppConfig({
+          ...DEFAULT_APP_CONFIG,
+          overlay: {
+            ...DEFAULT_APP_CONFIG.overlay,
+            autoHideOnScreenShare: true
+          }
+        })
+      )
+      .mockResolvedValueOnce(undefined)
+      .mockResolvedValueOnce(undefined);
+    vi.mocked(tauri.protectOverlayWindow).mockResolvedValueOnce({
+      alwaysOnTop: true,
+      skipTaskbar: true,
+      captureExclusion: "enabled",
+      clickThrough: true,
+      visible: true
+    });
+    vi.mocked(tauri.detectScreenShareStatus).mockResolvedValueOnce({
+      active: true,
+      matchedProcesses: [{ name: "teams.exe", pid: 777 }]
+    });
+
+    render(<Dashboard />);
+
+    expect(await screen.findByText("Live Interview Session")).toBeInTheDocument();
+    await waitFor(() => expect(tauri.setCompanionWindowsVisible).toHaveBeenCalledWith(false, true));
   });
 
   it("auto-hides the overlay when screen sharing detection fails closed", async () => {
