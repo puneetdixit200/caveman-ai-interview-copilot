@@ -1,4 +1,5 @@
 use serde::Serialize;
+use std::{thread, time::Duration};
 
 #[derive(Debug, Clone, Serialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
@@ -13,6 +14,14 @@ pub struct ScreenShareStatus {
     pub active: bool,
     pub matched_processes: Vec<ScreenShareProcess>,
     pub message: Option<String>,
+}
+
+const NATIVE_PRIVACY_SHIELD_INTERVAL: Duration = Duration::from_secs(2);
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum NativePrivacyShieldDecision {
+    Allow,
+    Hide { reason: String },
 }
 
 const WATCHED_SCREEN_SHARE_PROCESSES: &[&str] = &[
@@ -211,6 +220,40 @@ pub fn detect_screen_share_status() -> anyhow::Result<ScreenShareStatus> {
             ),
         })
     }
+}
+
+pub fn native_privacy_shield_decision(
+    status: anyhow::Result<ScreenShareStatus>,
+) -> NativePrivacyShieldDecision {
+    match status {
+        Ok(status) if status.active => NativePrivacyShieldDecision::Hide {
+            reason: status.message.unwrap_or_else(|| {
+                "Known screen-sharing or recording process is running.".to_string()
+            }),
+        },
+        Ok(_) => NativePrivacyShieldDecision::Allow,
+        Err(error) => NativePrivacyShieldDecision::Hide {
+            reason: format!("Screen-share guard failed closed: {error}"),
+        },
+    }
+}
+
+pub fn start_native_privacy_shield(app: tauri::AppHandle) {
+    let _ = thread::Builder::new()
+        .name("screen-share-privacy-shield".to_string())
+        .spawn(move || loop {
+            match native_privacy_shield_decision(detect_screen_share_status()) {
+                NativePrivacyShieldDecision::Allow => {
+                    let _ = crate::overlay::protect_overlay_window(&app, true);
+                }
+                NativePrivacyShieldDecision::Hide { .. } => {
+                    let _ = crate::overlay::set_overlay_window_visible(&app, false, true);
+                    let _ = crate::overlay::set_companion_windows_visible(&app, false, true);
+                }
+            }
+
+            thread::sleep(NATIVE_PRIVACY_SHIELD_INTERVAL);
+        });
 }
 
 fn screen_share_status_for_processes(processes: Vec<ScreenShareProcess>) -> ScreenShareStatus {
@@ -501,5 +544,51 @@ mod tests {
 
         assert!(!status.active);
         assert!(status.matched_processes.is_empty());
+    }
+
+    #[test]
+    fn native_privacy_shield_hides_when_screen_share_risk_is_active() {
+        let status = ScreenShareStatus {
+            active: true,
+            matched_processes: vec![ScreenShareProcess {
+                name: "teams.exe".to_string(),
+                pid: Some(42),
+            }],
+            message: Some("Known screen-sharing or recording process is running.".to_string()),
+        };
+
+        let decision = native_privacy_shield_decision(Ok(status));
+
+        assert!(matches!(
+            decision,
+            NativePrivacyShieldDecision::Hide { reason }
+                if reason.contains("Known screen-sharing or recording process is running")
+        ));
+    }
+
+    #[test]
+    fn native_privacy_shield_fails_closed_when_detection_errors() {
+        let decision = native_privacy_shield_decision(Err(anyhow::anyhow!("ps failed")));
+
+        assert!(matches!(
+            decision,
+            NativePrivacyShieldDecision::Hide { reason }
+                if reason.contains("Screen-share guard failed closed")
+                    && reason.contains("ps failed")
+        ));
+    }
+
+    #[test]
+    fn native_privacy_shield_leaves_windows_alone_when_detection_is_clear() {
+        let status = ScreenShareStatus {
+            active: false,
+            matched_processes: Vec::new(),
+            message: None,
+        };
+
+        assert_eq!(
+            native_privacy_shield_decision(Ok(status)),
+            NativePrivacyShieldDecision::Allow
+        );
     }
 }

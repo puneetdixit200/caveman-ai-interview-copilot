@@ -132,6 +132,15 @@ test("macOS bundle declares privacy usage descriptions for audio capture", async
   assert.match(entitlements, /com\.apple\.security\.device\.audio-input/);
 });
 
+test("packaged desktop windows opt into OS content protection before runtime setup", async () => {
+  const tauriConfig = JSON.parse(await readFile("src-tauri/tauri.conf.json", "utf8"));
+  const windowsByLabel = new Map(tauriConfig.app.windows.map((window) => [window.label, window]));
+
+  for (const label of ["main", "overlay"]) {
+    assert.equal(windowsByLabel.get(label)?.contentProtected, true);
+  }
+});
+
 test("release workflow builds macOS and Linux packages before publishing one release", async () => {
   const workflow = await readFile(workflowPath, "utf8");
 

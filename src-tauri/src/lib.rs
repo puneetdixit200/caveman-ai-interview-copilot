@@ -36,6 +36,7 @@ pub fn run() {
             app.manage(collaboration::CollaborationManager::default());
             app.manage(runtime::RuntimeBudget::default());
             overlay::configure_overlay_security(app);
+            screen_share::start_native_privacy_shield(app.handle().clone());
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
