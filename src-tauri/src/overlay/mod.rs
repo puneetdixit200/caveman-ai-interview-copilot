@@ -198,6 +198,7 @@ pub fn set_companion_windows_visible(
 
     let mut failures = Vec::new();
     let mut missing_required_windows = required_companion_window_labels();
+    let mut companion_windows = Vec::new();
 
     for (label, window) in app.webview_windows() {
         if !is_companion_window_label(&label) {
@@ -216,22 +217,57 @@ pub fn set_companion_windows_visible(
             ));
         }
 
-        let visibility_result = if visible {
-            window.show()
-        } else {
-            window.hide()
-        };
-        if let Err(error) = visibility_result {
-            failures.push(format!("{label} window visibility update failed: {error}"));
-        }
+        companion_windows.push((label, window));
     }
 
     for label in missing_required_windows {
         failures.push(format!("{label} window was not found."));
     }
 
-    if !failures.is_empty() {
-        return capture_exclusion_failed_status(visible, failures.join(" "));
+    let protection_status = if !failures.is_empty() {
+        capture_exclusion_failed_status(false, failures.join(" "))
+    } else if capture_exclusion_enabled {
+        capture_exclusion_enabled_status(false)
+    } else {
+        capture_exclusion_disabled_status(false)
+    };
+
+    if visible {
+        let gated_status = native_show_privacy_gate_status(
+            visible,
+            protection_status,
+            crate::screen_share::native_privacy_shield_decision(
+                crate::screen_share::detect_screen_share_status(),
+            ),
+            "companion app windows",
+        );
+
+        if native_show_was_denied(&gated_status) {
+            for (_, window) in &companion_windows {
+                let _ = window.hide();
+            }
+
+            return companion_window_status(gated_status);
+        }
+    }
+
+    let mut visibility_failures = Vec::new();
+    for (label, window) in &companion_windows {
+        let visibility_result = if visible {
+            window.show()
+        } else {
+            window.hide()
+        };
+        if let Err(error) = visibility_result {
+            visibility_failures.push(format!("{label} window visibility update failed: {error}"));
+        }
+    }
+
+    if !visibility_failures.is_empty() {
+        return companion_window_status(capture_exclusion_failed_status(
+            visible,
+            visibility_failures.join(" "),
+        ));
     }
 
     let mut status = if capture_exclusion_enabled {
@@ -239,14 +275,11 @@ pub fn set_companion_windows_visible(
     } else {
         capture_exclusion_disabled_status(visible)
     };
-    status.always_on_top = false;
-    status.skip_taskbar = false;
-    status.click_through = false;
     if !visible {
         status.message =
             Some("Companion app windows hidden because screen-share risk is active.".to_string());
     }
-    status
+    companion_window_status(status)
 }
 
 pub fn set_overlay_window_visible(
@@ -275,6 +308,7 @@ pub fn set_overlay_window_visible(
             crate::screen_share::native_privacy_shield_decision(
                 crate::screen_share::detect_screen_share_status(),
             ),
+            "the overlay",
         );
 
         if native_show_was_denied(&gated_status) {
@@ -302,6 +336,7 @@ pub fn native_show_privacy_gate_status(
     requested_visible: bool,
     mut status: OverlayProtectionStatus,
     screen_share_decision: crate::screen_share::NativePrivacyShieldDecision,
+    target_name: &str,
 ) -> OverlayProtectionStatus {
     if !requested_visible {
         return status;
@@ -325,9 +360,16 @@ pub fn native_show_privacy_gate_status(
 
     status.visible = false;
     status.message = Some(format!(
-        "Native privacy shield denied showing the overlay. {}",
+        "Native privacy shield denied showing {target_name}. {}",
         reasons.join(" ")
     ));
+    status
+}
+
+fn companion_window_status(mut status: OverlayProtectionStatus) -> OverlayProtectionStatus {
+    status.always_on_top = false;
+    status.skip_taskbar = false;
+    status.click_through = false;
     status
 }
 

@@ -106,6 +106,7 @@ fn native_visibility_gate_blocks_show_when_share_or_capture_risk_is_active() {
         NativePrivacyShieldDecision::Hide {
             reason: "Known screen-sharing or recording process is running.".to_string(),
         },
+        "the overlay",
     );
 
     assert_eq!(blocked_by_share.capture_exclusion, "enabled");
@@ -119,6 +120,7 @@ fn native_visibility_gate_blocks_show_when_share_or_capture_risk_is_active() {
         true,
         capture_exclusion_disabled_status(false),
         NativePrivacyShieldDecision::Allow,
+        "the overlay",
     );
 
     assert_eq!(blocked_by_capture.capture_exclusion, "disabled");
@@ -127,4 +129,22 @@ fn native_visibility_gate_blocks_show_when_share_or_capture_risk_is_active() {
         .message
         .unwrap()
         .contains("Capture exclusion is not enforced"));
+}
+
+#[test]
+fn native_visibility_gate_names_companion_windows_when_blocking_companion_show() {
+    let blocked = native_show_privacy_gate_status(
+        true,
+        capture_exclusion_enabled_status(false),
+        NativePrivacyShieldDecision::Hide {
+            reason: "Known screen-sharing or recording process is running.".to_string(),
+        },
+        "companion app windows",
+    );
+
+    assert!(!blocked.visible);
+    assert!(blocked
+        .message
+        .unwrap()
+        .contains("Native privacy shield denied showing companion app windows"));
 }
