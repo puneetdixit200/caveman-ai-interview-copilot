@@ -99,7 +99,7 @@ async function runScreenShareGuardContract() {
   try {
     await execFileAsync("cargo", [
       "test",
-      "detects_known_screen_share_processes_from_unix_process_list",
+      "detects_meeting_browser_and_recorder_helper_process_variants",
       "--manifest-path",
       "src-tauri/Cargo.toml"
     ]);

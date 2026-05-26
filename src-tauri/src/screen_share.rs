@@ -74,6 +74,7 @@ const WATCHED_SCREEN_SHARE_PROCESSES: &[&str] = &[
     "dingtalk.exe",
     "dingtalk",
     "facetime",
+    "google meet",
     // Browser shells used by Google Meet, browser Teams, Webex, HackerRank, etc.
     "chrome.exe",
     "chrome",
@@ -319,7 +320,14 @@ fn is_watched_screen_share_process(name: &str) -> bool {
     let normalized = normalize_process_name(name);
     WATCHED_SCREEN_SHARE_PROCESSES
         .iter()
-        .any(|candidate| *candidate == normalized)
+        .any(|candidate| process_name_matches_candidate(&normalized, candidate))
+}
+
+fn process_name_matches_candidate(normalized: &str, candidate: &str) -> bool {
+    normalized == candidate
+        || normalized.strip_prefix(candidate).is_some_and(|suffix| {
+            matches!(suffix.as_bytes().first(), Some(b' ' | b'(' | b'-' | b'.'))
+        })
 }
 
 fn normalize_process_name(name: &str) -> String {
@@ -465,6 +473,40 @@ mod tests {
                 .map(|process| process.pid)
                 .collect::<Vec<_>>(),
             vec![Some(1001), Some(1002), Some(1003), Some(1004)]
+        );
+    }
+
+    #[test]
+    fn detects_meeting_browser_and_recorder_helper_process_variants() {
+        let processes = vec![
+            ScreenShareProcess {
+                name: "/Applications/Microsoft Teams.app/Contents/Frameworks/Microsoft Teams Helper (Renderer).app/Contents/MacOS/Microsoft Teams Helper (Renderer)".to_string(),
+                pid: Some(1101),
+            },
+            ScreenShareProcess {
+                name: "/Applications/Google Chrome.app/Contents/Frameworks/Google Chrome Helper (GPU).app/Contents/MacOS/Google Chrome Helper (GPU)".to_string(),
+                pid: Some(1102),
+            },
+            ScreenShareProcess {
+                name: "/Applications/OBS.app/Contents/Frameworks/OBS Helper (Renderer).app/Contents/MacOS/OBS Helper (Renderer)".to_string(),
+                pid: Some(1103),
+            },
+            ScreenShareProcess {
+                name: "Google Meet".to_string(),
+                pid: Some(1104),
+            },
+        ];
+
+        let status = screen_share_status_for_processes(processes);
+
+        assert!(status.active);
+        assert_eq!(
+            status
+                .matched_processes
+                .iter()
+                .map(|process| process.pid)
+                .collect::<Vec<_>>(),
+            vec![Some(1101), Some(1102), Some(1103), Some(1104)]
         );
     }
 
