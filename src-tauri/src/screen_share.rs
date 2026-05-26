@@ -35,6 +35,12 @@ const WATCHED_SCREEN_SHARE_PROCESSES: &[&str] = &[
     "webex",
     "ciscocollabhost.exe",
     "cisco webex meetings",
+    "gotomeeting.exe",
+    "gotomeeting",
+    "g2mcomm.exe",
+    "g2mstart.exe",
+    "bluejeans.exe",
+    "bluejeans",
     "facetime",
     // Browser shells used by Google Meet, browser Teams, Webex, HackerRank, etc.
     "chrome.exe",
@@ -76,6 +82,28 @@ const WATCHED_SCREEN_SHARE_PROCESSES: &[&str] = &[
     "xsplit",
     "sharex.exe",
     "bandicam.exe",
+    // Remote desktop and support tools also expose the overlay to another viewer.
+    "teamviewer.exe",
+    "teamviewer",
+    "anydesk.exe",
+    "anydesk",
+    "rustdesk.exe",
+    "rustdesk",
+    "remoting_host.exe",
+    "chrome remote desktop",
+    "screen sharing",
+    "screensharingagent",
+    "screensharingd",
+    "vncviewer.exe",
+    "vnc viewer",
+    "vncserver.exe",
+    "vnc server",
+    "parsecd.exe",
+    "parsec",
+    "splashtop streamer",
+    "srserver.exe",
+    "connectwisecontrol.client.exe",
+    "screenconnect.clientservice.exe",
 ];
 
 pub fn detect_screen_share_status() -> anyhow::Result<ScreenShareStatus> {
@@ -293,6 +321,55 @@ mod tests {
                 .map(|process| process.pid)
                 .collect::<Vec<_>>(),
             vec![Some(1001), Some(1002), Some(1003), Some(1004)]
+        );
+    }
+
+    #[test]
+    fn detects_remote_support_and_secondary_meeting_processes() {
+        let processes = vec![
+            ScreenShareProcess {
+                name: r"C:\\Program Files\\GoToMeeting\\g2mcomm.exe".to_string(),
+                pid: Some(2001),
+            },
+            ScreenShareProcess {
+                name: "/Applications/TeamViewer.app/Contents/MacOS/TeamViewer".to_string(),
+                pid: Some(2002),
+            },
+            ScreenShareProcess {
+                name: "AnyDesk.exe".to_string(),
+                pid: Some(2003),
+            },
+            ScreenShareProcess {
+                name: "/System/Library/CoreServices/Applications/Screen Sharing.app/Contents/MacOS/Screen Sharing".to_string(),
+                pid: Some(2004),
+            },
+            ScreenShareProcess {
+                name: "remoting_host.exe".to_string(),
+                pid: Some(2005),
+            },
+            ScreenShareProcess {
+                name: "/Applications/RustDesk.app/Contents/MacOS/RustDesk".to_string(),
+                pid: Some(2006),
+            },
+        ];
+
+        let status = screen_share_status_for_processes(processes);
+
+        assert!(status.active);
+        assert_eq!(
+            status
+                .matched_processes
+                .iter()
+                .map(|process| process.pid)
+                .collect::<Vec<_>>(),
+            vec![
+                Some(2001),
+                Some(2002),
+                Some(2003),
+                Some(2004),
+                Some(2005),
+                Some(2006)
+            ]
         );
     }
 
