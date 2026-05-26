@@ -173,7 +173,7 @@ export function Dashboard() {
       setVisible(nextVisible);
       const status = await setOverlayWindowVisible(nextVisible, config.security.captureExclusionEnabled);
       const guardStatus =
-        nextVisible && config.overlay.autoHideOnScreenShare ? await detectScreenShareStatus() : null;
+        nextVisible && config.overlay.autoHideOnScreenShare ? await detectScreenShareStatusFailClosed() : null;
       if (guardStatus) {
         setScreenShareStatus(guardStatus);
       }
@@ -333,7 +333,7 @@ export function Dashboard() {
       if (cancelled) {
         return;
       }
-      const guardStatus = config.overlay.autoHideOnScreenShare ? await detectScreenShareStatus() : null;
+      const guardStatus = config.overlay.autoHideOnScreenShare ? await detectScreenShareStatusFailClosed() : null;
       if (cancelled) {
         return;
       }
@@ -1550,8 +1550,12 @@ function isCloudBlocked(config: AppConfig): boolean {
 }
 
 function overlayAutoHideMessage(screenShareStatus: ScreenShareStatus | null): string {
-  if (screenShareStatus?.active) {
+  if (screenShareStatus?.active && screenShareStatus.matchedProcesses.length > 0) {
     return `Overlay hidden because screen sharing process is running: ${screenShareProcessNames(screenShareStatus)}.`;
+  }
+
+  if (screenShareStatus?.active) {
+    return "Overlay hidden because screen-share guard could not verify that sharing is clear.";
   }
 
   return "Overlay hidden because capture exclusion is not enabled.";
@@ -1559,6 +1563,18 @@ function overlayAutoHideMessage(screenShareStatus: ScreenShareStatus | null): st
 
 function screenShareProcessNames(screenShareStatus: ScreenShareStatus): string {
   return screenShareStatus.matchedProcesses.map((process) => process.name).join(", ") || "unknown";
+}
+
+async function detectScreenShareStatusFailClosed(): Promise<ScreenShareStatus> {
+  try {
+    return await detectScreenShareStatus();
+  } catch {
+    return {
+      active: true,
+      matchedProcesses: [],
+      message: "Screen-share guard check failed."
+    };
+  }
 }
 
 function buildCollaborationSnapshot(

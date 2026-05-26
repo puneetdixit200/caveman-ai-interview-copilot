@@ -41,6 +41,29 @@ const WATCHED_SCREEN_SHARE_PROCESSES: &[&str] = &[
     "g2mstart.exe",
     "bluejeans.exe",
     "bluejeans",
+    "ringcentral.exe",
+    "ringcentral",
+    "ringcentral meetings",
+    "jitsi.exe",
+    "jitsi",
+    "jitsi meet",
+    "join.me.exe",
+    "join.me",
+    "around.exe",
+    "around",
+    "mmhmm.exe",
+    "mmhmm",
+    "telegram.exe",
+    "telegram",
+    "whatsapp.exe",
+    "whatsapp",
+    "signal.exe",
+    "signal",
+    "lark.exe",
+    "lark",
+    "feishu",
+    "dingtalk.exe",
+    "dingtalk",
     "facetime",
     // Browser shells used by Google Meet, browser Teams, Webex, HackerRank, etc.
     "chrome.exe",
@@ -99,11 +122,47 @@ const WATCHED_SCREEN_SHARE_PROCESSES: &[&str] = &[
     "vncserver.exe",
     "vnc server",
     "parsecd.exe",
+    "parsec.exe",
     "parsec",
     "splashtop streamer",
     "srserver.exe",
+    "quickassist.exe",
+    "msra.exe",
+    "mstsc.exe",
+    "msrdc.exe",
+    "msrdcw.exe",
+    "remotehelp.exe",
+    "logmein.exe",
+    "logmein",
+    "logmeinrescue.exe",
+    "lmi_rescue.exe",
+    "goto opener.exe",
+    "bomgar-scc.exe",
+    "bomgar-rep.exe",
+    "beyondtrust",
+    "jump desktop",
+    "jumpdesktopconnect",
+    "nomachine",
+    "nxplayer",
+    "nxserver",
     "connectwisecontrol.client.exe",
     "screenconnect.clientservice.exe",
+    // Local capture tools are treated as sharing risk when auto-hide is enabled.
+    "snippingtool.exe",
+    "screenclippinghost.exe",
+    "gamebar.exe",
+    "gamebarpresencewriter.exe",
+    "nvidia share.exe",
+    "nvidia broadcast.exe",
+    "screenrec.exe",
+    "screenrec",
+    "cleanshot x",
+    "kap",
+    "screen studio",
+    "screenpresso.exe",
+    "camtasiarecorder.exe",
+    "techsmith capture",
+    "ecamm live",
 ];
 
 pub fn detect_screen_share_status() -> anyhow::Result<ScreenShareStatus> {
@@ -369,6 +428,66 @@ mod tests {
                 Some(2004),
                 Some(2005),
                 Some(2006)
+            ]
+        );
+    }
+
+    #[test]
+    fn detects_additional_meeting_remote_assistance_and_capture_tools() {
+        let processes = vec![
+            ScreenShareProcess {
+                name: r"C:\\Users\\candidate\\AppData\\Local\\RingCentral\\RingCentral.exe"
+                    .to_string(),
+                pid: Some(3001),
+            },
+            ScreenShareProcess {
+                name: "/Applications/Jitsi Meet.app/Contents/MacOS/Jitsi Meet".to_string(),
+                pid: Some(3002),
+            },
+            ScreenShareProcess {
+                name: "WhatsApp.exe".to_string(),
+                pid: Some(3003),
+            },
+            ScreenShareProcess {
+                name: r"C:\\Windows\\System32\\QuickAssist.exe".to_string(),
+                pid: Some(3004),
+            },
+            ScreenShareProcess {
+                name: "msra.exe".to_string(),
+                pid: Some(3005),
+            },
+            ScreenShareProcess {
+                name: "SnippingTool.exe".to_string(),
+                pid: Some(3006),
+            },
+            ScreenShareProcess {
+                name: "NVIDIA Share.exe".to_string(),
+                pid: Some(3007),
+            },
+            ScreenShareProcess {
+                name: "/Applications/CleanShot X.app/Contents/MacOS/CleanShot X".to_string(),
+                pid: Some(3008),
+            },
+        ];
+
+        let status = screen_share_status_for_processes(processes);
+
+        assert!(status.active);
+        assert_eq!(
+            status
+                .matched_processes
+                .iter()
+                .map(|process| process.pid)
+                .collect::<Vec<_>>(),
+            vec![
+                Some(3001),
+                Some(3002),
+                Some(3003),
+                Some(3004),
+                Some(3005),
+                Some(3006),
+                Some(3007),
+                Some(3008)
             ]
         );
     }

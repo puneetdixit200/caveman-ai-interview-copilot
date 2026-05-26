@@ -368,6 +368,38 @@ describe("Dashboard collaboration helper", () => {
     expect(tauri.setOverlayWindowVisible).toHaveBeenCalledWith(false, true);
   });
 
+  it("auto-hides the overlay when screen sharing detection fails closed", async () => {
+    vi.mocked(tauri.getSetting)
+      .mockResolvedValueOnce(
+        serializeAppConfig({
+          ...DEFAULT_APP_CONFIG,
+          overlay: {
+            ...DEFAULT_APP_CONFIG.overlay,
+            autoHideOnScreenShare: true
+          }
+        })
+      )
+      .mockResolvedValueOnce(undefined)
+      .mockResolvedValueOnce(undefined);
+    vi.mocked(tauri.protectOverlayWindow).mockResolvedValueOnce({
+      alwaysOnTop: true,
+      skipTaskbar: true,
+      captureExclusion: "enabled",
+      clickThrough: true,
+      visible: true
+    });
+    vi.mocked(tauri.detectScreenShareStatus).mockRejectedValueOnce(new Error("tasklist failed"));
+
+    render(<Dashboard />);
+
+    expect(await screen.findByText("Live Interview Session")).toBeInTheDocument();
+    await waitFor(() => expect(tauri.detectScreenShareStatus).toHaveBeenCalled());
+    expect(
+      await screen.findByText("Overlay hidden because screen-share guard could not verify that sharing is clear.")
+    ).toBeInTheDocument();
+    expect(tauri.setOverlayWindowVisible).toHaveBeenCalledWith(false, true);
+  });
+
   it("does not arm Deepgram streaming while local-only mode blocks cloud calls", async () => {
     vi.mocked(tauri.getSetting)
       .mockResolvedValueOnce(
