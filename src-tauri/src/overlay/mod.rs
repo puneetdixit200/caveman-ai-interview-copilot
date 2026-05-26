@@ -268,6 +268,22 @@ pub fn set_overlay_window_visible(
     };
 
     let mut status = protect_overlay_window(app, capture_exclusion_enabled);
+    if visible {
+        let gated_status = native_show_privacy_gate_status(
+            visible,
+            status.clone(),
+            crate::screen_share::native_privacy_shield_decision(
+                crate::screen_share::detect_screen_share_status(),
+            ),
+        );
+
+        if native_show_was_denied(&gated_status) {
+            let _ = window.hide();
+            let _ = set_companion_windows_visible(app, false, capture_exclusion_enabled);
+            return gated_status;
+        }
+    }
+
     let visibility_result = if visible {
         window.show()
     } else {
@@ -280,6 +296,46 @@ pub fn set_overlay_window_visible(
     }
 
     status
+}
+
+pub fn native_show_privacy_gate_status(
+    requested_visible: bool,
+    mut status: OverlayProtectionStatus,
+    screen_share_decision: crate::screen_share::NativePrivacyShieldDecision,
+) -> OverlayProtectionStatus {
+    if !requested_visible {
+        return status;
+    }
+
+    let mut reasons = Vec::new();
+    if let crate::screen_share::NativePrivacyShieldDecision::Hide { reason } = screen_share_decision
+    {
+        reasons.push(reason);
+    }
+
+    if let crate::screen_share::NativePrivacyShieldDecision::Hide { reason } =
+        crate::screen_share::native_privacy_shield_decision_for_overlay_protection(&status)
+    {
+        reasons.push(reason);
+    }
+
+    if reasons.is_empty() {
+        return status;
+    }
+
+    status.visible = false;
+    status.message = Some(format!(
+        "Native privacy shield denied showing the overlay. {}",
+        reasons.join(" ")
+    ));
+    status
+}
+
+fn native_show_was_denied(status: &OverlayProtectionStatus) -> bool {
+    status
+        .message
+        .as_deref()
+        .is_some_and(|message| message.starts_with("Native privacy shield denied"))
 }
 
 fn required_companion_window_labels() -> Vec<&'static str> {

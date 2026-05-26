@@ -1,9 +1,10 @@
 use super::{
     capture_exclusion_disabled_status, capture_exclusion_enabled_status,
     capture_exclusion_unavailable_status, is_companion_window_label, is_overlay_window_label,
-    protected_window_labels, sanitize_overlay_bounds, windows_capture_exclusion_status,
-    OverlayProtectionStatus, OverlayWindowBounds,
+    native_show_privacy_gate_status, protected_window_labels, sanitize_overlay_bounds,
+    windows_capture_exclusion_status, OverlayProtectionStatus, OverlayWindowBounds,
 };
+use crate::screen_share::NativePrivacyShieldDecision;
 
 #[test]
 fn reports_unavailable_capture_exclusion_for_unsupported_platforms() {
@@ -93,4 +94,37 @@ fn reports_enabled_capture_exclusion_when_windows_uses_legacy_monitor_fallback()
         .message
         .unwrap()
         .contains("legacy WDA_MONITOR fallback"));
+}
+
+#[test]
+fn native_visibility_gate_blocks_show_when_share_or_capture_risk_is_active() {
+    let protected = capture_exclusion_enabled_status(false);
+
+    let blocked_by_share = native_show_privacy_gate_status(
+        true,
+        protected,
+        NativePrivacyShieldDecision::Hide {
+            reason: "Known screen-sharing or recording process is running.".to_string(),
+        },
+    );
+
+    assert_eq!(blocked_by_share.capture_exclusion, "enabled");
+    assert!(!blocked_by_share.visible);
+    assert!(blocked_by_share
+        .message
+        .unwrap()
+        .contains("Native privacy shield denied showing the overlay"));
+
+    let blocked_by_capture = native_show_privacy_gate_status(
+        true,
+        capture_exclusion_disabled_status(false),
+        NativePrivacyShieldDecision::Allow,
+    );
+
+    assert_eq!(blocked_by_capture.capture_exclusion, "disabled");
+    assert!(!blocked_by_capture.visible);
+    assert!(blocked_by_capture
+        .message
+        .unwrap()
+        .contains("Capture exclusion is not enforced"));
 }
