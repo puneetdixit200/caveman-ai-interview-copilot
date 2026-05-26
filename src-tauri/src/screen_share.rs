@@ -231,11 +231,23 @@ pub fn native_privacy_shield_decision(
                 "Known screen-sharing or recording process is running.".to_string()
             }),
         },
+        Ok(status) if screen_share_guard_is_unsupported(&status) => {
+            NativePrivacyShieldDecision::Hide {
+                reason: "Screen-share guard is not available on this platform.".to_string(),
+            }
+        }
         Ok(_) => NativePrivacyShieldDecision::Allow,
         Err(error) => NativePrivacyShieldDecision::Hide {
             reason: format!("Screen-share guard failed closed: {error}"),
         },
     }
+}
+
+fn screen_share_guard_is_unsupported(status: &ScreenShareStatus) -> bool {
+    status
+        .message
+        .as_deref()
+        .is_some_and(|message| message.contains("only implemented on Windows and macOS"))
 }
 
 pub fn start_native_privacy_shield(app: tauri::AppHandle) {
@@ -575,6 +587,26 @@ mod tests {
             NativePrivacyShieldDecision::Hide { reason }
                 if reason.contains("Screen-share guard failed closed")
                     && reason.contains("ps failed")
+        ));
+    }
+
+    #[test]
+    fn native_privacy_shield_fails_closed_when_guard_is_unsupported() {
+        let status = ScreenShareStatus {
+            active: false,
+            matched_processes: Vec::new(),
+            message: Some(
+                "Screen-share process guard is only implemented on Windows and macOS in this build."
+                    .to_string(),
+            ),
+        };
+
+        let decision = native_privacy_shield_decision(Ok(status));
+
+        assert!(matches!(
+            decision,
+            NativePrivacyShieldDecision::Hide { reason }
+                if reason.contains("Screen-share guard is not available")
         ));
     }
 
