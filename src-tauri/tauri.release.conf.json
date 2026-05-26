@@ -1,4 +1,32 @@
 {
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "title": "Caveman",
+        "width": 1280,
+        "height": 820,
+        "minWidth": 1024,
+        "minHeight": 720,
+        "contentProtected": true,
+        "resizable": true
+      },
+      {
+        "label": "overlay",
+        "title": "Caveman Overlay",
+        "url": "overlay.html",
+        "width": 680,
+        "height": 420,
+        "transparent": true,
+        "decorations": false,
+        "alwaysOnTop": true,
+        "contentProtected": true,
+        "skipTaskbar": true,
+        "resizable": true,
+        "visible": false
+      }
+    ]
+  },
   "bundle": {
     "createUpdaterArtifacts": true
   }
