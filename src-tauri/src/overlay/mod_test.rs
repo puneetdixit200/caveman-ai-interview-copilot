@@ -1,7 +1,7 @@
 use super::{
     capture_exclusion_disabled_status, capture_exclusion_enabled_status,
-    capture_exclusion_unavailable_status, protected_window_labels, sanitize_overlay_bounds,
-    OverlayProtectionStatus, OverlayWindowBounds,
+    capture_exclusion_unavailable_status, is_overlay_window_label, protected_window_labels,
+    sanitize_overlay_bounds, OverlayProtectionStatus, OverlayWindowBounds,
 };
 
 #[test]
@@ -67,4 +67,11 @@ fn sanitizes_overlay_bounds_without_breaking_multi_monitor_coordinates() {
 #[test]
 fn protects_both_dashboard_and_overlay_windows_from_capture() {
     assert_eq!(protected_window_labels(), ["main", "overlay"]);
+}
+
+#[test]
+fn applies_overlay_specific_chrome_only_to_overlay_window() {
+    assert!(is_overlay_window_label("overlay"));
+    assert!(!is_overlay_window_label("main"));
+    assert!(!is_overlay_window_label("settings"));
 }

@@ -28,21 +28,23 @@ pub fn protected_window_labels() -> [&'static str; 2] {
     PROTECTED_WINDOW_LABELS
 }
 
+pub fn is_overlay_window_label(label: &str) -> bool {
+    label == "overlay"
+}
+
 pub fn configure_overlay_security(app: &mut tauri::App) {
     use tauri::Manager;
 
-    for label in protected_window_labels() {
-        if let Some(window) = app.get_webview_window(label) {
-            let _ = window.set_content_protected(true);
-            let _ = apply_capture_exclusion(&window, true);
+    for (label, window) in app.webview_windows() {
+        let _ = window.set_content_protected(true);
+        let _ = apply_capture_exclusion(&window, true);
 
-            if label == "overlay" {
-                let _ = window.set_always_on_top(true);
-                let _ = window.set_skip_taskbar(true);
-                let _ = window.set_decorations(false);
-                let _ = window.set_shadow(false);
-                let _ = window.set_ignore_cursor_events(true);
-            }
+        if is_overlay_window_label(&label) {
+            let _ = window.set_always_on_top(true);
+            let _ = window.set_skip_taskbar(true);
+            let _ = window.set_decorations(false);
+            let _ = window.set_shadow(false);
+            let _ = window.set_ignore_cursor_events(true);
         }
     }
 }
@@ -152,25 +154,31 @@ fn apply_capture_exclusion_to_companion_windows(
     use tauri::Manager;
 
     let mut failures = Vec::new();
-    for label in protected_window_labels() {
-        if label == "overlay" {
+    let mut missing_required_windows = protected_window_labels()
+        .into_iter()
+        .filter(|label| !is_overlay_window_label(label))
+        .collect::<Vec<_>>();
+
+    for (label, window) in app.webview_windows() {
+        if is_overlay_window_label(&label) {
             continue;
         }
 
-        match app.get_webview_window(label) {
-            Some(window) => {
-                let status = apply_capture_exclusion(&window, capture_exclusion_enabled);
-                if status.capture_exclusion == "failed" {
-                    failures.push(format!(
-                        "{label} window capture exclusion failed: {}",
-                        status
-                            .message
-                            .unwrap_or_else(|| "unknown error".to_string())
-                    ));
-                }
-            }
-            None => failures.push(format!("{label} window was not found.")),
+        missing_required_windows.retain(|required| *required != label.as_str());
+
+        let status = apply_capture_exclusion(&window, capture_exclusion_enabled);
+        if status.capture_exclusion == "failed" {
+            failures.push(format!(
+                "{label} window capture exclusion failed: {}",
+                status
+                    .message
+                    .unwrap_or_else(|| "unknown error".to_string())
+            ));
         }
+    }
+
+    for label in missing_required_windows {
+        failures.push(format!("{label} window was not found."));
     }
 
     if failures.is_empty() {
