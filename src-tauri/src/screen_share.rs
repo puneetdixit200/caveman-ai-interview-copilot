@@ -250,22 +250,52 @@ fn screen_share_guard_is_unsupported(status: &ScreenShareStatus) -> bool {
         .is_some_and(|message| message.contains("only implemented on Windows and macOS"))
 }
 
+pub fn native_privacy_shield_decision_for_overlay_protection(
+    status: &crate::overlay::OverlayProtectionStatus,
+) -> NativePrivacyShieldDecision {
+    if status.capture_exclusion == "enabled" {
+        return NativePrivacyShieldDecision::Allow;
+    }
+
+    let detail = status
+        .message
+        .as_deref()
+        .unwrap_or("capture exclusion reported an unsafe state");
+
+    NativePrivacyShieldDecision::Hide {
+        reason: format!(
+            "Capture exclusion is not enforced: {}. {detail}",
+            status.capture_exclusion
+        ),
+    }
+}
+
 pub fn start_native_privacy_shield(app: tauri::AppHandle) {
     let _ = thread::Builder::new()
         .name("screen-share-privacy-shield".to_string())
         .spawn(move || loop {
             match native_privacy_shield_decision(detect_screen_share_status()) {
                 NativePrivacyShieldDecision::Allow => {
-                    let _ = crate::overlay::protect_overlay_window(&app, true);
+                    let status = crate::overlay::protect_overlay_window(&app, true);
+                    if matches!(
+                        native_privacy_shield_decision_for_overlay_protection(&status),
+                        NativePrivacyShieldDecision::Hide { .. }
+                    ) {
+                        hide_app_windows_for_native_privacy_shield(&app);
+                    }
                 }
                 NativePrivacyShieldDecision::Hide { .. } => {
-                    let _ = crate::overlay::set_overlay_window_visible(&app, false, true);
-                    let _ = crate::overlay::set_companion_windows_visible(&app, false, true);
+                    hide_app_windows_for_native_privacy_shield(&app);
                 }
             }
 
             thread::sleep(NATIVE_PRIVACY_SHIELD_INTERVAL);
         });
+}
+
+fn hide_app_windows_for_native_privacy_shield(app: &tauri::AppHandle) {
+    let _ = crate::overlay::set_overlay_window_visible(app, false, true);
+    let _ = crate::overlay::set_companion_windows_visible(app, false, true);
 }
 
 fn screen_share_status_for_processes(processes: Vec<ScreenShareProcess>) -> ScreenShareStatus {
@@ -622,6 +652,29 @@ mod tests {
             native_privacy_shield_decision(Ok(status)),
             NativePrivacyShieldDecision::Allow
         );
+    }
+
+    #[test]
+    fn native_privacy_shield_fails_closed_when_capture_exclusion_is_not_enforced() {
+        for capture_exclusion in ["failed", "unsupported", "disabled"] {
+            let status = crate::overlay::OverlayProtectionStatus {
+                always_on_top: true,
+                skip_taskbar: true,
+                capture_exclusion: capture_exclusion.to_string(),
+                click_through: true,
+                visible: true,
+                message: Some(format!("capture exclusion reported {capture_exclusion}")),
+            };
+
+            let decision = native_privacy_shield_decision_for_overlay_protection(&status);
+
+            assert!(matches!(
+                decision,
+                NativePrivacyShieldDecision::Hide { reason }
+                    if reason.contains("Capture exclusion is not enforced")
+                        && reason.contains(capture_exclusion)
+            ));
+        }
     }
 
     #[test]
