@@ -1,10 +1,11 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   addTranscript,
   addPracticeScore,
   clearKnowledgeBaseNative,
   deleteProviderApiKey,
   deleteKnowledgeDocumentNative,
+  detectScreenShareStatus,
   getActiveWindowInfo,
   getRuntimeBudgetStatus,
   listPracticeScores,
@@ -14,6 +15,17 @@ import {
   saveProviderApiKey,
   typeTextIntoActiveWindow
 } from "./tauri";
+
+const invokeMock = vi.hoisted(() => vi.fn());
+
+vi.mock("@tauri-apps/api/core", () => ({
+  invoke: invokeMock
+}));
+
+afterEach(() => {
+  invokeMock.mockReset();
+  delete window.__TAURI_INTERNALS__;
+});
 
 describe("tauri fallback security events", () => {
   afterEach(() => {
@@ -61,6 +73,16 @@ describe("tauri fallback runtime budget", () => {
     expect(status.idleCpuTargetPercent).toBe(15);
     expect(status.activeCpuTargetPercent).toBe(40);
     expect(status.startupMs).toBeGreaterThanOrEqual(0);
+  });
+});
+
+describe("tauri desktop screen-share detection", () => {
+  it("propagates native detector failures so the dashboard can fail closed", async () => {
+    window.__TAURI_INTERNALS__ = {};
+    invokeMock.mockRejectedValueOnce(new Error("ps failed"));
+
+    await expect(detectScreenShareStatus()).rejects.toThrow("ps failed");
+    expect(invokeMock).toHaveBeenCalledWith("detect_screen_share_status", {});
   });
 });
 

@@ -809,7 +809,7 @@ export async function setOverlayWindowBounds(
 }
 
 export async function detectScreenShareStatus(): Promise<ScreenShareStatus> {
-  return invokeOrFallback<ScreenShareStatus>("detect_screen_share_status", {}, () => ({
+  return invokeStrictOrFallback<ScreenShareStatus>("detect_screen_share_status", {}, () => ({
     active: false,
     matchedProcesses: [],
     message: "Native screen-share process detection is available only inside the Caveman desktop app."
