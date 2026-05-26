@@ -1,29 +1,15 @@
 import { describe, expect, it } from "vitest";
-import { shouldAutoHideOverlay } from "./overlaySafety";
+import { shouldHideForPrivacyShield } from "./overlaySafety";
 
 describe("overlaySafety", () => {
-  it("auto-hides only when enabled and capture exclusion is not active", () => {
-    expect(shouldAutoHideOverlay({ autoHideOnScreenShare: true, captureExclusion: "enabled" })).toBe(false);
-    expect(shouldAutoHideOverlay({ autoHideOnScreenShare: true, captureExclusion: "failed" })).toBe(true);
-    expect(shouldAutoHideOverlay({ autoHideOnScreenShare: true, captureExclusion: "unsupported" })).toBe(true);
-    expect(shouldAutoHideOverlay({ autoHideOnScreenShare: true, captureExclusion: "disabled" })).toBe(true);
-    expect(shouldAutoHideOverlay({ autoHideOnScreenShare: false, captureExclusion: "failed" })).toBe(false);
+  it("hides for privacy when capture exclusion is not active", () => {
+    expect(shouldHideForPrivacyShield({ captureExclusion: "enabled" })).toBe(false);
+    expect(shouldHideForPrivacyShield({ captureExclusion: "failed" })).toBe(true);
+    expect(shouldHideForPrivacyShield({ captureExclusion: "unsupported" })).toBe(true);
+    expect(shouldHideForPrivacyShield({ captureExclusion: "disabled" })).toBe(true);
   });
 
-  it("auto-hides when a screen-sharing process is detected even if capture exclusion is active", () => {
-    expect(
-      shouldAutoHideOverlay({
-        autoHideOnScreenShare: true,
-        captureExclusion: "enabled",
-        screenShareDetected: true
-      })
-    ).toBe(true);
-    expect(
-      shouldAutoHideOverlay({
-        autoHideOnScreenShare: false,
-        captureExclusion: "enabled",
-        screenShareDetected: true
-      })
-    ).toBe(false);
+  it("hides when a screen-sharing process is detected even if capture exclusion is active", () => {
+    expect(shouldHideForPrivacyShield({ captureExclusion: "enabled", screenShareDetected: true })).toBe(true);
   });
 });

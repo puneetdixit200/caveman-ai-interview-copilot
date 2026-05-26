@@ -389,7 +389,9 @@ describe("Settings", { timeout: 20_000 }, () => {
     expect(screen.getByRole("textbox", { name: "Capture hotkey" })).toBeInTheDocument();
     expect(screen.getByRole("textbox", { name: "Generate answer hotkey" })).toBeInTheDocument();
     expect(screen.getByRole("textbox", { name: "Type latest answer hotkey" })).toBeInTheDocument();
-    expect(screen.getByLabelText("Auto-hide when screen sharing")).toBeInTheDocument();
+    const privacyShield = screen.getByLabelText("Screen-share privacy shield always on");
+    expect(privacyShield).toBeChecked();
+    expect(privacyShield).toBeDisabled();
     expect(screen.getByRole("spinbutton", { name: "Overlay X" })).toBeInTheDocument();
     expect(screen.getByRole("spinbutton", { name: "Overlay width" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Read Overlay Position" })).toBeInTheDocument();

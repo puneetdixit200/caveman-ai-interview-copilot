@@ -325,21 +325,11 @@ function evaluateOverlayReadiness(
     };
   }
 
-  if (!config.overlay.autoHideOnScreenShare) {
-    return {
-      id: "overlay",
-      label: "Screen-share auto-hide off",
-      status: "warning",
-      detail: "The overlay is protected, but it will not automatically hide when screen sharing is detected.",
-      action: "Enable auto-hide when screen sharing for an extra safety layer."
-    };
-  }
-
   return {
     id: "overlay",
-    label: "Stealth overlay ready",
+    label: "Screen-share privacy shield ready",
     status: "ready",
-    detail: "Capture exclusion is enabled and screen-share auto-hide is configured."
+    detail: "Capture exclusion is enabled and screen-share hiding is enforced."
   };
 }
 

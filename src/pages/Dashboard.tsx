@@ -14,7 +14,7 @@ import { LocalWhisperChunkTranscriber } from "../lib/localWhisperStreaming";
 import { canSendOcrContext } from "../lib/ocr";
 import { registerGlobalActionShortcuts } from "../lib/globalHotkeys";
 import { DEFAULT_OVERLAY_SHORTCUT, overlayShortcutLabel } from "../lib/hotkeys";
-import { shouldAutoHideOverlay } from "../lib/overlaySafety";
+import { shouldHideForPrivacyShield } from "../lib/overlaySafety";
 import {
   KNOWLEDGE_BASE_SETTING_KEY,
   createKnowledgeBase,
@@ -112,6 +112,8 @@ const INTERVIEW_TYPE_OPTIONS: Array<{ id: InterviewType; label: string }> = [
   { id: "mixed", label: "Mixed" }
 ];
 
+const PRIVACY_SHIELD_INTERVAL_MS = 5000;
+
 export function Dashboard() {
   const [running, setRunning] = useState(false);
   const [session, setSession] = useState<SessionRecord | null>(null);
@@ -173,15 +175,13 @@ export function Dashboard() {
       }
       setVisible(nextVisible);
       const status = await setOverlayWindowVisible(nextVisible, config.security.captureExclusionEnabled);
-      const guardStatus =
-        nextVisible && config.overlay.autoHideOnScreenShare ? await detectScreenShareStatusFailClosed() : null;
+      const guardStatus = nextVisible ? await detectScreenShareStatusFailClosed() : null;
       if (guardStatus) {
         setScreenShareStatus(guardStatus);
       }
       if (
         nextVisible &&
-        shouldAutoHideOverlay({
-          autoHideOnScreenShare: config.overlay.autoHideOnScreenShare,
+        shouldHideForPrivacyShield({
           captureExclusion: status.captureExclusion,
           screenShareDetected: guardStatus?.active ?? false
         })
@@ -204,7 +204,7 @@ export function Dashboard() {
         setVisible(status.visible);
       }
     },
-    [config.overlay.autoHideOnScreenShare, config.overlay.bounds, config.security.captureExclusionEnabled, setVisible]
+    [config.overlay.bounds, config.security.captureExclusionEnabled, setVisible]
   );
 
   const toggleOverlayWindow = useCallback(() => {
@@ -338,17 +338,14 @@ export function Dashboard() {
       if (cancelled) {
         return;
       }
-      const guardStatus = config.overlay.autoHideOnScreenShare ? await detectScreenShareStatusFailClosed() : null;
+      const guardStatus = await detectScreenShareStatusFailClosed();
       if (cancelled) {
         return;
       }
-      if (guardStatus) {
-        setScreenShareStatus(guardStatus);
-      }
+      setScreenShareStatus(guardStatus);
 
       if (
-        shouldAutoHideOverlay({
-          autoHideOnScreenShare: config.overlay.autoHideOnScreenShare,
+        shouldHideForPrivacyShield({
           captureExclusion: status.captureExclusion,
           screenShareDetected: guardStatus?.active ?? false
         })
@@ -375,11 +372,9 @@ export function Dashboard() {
     }
 
     void applyOverlayProtection();
-    if (config.overlay.autoHideOnScreenShare) {
-      intervalId = window.setInterval(() => {
-        void applyOverlayProtection();
-      }, 5000);
-    }
+    intervalId = window.setInterval(() => {
+      void applyOverlayProtection();
+    }, PRIVACY_SHIELD_INTERVAL_MS);
 
     return () => {
       cancelled = true;
@@ -387,7 +382,7 @@ export function Dashboard() {
         window.clearInterval(intervalId);
       }
     };
-  }, [config.overlay.autoHideOnScreenShare, config.security.captureExclusionEnabled, settingsLoaded, setVisible]);
+  }, [config.security.captureExclusionEnabled, settingsLoaded, setVisible]);
 
   useEffect(() => {
     let disposed = false;

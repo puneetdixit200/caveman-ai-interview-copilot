@@ -1429,12 +1429,8 @@ export function Settings() {
             />
           </label>
           <label className="toggle-row">
-            <span>Auto-hide when screen sharing</span>
-            <input
-              type="checkbox"
-              checked={config.overlay.autoHideOnScreenShare}
-              onChange={(event) => updateOverlay({ autoHideOnScreenShare: event.currentTarget.checked })}
-            />
+            <span>Screen-share privacy shield always on</span>
+            <input type="checkbox" checked disabled readOnly />
           </label>
         </div>
       </section>

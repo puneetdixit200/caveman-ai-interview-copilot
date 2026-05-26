@@ -82,6 +82,25 @@ describe("evaluateRealUseReadiness", () => {
     });
   });
 
+  it("treats the screen-share privacy shield as enforced even when the legacy auto-hide setting is off", () => {
+    const readiness = evaluateRealUseReadiness({
+      config: mergeConfig({
+        overlay: {
+          ...DEFAULT_APP_CONFIG.overlay,
+          autoHideOnScreenShare: false
+        }
+      }),
+      audioDevices: devices,
+      overlayProtection: { captureExclusion: "enabled" }
+    });
+
+    expect(readiness.items.find((item) => item.id === "overlay")).toMatchObject({
+      status: "ready",
+      label: "Screen-share privacy shield ready",
+      detail: "Capture exclusion is enabled and screen-share hiding is enforced."
+    });
+  });
+
   it("warns when the app is still configured for manual transcript use", () => {
     const readiness = evaluateRealUseReadiness({
       config: mergeConfig({

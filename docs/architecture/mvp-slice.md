@@ -17,7 +17,7 @@ The original MVP integration gaps have been closed in the current app:
 2. `src-tauri/src/stt/mod.rs` and `src/lib/localWhisperStreaming.ts` support local whisper.cpp sidecars and streaming transcript events.
 3. `src/lib/providerClients.ts` and `src/lib/providerRouter.ts` include Ollama, OpenRouter, LM Studio, llama.cpp, vLLM, and direct cloud provider routing.
 4. `src-tauri/src/secrets/mod.rs` stores provider keys through the operating-system keychain instead of local settings JSON.
-5. `src-tauri/src/overlay/mod.rs` applies platform capture-exclusion controls where supported, and the default config now enables screen-share auto-hide.
+5. `src-tauri/src/overlay/mod.rs` applies platform capture-exclusion controls where supported, and the dashboard enforces the screen-share privacy shield.
 6. `npm run verify`, `npm run obs:smoke`, `npm run audio:smoke`, and the `Desktop Package Smoke` workflow cover the release and live-use contracts.
 
 ## Remaining Commercial Release Gates

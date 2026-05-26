@@ -406,6 +406,38 @@ describe("Dashboard collaboration helper", () => {
     await waitFor(() => expect(tauri.setCompanionWindowsVisible).toHaveBeenCalledWith(false, true));
   });
 
+  it("privacy shield hides app windows even when overlay auto-hide is disabled", async () => {
+    vi.mocked(tauri.getSetting)
+      .mockResolvedValueOnce(
+        serializeAppConfig({
+          ...DEFAULT_APP_CONFIG,
+          overlay: {
+            ...DEFAULT_APP_CONFIG.overlay,
+            autoHideOnScreenShare: false
+          }
+        })
+      )
+      .mockResolvedValueOnce(undefined)
+      .mockResolvedValueOnce(undefined);
+    vi.mocked(tauri.protectOverlayWindow).mockResolvedValueOnce({
+      alwaysOnTop: true,
+      skipTaskbar: true,
+      captureExclusion: "enabled",
+      clickThrough: true,
+      visible: true
+    });
+    vi.mocked(tauri.detectScreenShareStatus).mockResolvedValueOnce({
+      active: true,
+      matchedProcesses: [{ name: "teams.exe", pid: 777 }]
+    });
+
+    render(<Dashboard />);
+
+    expect(await screen.findByText("Live Interview Session")).toBeInTheDocument();
+    await waitFor(() => expect(tauri.setOverlayWindowVisible).toHaveBeenCalledWith(false, true));
+    await waitFor(() => expect(tauri.setCompanionWindowsVisible).toHaveBeenCalledWith(false, true));
+  });
+
   it("auto-hides the overlay when screen sharing detection fails closed", async () => {
     vi.mocked(tauri.getSetting)
       .mockResolvedValueOnce(

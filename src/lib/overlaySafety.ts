@@ -1,7 +1,6 @@
-export function shouldAutoHideOverlay(input: {
-  autoHideOnScreenShare: boolean;
+export function shouldHideForPrivacyShield(input: {
   captureExclusion: string;
   screenShareDetected?: boolean;
 }): boolean {
-  return input.autoHideOnScreenShare && (input.screenShareDetected === true || input.captureExclusion !== "enabled");
+  return input.screenShareDetected === true || input.captureExclusion !== "enabled";
 }
