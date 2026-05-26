@@ -1,7 +1,7 @@
 use super::{
     capture_exclusion_disabled_status, capture_exclusion_enabled_status,
-    capture_exclusion_unavailable_status, sanitize_overlay_bounds, OverlayProtectionStatus,
-    OverlayWindowBounds,
+    capture_exclusion_unavailable_status, protected_window_labels, sanitize_overlay_bounds,
+    OverlayProtectionStatus, OverlayWindowBounds,
 };
 
 #[test]
@@ -62,4 +62,9 @@ fn sanitizes_overlay_bounds_without_breaking_multi_monitor_coordinates() {
             monitor_name: Some("Left Display".to_string()),
         }
     );
+}
+
+#[test]
+fn protects_both_dashboard_and_overlay_windows_from_capture() {
+    assert_eq!(protected_window_labels(), ["main", "overlay"]);
 }

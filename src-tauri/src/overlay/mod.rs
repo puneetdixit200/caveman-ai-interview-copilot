@@ -22,17 +22,28 @@ pub struct OverlayWindowBounds {
     pub monitor_name: Option<String>,
 }
 
+pub const PROTECTED_WINDOW_LABELS: [&str; 2] = ["main", "overlay"];
+
+pub fn protected_window_labels() -> [&'static str; 2] {
+    PROTECTED_WINDOW_LABELS
+}
+
 pub fn configure_overlay_security(app: &mut tauri::App) {
     use tauri::Manager;
 
-    if let Some(window) = app.get_webview_window("overlay") {
-        let _ = window.set_always_on_top(true);
-        let _ = window.set_skip_taskbar(true);
-        let _ = window.set_decorations(false);
-        let _ = window.set_shadow(false);
-        let _ = window.set_ignore_cursor_events(true);
-        let _ = window.set_content_protected(true);
-        let _ = apply_capture_exclusion(&window, true);
+    for label in protected_window_labels() {
+        if let Some(window) = app.get_webview_window(label) {
+            let _ = window.set_content_protected(true);
+            let _ = apply_capture_exclusion(&window, true);
+
+            if label == "overlay" {
+                let _ = window.set_always_on_top(true);
+                let _ = window.set_skip_taskbar(true);
+                let _ = window.set_decorations(false);
+                let _ = window.set_shadow(false);
+                let _ = window.set_ignore_cursor_events(true);
+            }
+        }
     }
 }
 
@@ -120,7 +131,53 @@ pub fn protect_overlay_window(
     status.skip_taskbar = skip_taskbar;
     status.click_through = click_through;
     status.visible = visible;
+
+    if let Some(message) =
+        apply_capture_exclusion_to_companion_windows(app, capture_exclusion_enabled)
+    {
+        status.capture_exclusion = "failed".to_string();
+        status.message = Some(match status.message {
+            Some(existing) => format!("{existing} {message}"),
+            None => message,
+        });
+    }
+
     status
+}
+
+fn apply_capture_exclusion_to_companion_windows(
+    app: &tauri::AppHandle,
+    capture_exclusion_enabled: bool,
+) -> Option<String> {
+    use tauri::Manager;
+
+    let mut failures = Vec::new();
+    for label in protected_window_labels() {
+        if label == "overlay" {
+            continue;
+        }
+
+        match app.get_webview_window(label) {
+            Some(window) => {
+                let status = apply_capture_exclusion(&window, capture_exclusion_enabled);
+                if status.capture_exclusion == "failed" {
+                    failures.push(format!(
+                        "{label} window capture exclusion failed: {}",
+                        status
+                            .message
+                            .unwrap_or_else(|| "unknown error".to_string())
+                    ));
+                }
+            }
+            None => failures.push(format!("{label} window was not found.")),
+        }
+    }
+
+    if failures.is_empty() {
+        None
+    } else {
+        Some(failures.join(" "))
+    }
 }
 
 pub fn set_overlay_window_visible(

@@ -16,15 +16,15 @@ pub struct ScreenShareStatus {
 }
 
 const WATCHED_SCREEN_SHARE_PROCESSES: &[&str] = &[
+    // Native meeting and huddle apps.
     "zoom.exe",
     "zoom.us",
     "teams.exe",
+    "teams",
     "ms-teams.exe",
     "microsoft teams",
+    "microsoft teams helper",
     "msteams",
-    "obs64.exe",
-    "obs32.exe",
-    "obs",
     "discord.exe",
     "discord",
     "slack.exe",
@@ -35,6 +35,47 @@ const WATCHED_SCREEN_SHARE_PROCESSES: &[&str] = &[
     "webex",
     "ciscocollabhost.exe",
     "cisco webex meetings",
+    "facetime",
+    // Browser shells used by Google Meet, browser Teams, Webex, HackerRank, etc.
+    "chrome.exe",
+    "chrome",
+    "google chrome",
+    "google chrome helper",
+    "google chrome helper (renderer)",
+    "msedge.exe",
+    "microsoft edge",
+    "firefox.exe",
+    "firefox",
+    "safari",
+    "safari web content",
+    "brave.exe",
+    "brave browser",
+    "arc",
+    "arc helper",
+    "opera.exe",
+    "opera",
+    "vivaldi.exe",
+    "vivaldi",
+    // Recording and broadcast tools that can expose overlays outside meeting apps.
+    "obs64.exe",
+    "obs32.exe",
+    "obs",
+    "streamlabs obs",
+    "streamlabs desktop",
+    "quicktime player",
+    "quicktimeplayerx",
+    "loom.exe",
+    "loom",
+    "camtasia.exe",
+    "camtasia",
+    "snagit32.exe",
+    "snagit64.exe",
+    "snagit",
+    "screenflow",
+    "xsplit.core.exe",
+    "xsplit",
+    "sharex.exe",
+    "bandicam.exe",
 ];
 
 pub fn detect_screen_share_status() -> anyhow::Result<ScreenShareStatus> {
@@ -110,10 +151,11 @@ fn is_watched_screen_share_process(name: &str) -> bool {
 }
 
 fn normalize_process_name(name: &str) -> String {
-    std::path::Path::new(name.trim())
-        .file_name()
-        .and_then(|value| value.to_str())
-        .unwrap_or(name.trim())
+    let trimmed = name.trim();
+    trimmed
+        .rsplit(['/', '\\'])
+        .next()
+        .unwrap_or(trimmed)
         .to_ascii_lowercase()
 }
 
@@ -217,6 +259,40 @@ mod tests {
                 name: "/Applications/zoom.us.app/Contents/MacOS/zoom.us".to_string(),
                 pid: Some(4242)
             }]
+        );
+    }
+
+    #[test]
+    fn detects_browser_based_meeting_and_recording_processes() {
+        let processes = vec![
+            ScreenShareProcess {
+                name: r"C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe".to_string(),
+                pid: Some(1001),
+            },
+            ScreenShareProcess {
+                name: "/Applications/Microsoft Teams.app/Contents/MacOS/MSTeams".to_string(),
+                pid: Some(1002),
+            },
+            ScreenShareProcess {
+                name: "/Applications/Safari.app/Contents/MacOS/Safari".to_string(),
+                pid: Some(1003),
+            },
+            ScreenShareProcess {
+                name: "QuickTime Player".to_string(),
+                pid: Some(1004),
+            },
+        ];
+
+        let status = screen_share_status_for_processes(processes);
+
+        assert!(status.active);
+        assert_eq!(
+            status
+                .matched_processes
+                .iter()
+                .map(|process| process.pid)
+                .collect::<Vec<_>>(),
+            vec![Some(1001), Some(1002), Some(1003), Some(1004)]
         );
     }
 
