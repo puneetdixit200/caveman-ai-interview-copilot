@@ -16,7 +16,7 @@ pub struct ScreenShareStatus {
     pub message: Option<String>,
 }
 
-const NATIVE_PRIVACY_SHIELD_INTERVAL: Duration = Duration::from_secs(2);
+const NATIVE_PRIVACY_SHIELD_INTERVAL: Duration = Duration::from_millis(500);
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum NativePrivacyShieldDecision {
@@ -590,5 +590,10 @@ mod tests {
             native_privacy_shield_decision(Ok(status)),
             NativePrivacyShieldDecision::Allow
         );
+    }
+
+    #[test]
+    fn native_privacy_shield_polls_quickly_enough_for_new_share_sessions() {
+        assert!(NATIVE_PRIVACY_SHIELD_INTERVAL <= Duration::from_millis(500));
     }
 }
