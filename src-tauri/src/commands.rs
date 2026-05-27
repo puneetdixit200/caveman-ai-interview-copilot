@@ -520,6 +520,23 @@ pub fn type_text_into_active_window(
     database: State<'_, Database>,
     text: String,
 ) -> Result<typing::TypingResult, String> {
+    let denial = typing::native_typing_privacy_gate_message(
+        crate::screen_share::native_privacy_shield_decision(
+            crate::screen_share::detect_screen_share_status(),
+        ),
+    );
+
+    if let Some(message) = denial {
+        record_security_event(
+            &database,
+            "automation",
+            "active_window_typing_blocked",
+            None,
+            Some("Blocked active-window typing because screen-share privacy shield was active"),
+        );
+        return Err(message);
+    }
+
     let result = typing::type_text_into_active_window(&text).map_err(to_command_error)?;
     record_security_event(
         &database,

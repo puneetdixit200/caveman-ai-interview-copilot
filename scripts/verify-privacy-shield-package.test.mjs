@@ -75,6 +75,14 @@ test("requires packaged OCR capture settle marker", () => {
   );
 });
 
+test("requires packaged active-window typing privacy marker", () => {
+  assert.ok(
+    COMMON_PRIVACY_SHIELD_MARKERS.includes(
+      "Native privacy shield denied active-window typing during screen-share risk."
+    )
+  );
+});
+
 test("reports missing packaged native privacy markers", () => {
   const result = evaluateBinaryPrivacyMarkers(Buffer.from("Capture exclusion is not enforced."), [
     "Capture exclusion is not enforced.",

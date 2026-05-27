@@ -1,5 +1,8 @@
 use serde::Serialize;
 
+pub const ACTIVE_WINDOW_TYPING_PRIVACY_MARKER: &str =
+    "Native privacy shield denied active-window typing during screen-share risk.";
+
 #[derive(Debug, Clone, Serialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct TypingResult {
@@ -32,6 +35,18 @@ pub fn type_text_into_active_window(text: &str) -> anyhow::Result<TypingResult> 
         character_count: text.chars().count(),
         input_event_count: units.len() * 2,
     })
+}
+
+pub fn native_typing_privacy_gate_message(
+    screen_share_decision: crate::screen_share::NativePrivacyShieldDecision,
+) -> Option<String> {
+    if let crate::screen_share::NativePrivacyShieldDecision::Hide { reason } = screen_share_decision
+    {
+        std::hint::black_box(ACTIVE_WINDOW_TYPING_PRIVACY_MARKER);
+        return Some(format!("{ACTIVE_WINDOW_TYPING_PRIVACY_MARKER} {reason}"));
+    }
+
+    None
 }
 
 pub fn unicode_key_units(text: &str) -> Vec<u16> {
@@ -295,7 +310,11 @@ fn send_unicode_key_units(_units: &[u16]) -> anyhow::Result<()> {
 
 #[cfg(test)]
 mod tests {
-    use super::{active_window_info_from_parts, detect_code_editor, unicode_key_units};
+    use super::{
+        active_window_info_from_parts, detect_code_editor, native_typing_privacy_gate_message,
+        unicode_key_units, ACTIVE_WINDOW_TYPING_PRIVACY_MARKER,
+    };
+    use crate::screen_share::NativePrivacyShieldDecision;
 
     #[test]
     fn unicode_key_units_normalize_newlines_for_windows_text_injection() {
@@ -320,6 +339,25 @@ mod tests {
                 'w' as u16,
                 'o' as u16
             ]
+        );
+    }
+
+    #[test]
+    fn native_typing_privacy_gate_blocks_when_screen_share_risk_is_active() {
+        let message = native_typing_privacy_gate_message(NativePrivacyShieldDecision::Hide {
+            reason: "Known screen-sharing or recording process is running.".to_string(),
+        })
+        .expect("screen-share risk should block active-window typing");
+
+        assert!(message.contains(ACTIVE_WINDOW_TYPING_PRIVACY_MARKER));
+        assert!(message.contains("Known screen-sharing or recording process"));
+    }
+
+    #[test]
+    fn native_typing_privacy_gate_allows_when_screen_share_is_clear() {
+        assert_eq!(
+            native_typing_privacy_gate_message(NativePrivacyShieldDecision::Allow),
+            None
         );
     }
 

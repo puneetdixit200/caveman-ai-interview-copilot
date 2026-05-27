@@ -207,6 +207,25 @@ test("native screen OCR capture hides app windows before creating screenshots", 
   assert.match(commandBody, /ocr::native_capture_privacy_gate_message/);
 });
 
+test("native active-window typing fails closed during screen-share risk", async () => {
+  const commandsRs = await readFile("src-tauri/src/commands.rs", "utf8");
+  const commandStart = commandsRs.indexOf("pub fn type_text_into_active_window(");
+
+  assert.notEqual(commandStart, -1, "active-window typing command must exist");
+
+  const commandBody = commandsRs.slice(commandStart, commandsRs.indexOf("#[tauri::command]", commandStart + 1));
+  const gateMessage = commandBody.indexOf("typing::native_typing_privacy_gate_message(");
+  const detectShare = commandBody.indexOf("crate::screen_share::detect_screen_share_status()");
+  const typeCall = commandBody.indexOf("typing::type_text_into_active_window(&text)");
+
+  assert.notEqual(gateMessage, -1, "typing command must consult the native privacy shield");
+  assert.notEqual(detectShare, -1, "typing command must fail closed on screen-share detector state");
+  assert.notEqual(typeCall, -1, "typing command must still call the platform typing implementation after the gate");
+  assert.ok(gateMessage < typeCall, "typing privacy gate must run before keyboard input is sent");
+  assert.ok(detectShare < typeCall, "screen-share detection must run before keyboard input is sent");
+  assert.match(commandBody, /active_window_typing_blocked/);
+});
+
 test("native privacy commands do not expose a capture-exclusion off switch", async () => {
   const commandsRs = await readFile("src-tauri/src/commands.rs", "utf8");
   const overlayRs = await readFile("src-tauri/src/overlay/mod.rs", "utf8");
