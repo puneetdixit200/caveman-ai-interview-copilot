@@ -97,4 +97,28 @@ describe("ocr", () => {
       capturedAtMs: 1234
     });
   });
+
+  it("does not fall back to browser capture when native desktop OCR capture is denied", async () => {
+    const settings: OcrSettings = {
+      enabled: true,
+      provider: "local_tesseract",
+      includeInPrompt: true,
+      reviewBeforeSend: true
+    };
+
+    await expect(
+      runScreenOcr(settings, {
+        isDesktop: () => true,
+        captureFrame: async () => {
+          throw new Error("browser capture should not be used");
+        },
+        captureNativeFrame: async () => {
+          throw new Error("Native privacy shield denied screen OCR capture.");
+        },
+        recognizeImage: async () => {
+          throw new Error("recognition should not run");
+        }
+      })
+    ).rejects.toThrow("Native privacy shield denied screen OCR capture");
+  });
 });

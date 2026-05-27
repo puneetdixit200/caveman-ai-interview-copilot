@@ -13,6 +13,7 @@ export interface ScreenOcrResult {
 export interface ScreenOcrDependencies {
   captureFrame?: () => Promise<string>;
   captureNativeFrame?: () => Promise<NativeScreenFrame>;
+  isDesktop?: () => boolean;
   recognizeImage?: (imageDataUrl: string) => Promise<string>;
   now?: () => number;
 }
@@ -90,12 +91,14 @@ async function captureOcrFrame(
 ): Promise<Partial<NativeScreenFrame> & { imageDataUrl: string; capturedAtMs?: number }> {
   const captureFrame = dependencies.captureFrame ?? captureScreenFrame;
   const captureNativeFrame = dependencies.captureNativeFrame ?? captureNativeScreenFrame;
+  const isDesktop = dependencies.isDesktop ?? isRunningInTauri;
+  const runningInDesktop = isDesktop();
 
-  if (settings.provider === "windows_ocr" || isRunningInTauri()) {
+  if (settings.provider === "windows_ocr" || runningInDesktop) {
     try {
       return await captureNativeFrame();
     } catch (error) {
-      if (settings.provider === "windows_ocr") {
+      if (settings.provider === "windows_ocr" || runningInDesktop) {
         throw error;
       }
     }
