@@ -21,11 +21,19 @@ pub struct ScreenShareStatus {
 const NATIVE_PRIVACY_SHIELD_INTERVAL: Duration = Duration::from_millis(500);
 const EDGE_WEBVIEW_HOST_PROCESS: &str = "msedgewebview2.exe";
 const EDGE_PWA_HOST_PROCESS: &str = "msedge_proxy.exe";
+const CHROME_PWA_HOST_PROCESS: &str = "chrome_proxy.exe";
+const BRAVE_PWA_HOST_PROCESS: &str = "brave_proxy.exe";
+const OPERA_PWA_HOST_PROCESS: &str = "opera_proxy.exe";
+const VIVALDI_PWA_HOST_PROCESS: &str = "vivaldi_proxy.exe";
 const TEAMS_WEB_MEETING_ORIGIN: &str = "teams.microsoft.com";
 const MEET_WEB_MEETING_ORIGIN: &str = "meet.google.com";
 const PACKAGE_PRIVACY_SHIELD_WEBVIEW_MARKERS: &[&str] = &[
     EDGE_WEBVIEW_HOST_PROCESS,
     EDGE_PWA_HOST_PROCESS,
+    CHROME_PWA_HOST_PROCESS,
+    BRAVE_PWA_HOST_PROCESS,
+    OPERA_PWA_HOST_PROCESS,
+    VIVALDI_PWA_HOST_PROCESS,
     TEAMS_WEB_MEETING_ORIGIN,
     MEET_WEB_MEETING_ORIGIN,
 ];
@@ -209,7 +217,10 @@ const SCREEN_SHARE_TITLE_HOST_PROCESSES: &[&str] = &[
     EDGE_WEBVIEW_HOST_PROCESS,
     EDGE_PWA_HOST_PROCESS,
     "applicationframehost.exe",
-    "chrome_proxy.exe",
+    CHROME_PWA_HOST_PROCESS,
+    BRAVE_PWA_HOST_PROCESS,
+    OPERA_PWA_HOST_PROCESS,
+    VIVALDI_PWA_HOST_PROCESS,
 ];
 
 pub fn detect_screen_share_status() -> anyhow::Result<ScreenShareStatus> {
@@ -549,12 +560,39 @@ mod tests {
     }
 
     #[test]
+    fn detects_meeting_titles_from_alternate_chromium_pwa_hosts() {
+        let processes = parse_tasklist_csv(
+            "\"brave_proxy.exe\",\"601\",\"Console\",\"1\",\"64,000 K\",\"Running\",\"DESKTOP\\\\me\",\"0:00:21\",\"Google Meet - Candidate Screen\"\n\"opera_proxy.exe\",\"602\",\"Console\",\"1\",\"64,000 K\",\"Running\",\"DESKTOP\\\\me\",\"0:00:22\",\"Microsoft Teams - Interview\"\n\"vivaldi_proxy.exe\",\"603\",\"Console\",\"1\",\"64,000 K\",\"Running\",\"DESKTOP\\\\me\",\"0:00:23\",\"teams.microsoft.com - Standup\"\n\"RuntimeBroker.exe\",\"604\",\"Console\",\"1\",\"10,000 K\",\"Running\",\"DESKTOP\\\\me\",\"0:00:01\",\"Settings\"",
+        );
+
+        let status = screen_share_status_for_processes(processes);
+
+        assert!(status.active);
+        assert_eq!(
+            status
+                .matched_processes
+                .iter()
+                .map(|process| (process.name.as_str(), process.window_title.as_deref()))
+                .collect::<Vec<_>>(),
+            vec![
+                ("brave_proxy.exe", Some("Google Meet - Candidate Screen")),
+                ("opera_proxy.exe", Some("Microsoft Teams - Interview")),
+                ("vivaldi_proxy.exe", Some("teams.microsoft.com - Standup"))
+            ]
+        );
+    }
+
+    #[test]
     fn anchors_webview_markers_for_packaged_privacy_attestation() {
         assert_eq!(
             PACKAGE_PRIVACY_SHIELD_WEBVIEW_MARKERS,
             &[
                 EDGE_WEBVIEW_HOST_PROCESS,
                 EDGE_PWA_HOST_PROCESS,
+                CHROME_PWA_HOST_PROCESS,
+                BRAVE_PWA_HOST_PROCESS,
+                OPERA_PWA_HOST_PROCESS,
+                VIVALDI_PWA_HOST_PROCESS,
                 TEAMS_WEB_MEETING_ORIGIN,
                 MEET_WEB_MEETING_ORIGIN
             ]
