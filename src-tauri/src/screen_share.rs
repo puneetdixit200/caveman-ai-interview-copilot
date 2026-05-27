@@ -19,6 +19,8 @@ pub struct ScreenShareStatus {
 }
 
 const NATIVE_PRIVACY_SHIELD_INTERVAL: Duration = Duration::from_millis(250);
+pub const NATIVE_PRIVACY_SHIELD_THREAD_START_FAILED_MARKER: &str =
+    "Native privacy shield thread failed to start; refusing to run without fail-closed screen-share guard.";
 const EDGE_WEBVIEW_HOST_PROCESS: &str = "msedgewebview2.exe";
 const EDGE_PWA_HOST_PROCESS: &str = "msedge_proxy.exe";
 const CHROME_PWA_HOST_PROCESS: &str = "chrome_proxy.exe";
@@ -536,8 +538,8 @@ pub fn native_privacy_shield_decision_for_overlay_protection(
     }
 }
 
-pub fn start_native_privacy_shield(app: tauri::AppHandle) {
-    let _ = thread::Builder::new()
+pub fn start_native_privacy_shield(app: tauri::AppHandle) -> anyhow::Result<()> {
+    thread::Builder::new()
         .name("screen-share-privacy-shield".to_string())
         .spawn(move || loop {
             match native_privacy_shield_decision(detect_screen_share_status()) {
@@ -556,7 +558,18 @@ pub fn start_native_privacy_shield(app: tauri::AppHandle) {
             }
 
             thread::sleep(NATIVE_PRIVACY_SHIELD_INTERVAL);
-        });
+        })
+        .map(|_| ())
+        .map_err(|error| {
+            anyhow::anyhow!(
+                "{}",
+                native_privacy_shield_thread_start_error_message(error)
+            )
+        })
+}
+
+pub fn native_privacy_shield_thread_start_error_message(error: impl std::fmt::Display) -> String {
+    format!("{NATIVE_PRIVACY_SHIELD_THREAD_START_FAILED_MARKER} {error}")
 }
 
 fn hide_app_windows_for_native_privacy_shield(app: &tauri::AppHandle) {
@@ -1708,5 +1721,14 @@ mod tests {
     #[test]
     fn native_privacy_shield_polls_quickly_enough_for_new_share_sessions() {
         assert!(NATIVE_PRIVACY_SHIELD_INTERVAL <= Duration::from_millis(250));
+    }
+
+    #[test]
+    fn native_privacy_shield_thread_start_error_fails_closed() {
+        let message = native_privacy_shield_thread_start_error_message("spawn denied");
+
+        assert!(message.contains(NATIVE_PRIVACY_SHIELD_THREAD_START_FAILED_MARKER));
+        assert!(message.contains("spawn denied"));
+        assert!(message.contains("refusing to run"));
     }
 }

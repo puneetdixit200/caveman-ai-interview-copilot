@@ -37,7 +37,7 @@ pub fn run() {
             app.manage(runtime::RuntimeBudget::default());
             overlay::configure_overlay_security(app);
             let _ = overlay::set_companion_windows_visible(app.handle(), true, true);
-            screen_share::start_native_privacy_shield(app.handle().clone());
+            screen_share::start_native_privacy_shield(app.handle().clone())?;
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![

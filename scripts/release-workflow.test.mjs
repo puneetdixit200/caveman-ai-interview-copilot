@@ -182,6 +182,23 @@ test("startup setup hides app windows when native privacy cannot be proven", asy
   assert.match(overlayRs.slice(startupDecisionStart), /native_privacy_shield_decision_for_overlay_protection/);
 });
 
+test("startup refuses to run when the native privacy shield thread cannot start", async () => {
+  const libRs = await readFile("src-tauri/src/lib.rs", "utf8");
+  const screenShareRs = await readFile("src-tauri/src/screen_share.rs", "utf8");
+  const setupStart = libRs.indexOf(".setup(|app|");
+  const setupEnd = libRs.indexOf(".invoke_handler", setupStart);
+  const setupBody = libRs.slice(setupStart, setupEnd);
+
+  assert.notEqual(setupStart, -1, "Tauri setup block must exist");
+  assert.match(setupBody, /screen_share::start_native_privacy_shield\(app\.handle\(\)\.clone\(\)\)\?/);
+  assert.doesNotMatch(setupBody, /let _ = screen_share::start_native_privacy_shield/);
+  assert.match(screenShareRs, /pub fn start_native_privacy_shield\(app: tauri::AppHandle\) -> anyhow::Result<\(\)>/);
+  assert.match(
+    screenShareRs,
+    /Native privacy shield thread failed to start; refusing to run without fail-closed screen-share guard\./
+  );
+});
+
 test("native screen OCR capture hides app windows before creating screenshots", async () => {
   const commandsRs = await readFile("src-tauri/src/commands.rs", "utf8");
   const commandStart = commandsRs.indexOf("pub fn capture_screen_frame(app_handle: AppHandle)");
