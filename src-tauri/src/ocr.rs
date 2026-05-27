@@ -1,3 +1,4 @@
+use crate::screen_share::NativePrivacyShieldDecision;
 use base64::{engine::general_purpose::STANDARD, Engine as _};
 use serde::Serialize;
 use xcap::image::{codecs::png::PngEncoder, ColorType, ImageEncoder, RgbaImage};
@@ -28,6 +29,30 @@ pub fn capture_screen_frame() -> anyhow::Result<ScreenFrame> {
         monitor_name,
         captured_at_ms: chrono::Utc::now().timestamp_millis(),
     })
+}
+
+pub fn native_capture_privacy_gate_message(
+    screen_share_decision: NativePrivacyShieldDecision,
+    capture_exclusion_decision: NativePrivacyShieldDecision,
+) -> Option<String> {
+    let mut reasons = Vec::new();
+
+    if let NativePrivacyShieldDecision::Hide { reason } = screen_share_decision {
+        reasons.push(reason);
+    }
+
+    if let NativePrivacyShieldDecision::Hide { reason } = capture_exclusion_decision {
+        reasons.push(reason);
+    }
+
+    if reasons.is_empty() {
+        return None;
+    }
+
+    Some(format!(
+        "Native privacy shield denied screen OCR capture. {}",
+        reasons.join(" ")
+    ))
 }
 
 pub fn primary_monitor_index(primary_flags: &[bool]) -> Option<usize> {
@@ -72,7 +97,10 @@ fn select_primary_monitor(monitors: Vec<Monitor>) -> anyhow::Result<Monitor> {
 
 #[cfg(test)]
 mod tests {
-    use super::{png_data_url_from_rgba_image, primary_monitor_index};
+    use super::{
+        native_capture_privacy_gate_message, png_data_url_from_rgba_image, primary_monitor_index,
+    };
+    use crate::screen_share::NativePrivacyShieldDecision;
     use xcap::image::{ImageBuffer, Rgba};
 
     #[test]
@@ -89,5 +117,41 @@ mod tests {
 
         assert!(data_url.starts_with("data:image/png;base64,"));
         assert!(data_url.len() > "data:image/png;base64,".len());
+    }
+
+    #[test]
+    fn native_ocr_capture_gate_blocks_when_share_or_capture_risk_is_active() {
+        let blocked_by_share = native_capture_privacy_gate_message(
+            NativePrivacyShieldDecision::Hide {
+                reason: "Known screen-sharing or recording process is running.".to_string(),
+            },
+            NativePrivacyShieldDecision::Allow,
+        )
+        .expect("screen-share risk should block OCR capture");
+
+        assert!(blocked_by_share.contains("Native privacy shield denied screen OCR capture"));
+        assert!(blocked_by_share.contains("Known screen-sharing or recording process"));
+
+        let blocked_by_capture = native_capture_privacy_gate_message(
+            NativePrivacyShieldDecision::Allow,
+            NativePrivacyShieldDecision::Hide {
+                reason: "Capture exclusion is not enforced: disabled.".to_string(),
+            },
+        )
+        .expect("capture-exclusion risk should block OCR capture");
+
+        assert!(blocked_by_capture.contains("Native privacy shield denied screen OCR capture"));
+        assert!(blocked_by_capture.contains("Capture exclusion is not enforced"));
+    }
+
+    #[test]
+    fn native_ocr_capture_gate_allows_when_share_clear_and_capture_exclusion_enforced() {
+        assert_eq!(
+            native_capture_privacy_gate_message(
+                NativePrivacyShieldDecision::Allow,
+                NativePrivacyShieldDecision::Allow,
+            ),
+            None
+        );
     }
 }

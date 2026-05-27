@@ -161,6 +161,28 @@ test("packaged dashboard stays hidden until the native privacy gate allows start
   );
 });
 
+test("native screen OCR capture hides app windows before creating screenshots", async () => {
+  const commandsRs = await readFile("src-tauri/src/commands.rs", "utf8");
+  const commandStart = commandsRs.indexOf("pub fn capture_screen_frame(app_handle: AppHandle)");
+
+  assert.notEqual(commandStart, -1, "OCR capture command must receive AppHandle for native privacy controls");
+  assert.ok(
+    commandStart < commandsRs.indexOf("ocr::capture_screen_frame()", commandStart),
+    "OCR capture command must be app-aware before invoking the native screenshot API"
+  );
+
+  const commandBody = commandsRs.slice(commandStart, commandsRs.indexOf("#[tauri::command]", commandStart + 1));
+  const hideOverlay = commandBody.indexOf("overlay::set_overlay_window_visible(&app_handle, false, true)");
+  const hideCompanions = commandBody.indexOf("overlay::set_companion_windows_visible(&app_handle, false, true)");
+  const captureCall = commandBody.indexOf("ocr::capture_screen_frame()");
+
+  assert.notEqual(hideOverlay, -1, "OCR capture must hide overlay window before screenshotting");
+  assert.notEqual(hideCompanions, -1, "OCR capture must hide companion app windows before screenshotting");
+  assert.ok(hideOverlay < captureCall, "overlay hide must run before native screenshot capture");
+  assert.ok(hideCompanions < captureCall, "companion window hide must run before native screenshot capture");
+  assert.match(commandBody, /ocr::native_capture_privacy_gate_message/);
+});
+
 test("default desktop capability denies raw window visibility bypasses", async () => {
   const capability = JSON.parse(await readFile("src-tauri/capabilities/default.json", "utf8"));
   const permissions = new Set(capability.permissions);

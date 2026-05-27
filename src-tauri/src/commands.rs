@@ -15,7 +15,7 @@ use crate::models::{
 };
 use crate::ocr;
 use crate::ocr::ScreenFrame;
-use crate::overlay::{OverlayProtectionStatus, OverlayWindowBounds};
+use crate::overlay::{self, OverlayProtectionStatus, OverlayWindowBounds};
 use crate::plugins::PluginManifestFile;
 use crate::runtime::{RuntimeBudget, RuntimeBudgetStatus};
 use crate::screen_share::ScreenShareStatus;
@@ -492,7 +492,24 @@ pub fn load_plugin_manifests(directory: String) -> Result<Vec<PluginManifestFile
 }
 
 #[tauri::command]
-pub fn capture_screen_frame() -> Result<ScreenFrame, String> {
+pub fn capture_screen_frame(app_handle: AppHandle) -> Result<ScreenFrame, String> {
+    let protection_status = overlay::protect_overlay_window(&app_handle, true);
+    let denial = ocr::native_capture_privacy_gate_message(
+        crate::screen_share::native_privacy_shield_decision(
+            crate::screen_share::detect_screen_share_status(),
+        ),
+        crate::screen_share::native_privacy_shield_decision_for_overlay_protection(
+            &protection_status,
+        ),
+    );
+
+    let _ = overlay::set_overlay_window_visible(&app_handle, false, true);
+    let _ = overlay::set_companion_windows_visible(&app_handle, false, true);
+
+    if let Some(message) = denial {
+        return Err(message);
+    }
+
     ocr::capture_screen_frame().map_err(to_command_error)
 }
 
