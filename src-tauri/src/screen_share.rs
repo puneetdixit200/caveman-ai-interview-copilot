@@ -19,6 +19,14 @@ pub struct ScreenShareStatus {
 }
 
 const NATIVE_PRIVACY_SHIELD_INTERVAL: Duration = Duration::from_millis(500);
+const EDGE_WEBVIEW_HOST_PROCESS: &str = "msedgewebview2.exe";
+const TEAMS_WEB_MEETING_ORIGIN: &str = "teams.microsoft.com";
+const MEET_WEB_MEETING_ORIGIN: &str = "meet.google.com";
+const PACKAGE_PRIVACY_SHIELD_WEBVIEW_MARKERS: &[&str] = &[
+    EDGE_WEBVIEW_HOST_PROCESS,
+    TEAMS_WEB_MEETING_ORIGIN,
+    MEET_WEB_MEETING_ORIGIN,
+];
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum NativePrivacyShieldDecision {
@@ -179,10 +187,10 @@ const WATCHED_SCREEN_SHARE_PROCESSES: &[&str] = &[
 
 const WATCHED_SCREEN_SHARE_TITLES: &[&str] = &[
     "google meet",
-    "meet.google.com",
+    MEET_WEB_MEETING_ORIGIN,
     "microsoft teams",
     "teams meeting",
-    "teams.microsoft.com",
+    TEAMS_WEB_MEETING_ORIGIN,
     "zoom meeting",
     "webex meeting",
     "slack huddle",
@@ -195,7 +203,15 @@ const WATCHED_SCREEN_SHARE_TITLES: &[&str] = &[
     "interview - microsoft teams",
 ];
 
+const SCREEN_SHARE_TITLE_HOST_PROCESSES: &[&str] = &[
+    EDGE_WEBVIEW_HOST_PROCESS,
+    "applicationframehost.exe",
+    "chrome_proxy.exe",
+];
+
 pub fn detect_screen_share_status() -> anyhow::Result<ScreenShareStatus> {
+    retain_package_privacy_shield_webview_markers();
+
     #[cfg(target_os = "windows")]
     {
         let output = std::process::Command::new("tasklist")
@@ -241,6 +257,10 @@ pub fn detect_screen_share_status() -> anyhow::Result<ScreenShareStatus> {
             ),
         })
     }
+}
+
+fn retain_package_privacy_shield_webview_markers() {
+    std::hint::black_box(PACKAGE_PRIVACY_SHIELD_WEBVIEW_MARKERS);
 }
 
 pub fn native_privacy_shield_decision(
@@ -324,7 +344,8 @@ fn screen_share_status_for_processes(processes: Vec<ScreenShareProcess>) -> Scre
         .into_iter()
         .filter(|process| {
             is_watched_screen_share_process(&process.name)
-                || is_watched_screen_share_window_title(process.window_title.as_deref())
+                || (is_screen_share_window_title_host_process(&process.name)
+                    && is_watched_screen_share_window_title(process.window_title.as_deref()))
         })
         .collect::<Vec<_>>();
 
@@ -342,6 +363,13 @@ fn screen_share_status_for_processes(processes: Vec<ScreenShareProcess>) -> Scre
 fn is_watched_screen_share_process(name: &str) -> bool {
     let normalized = normalize_process_name(name);
     WATCHED_SCREEN_SHARE_PROCESSES
+        .iter()
+        .any(|candidate| process_name_matches_candidate(&normalized, candidate))
+}
+
+fn is_screen_share_window_title_host_process(name: &str) -> bool {
+    let normalized = normalize_process_name(name);
+    SCREEN_SHARE_TITLE_HOST_PROCESSES
         .iter()
         .any(|candidate| process_name_matches_candidate(&normalized, candidate))
 }
@@ -496,6 +524,37 @@ mod tests {
                 )
             ]
         );
+    }
+
+    #[test]
+    fn anchors_webview_markers_for_packaged_privacy_attestation() {
+        assert_eq!(
+            PACKAGE_PRIVACY_SHIELD_WEBVIEW_MARKERS,
+            &[
+                EDGE_WEBVIEW_HOST_PROCESS,
+                TEAMS_WEB_MEETING_ORIGIN,
+                MEET_WEB_MEETING_ORIGIN
+            ]
+        );
+    }
+
+    #[test]
+    fn ignores_meeting_titles_from_unrelated_windows() {
+        let status = screen_share_status_for_processes(vec![
+            ScreenShareProcess {
+                name: "notepad.exe".to_string(),
+                pid: Some(771),
+                window_title: Some("Google Meet prep notes".to_string()),
+            },
+            ScreenShareProcess {
+                name: "msedgewebview2.exe".to_string(),
+                pid: Some(772),
+                window_title: Some("N/A".to_string()),
+            },
+        ]);
+
+        assert!(!status.active);
+        assert_eq!(status.matched_processes, Vec::<ScreenShareProcess>::new());
     }
 
     #[test]
