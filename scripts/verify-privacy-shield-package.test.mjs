@@ -184,6 +184,9 @@ test("requires packaged protection refresh fail-closed marker", () => {
     )
   );
   assert.ok(
+    COMMON_PRIVACY_SHIELD_MARKERS.includes("Startup privacy shield denied initial companion window show.")
+  );
+  assert.ok(
     COMMON_PRIVACY_SHIELD_MARKERS.includes(
       "Companion app windows stayed hidden because capture exclusion was not proven."
     )

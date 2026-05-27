@@ -7,6 +7,7 @@ use super::{
     startup_privacy_shield_hide_reason, windows_capture_exclusion_status, OverlayProtectionStatus,
     OverlayWindowBounds, COMPANION_HIDE_UNSAFE_PROTECTION_MARKER,
     COMPANION_UNSAFE_PROTECTION_MARKER, PROTECTION_REFRESH_FAIL_CLOSED_MARKER,
+    STARTUP_PRIVACY_SHIELD_DENIED_INITIAL_SHOW_MARKER,
 };
 use crate::screen_share::NativePrivacyShieldDecision;
 
@@ -182,6 +183,7 @@ fn startup_privacy_shield_hides_when_screen_share_is_already_running() {
     .expect("startup should hide when a screen-share process is already active");
 
     assert!(reason.contains("Known screen-sharing or recording process is running"));
+    assert!(reason.contains(STARTUP_PRIVACY_SHIELD_DENIED_INITIAL_SHOW_MARKER));
 }
 
 #[test]
@@ -194,6 +196,7 @@ fn startup_privacy_shield_hides_when_capture_exclusion_is_not_proven() {
 
     assert!(reason.contains("Capture exclusion is not enforced"));
     assert!(reason.contains("unsupported"));
+    assert!(reason.contains(STARTUP_PRIVACY_SHIELD_DENIED_INITIAL_SHOW_MARKER));
 }
 
 #[test]

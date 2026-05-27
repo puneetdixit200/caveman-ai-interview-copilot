@@ -25,6 +25,7 @@ export const COMMON_PRIVACY_SHIELD_MARKERS = [
   "Capture exclusion is not enforced:",
   "Native privacy shield denied showing",
   "Native privacy shield hid app windows after protection refresh failed closed.",
+  "Startup privacy shield denied initial companion window show.",
   "Companion app windows stayed hidden because capture exclusion was not proven.",
   "Companion window capture exclusion is unsafe.",
   "Native privacy shield thread failed to start; refusing to run without fail-closed screen-share guard.",

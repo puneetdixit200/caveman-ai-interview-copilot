@@ -25,6 +25,8 @@ pub struct OverlayWindowBounds {
 pub const PROTECTED_WINDOW_LABELS: [&str; 2] = ["main", "overlay"];
 pub const PROTECTION_REFRESH_FAIL_CLOSED_MARKER: &str =
     "Native privacy shield hid app windows after protection refresh failed closed.";
+pub const STARTUP_PRIVACY_SHIELD_DENIED_INITIAL_SHOW_MARKER: &str =
+    "Startup privacy shield denied initial companion window show.";
 pub const COMPANION_HIDE_UNSAFE_PROTECTION_MARKER: &str =
     "Companion app windows stayed hidden because capture exclusion was not proven.";
 pub const COMPANION_UNSAFE_PROTECTION_MARKER: &str =
@@ -46,7 +48,7 @@ pub fn is_companion_window_label(label: &str) -> bool {
     !is_overlay_window_label(label)
 }
 
-pub fn configure_overlay_security(app: &mut tauri::App) {
+pub fn configure_overlay_security(app: &mut tauri::App) -> bool {
     use tauri::Manager;
 
     let mut protection_statuses = Vec::new();
@@ -70,11 +72,15 @@ pub fn configure_overlay_security(app: &mut tauri::App) {
         ),
     );
 
-    if startup_hide_reason.is_some() {
+    let startup_allows_initial_show = startup_hide_reason.is_none();
+
+    if !startup_allows_initial_show {
         for (_, window) in app.webview_windows() {
             let _ = window.hide();
         }
     }
+
+    startup_allows_initial_show
 }
 
 pub fn startup_privacy_shield_hide_reason(
@@ -99,7 +105,7 @@ pub fn startup_privacy_shield_hide_reason(
         None
     } else {
         Some(format!(
-            "Startup privacy shield hid app windows. {}",
+            "{STARTUP_PRIVACY_SHIELD_DENIED_INITIAL_SHOW_MARKER} Startup privacy shield hid app windows. {}",
             reasons.join(" ")
         ))
     }

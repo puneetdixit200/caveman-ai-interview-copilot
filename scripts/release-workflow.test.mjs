@@ -153,17 +153,24 @@ test("packaged dashboard stays hidden until the native privacy gate allows start
 
   assert.equal(windowsByLabel.get("main")?.visible, false);
   assert.equal(releaseWindowsByLabel.get("main")?.visible, false);
+  assert.match(libRs, /let startup_allows_initial_show = overlay::configure_overlay_security\(app\)/);
+  assert.match(libRs, /if startup_allows_initial_show\s*\{/);
   assert.match(libRs, /overlay::set_companion_windows_visible\(app\.handle\(\),\s*true,\s*true\)/);
   assert.ok(
-    libRs.indexOf("overlay::configure_overlay_security(app)") <
+    libRs.indexOf("let startup_allows_initial_show = overlay::configure_overlay_security(app)") <
+      libRs.indexOf("if startup_allows_initial_show"),
+    "startup show gate must use the native startup privacy decision"
+  );
+  assert.ok(
+    libRs.indexOf("if startup_allows_initial_show") <
       libRs.indexOf("overlay::set_companion_windows_visible(app.handle(), true, true)"),
-    "startup show must run after content protection is applied"
+    "startup show must run only after the privacy gate allows it"
   );
 });
 
 test("startup setup hides app windows when native privacy cannot be proven", async () => {
   const overlayRs = await readFile("src-tauri/src/overlay/mod.rs", "utf8");
-  const configureStart = overlayRs.indexOf("pub fn configure_overlay_security(app: &mut tauri::App)");
+  const configureStart = overlayRs.indexOf("pub fn configure_overlay_security(app: &mut tauri::App) -> bool");
   const startupDecisionStart = overlayRs.indexOf("pub fn startup_privacy_shield_hide_reason");
 
   assert.notEqual(configureStart, -1, "native startup security setup must exist");
@@ -172,6 +179,8 @@ test("startup setup hides app windows when native privacy cannot be proven", asy
   const configureBody = overlayRs.slice(configureStart, startupDecisionStart);
   assert.match(configureBody, /protection_statuses\.push\(apply_capture_exclusion\(&window,\s*true\)\)/);
   assert.match(configureBody, /startup_privacy_shield_hide_reason\(/);
+  assert.match(configureBody, /let startup_allows_initial_show = startup_hide_reason\.is_none\(\)/);
+  assert.match(configureBody, /startup_allows_initial_show/);
   assert.ok(
     configureBody.indexOf("protection_statuses.push(apply_capture_exclusion(&window, true))") <
       configureBody.indexOf("startup_privacy_shield_hide_reason("),
@@ -179,7 +188,9 @@ test("startup setup hides app windows when native privacy cannot be proven", asy
   );
   assert.match(configureBody, /crate::screen_share::detect_screen_share_status\(\)/);
   assert.match(configureBody, /window\.hide\(\)/);
+  assert.match(configureBody, /startup_allows_initial_show\s*$/m);
   assert.match(overlayRs.slice(startupDecisionStart), /native_privacy_shield_decision_for_overlay_protection/);
+  assert.match(overlayRs.slice(startupDecisionStart), /STARTUP_PRIVACY_SHIELD_DENIED_INITIAL_SHOW_MARKER/);
 });
 
 test("startup refuses to run when the native privacy shield thread cannot start", async () => {
