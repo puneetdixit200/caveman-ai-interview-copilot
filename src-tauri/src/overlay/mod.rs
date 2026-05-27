@@ -25,6 +25,8 @@ pub struct OverlayWindowBounds {
 pub const PROTECTED_WINDOW_LABELS: [&str; 2] = ["main", "overlay"];
 pub const PROTECTION_REFRESH_FAIL_CLOSED_MARKER: &str =
     "Native privacy shield hid app windows after protection refresh failed closed.";
+pub const COMPANION_HIDE_UNSAFE_PROTECTION_MARKER: &str =
+    "Companion app windows stayed hidden because capture exclusion was not proven.";
 
 pub fn protected_window_labels() -> [&'static str; 2] {
     PROTECTED_WINDOW_LABELS
@@ -335,7 +337,7 @@ pub fn set_companion_windows_visible(
     if visible {
         let gated_status = native_show_privacy_gate_status(
             visible,
-            protection_status,
+            protection_status.clone(),
             crate::screen_share::native_privacy_shield_decision(
                 crate::screen_share::detect_screen_share_status(),
             ),
@@ -370,14 +372,35 @@ pub fn set_companion_windows_visible(
         ));
     }
 
-    let mut status = if capture_exclusion_enabled {
+    companion_visibility_success_status(visible, capture_exclusion_enabled, protection_status)
+}
+
+pub fn companion_visibility_success_status(
+    visible: bool,
+    capture_exclusion_enabled: bool,
+    protection_status: OverlayProtectionStatus,
+) -> OverlayProtectionStatus {
+    let protection_is_unsafe = matches!(
+        crate::screen_share::native_privacy_shield_decision_for_overlay_protection(
+            &protection_status
+        ),
+        crate::screen_share::NativePrivacyShieldDecision::Hide { .. }
+    );
+    let mut status = if protection_is_unsafe {
+        protection_status
+    } else if capture_exclusion_enabled {
         capture_exclusion_enabled_status(visible)
     } else {
         capture_exclusion_disabled_status(visible)
     };
+    status.visible = visible && status.capture_exclusion == "enabled";
     if !visible {
-        status.message =
-            Some("Companion app windows hidden because screen-share risk is active.".to_string());
+        let mut messages =
+            vec!["Companion app windows hidden because screen-share risk is active.".to_string()];
+        if protection_is_unsafe {
+            messages.push(COMPANION_HIDE_UNSAFE_PROTECTION_MARKER.to_string());
+        }
+        status.message = Some(join_status_messages(status.message.take(), messages));
     }
     companion_window_status(status)
 }

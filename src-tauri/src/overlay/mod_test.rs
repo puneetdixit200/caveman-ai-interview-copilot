@@ -1,10 +1,12 @@
 use super::{
     capture_exclusion_disabled_status, capture_exclusion_enabled_status,
-    capture_exclusion_unavailable_status, enforce_capture_exclusion_setting,
-    is_companion_window_label, is_overlay_window_label, native_show_privacy_gate_status,
-    protected_window_labels, protection_refresh_fail_closed_message, sanitize_overlay_bounds,
+    capture_exclusion_unavailable_status, companion_visibility_success_status,
+    enforce_capture_exclusion_setting, is_companion_window_label, is_overlay_window_label,
+    native_show_privacy_gate_status, protected_window_labels,
+    protection_refresh_fail_closed_message, sanitize_overlay_bounds,
     startup_privacy_shield_hide_reason, windows_capture_exclusion_status, OverlayProtectionStatus,
-    OverlayWindowBounds, PROTECTION_REFRESH_FAIL_CLOSED_MARKER,
+    OverlayWindowBounds, COMPANION_HIDE_UNSAFE_PROTECTION_MARKER,
+    PROTECTION_REFRESH_FAIL_CLOSED_MARKER,
 };
 use crate::screen_share::NativePrivacyShieldDecision;
 
@@ -221,4 +223,29 @@ fn protection_refresh_allows_when_capture_exclusion_is_enabled() {
         protection_refresh_fail_closed_message(&capture_exclusion_enabled_status(false)),
         None
     );
+}
+
+#[test]
+fn hidden_companion_windows_preserve_unsafe_capture_status() {
+    let status =
+        companion_visibility_success_status(false, true, capture_exclusion_unavailable_status());
+
+    assert_eq!(status.capture_exclusion, "unsupported");
+    assert!(!status.visible);
+    let message = status.message.unwrap();
+    assert!(message.contains("Capture exclusion is only implemented"));
+    assert!(message.contains(COMPANION_HIDE_UNSAFE_PROTECTION_MARKER));
+}
+
+#[test]
+fn hidden_companion_windows_do_not_report_unsafe_when_protection_is_enabled() {
+    let status =
+        companion_visibility_success_status(false, true, capture_exclusion_enabled_status(false));
+
+    assert_eq!(status.capture_exclusion, "enabled");
+    assert!(!status.visible);
+    assert!(!status
+        .message
+        .unwrap()
+        .contains(COMPANION_HIDE_UNSAFE_PROTECTION_MARKER));
 }

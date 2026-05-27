@@ -55,6 +55,12 @@ const VIDYARD_WEB_RECORDER_ORIGIN: &str = "vidyard.com";
 const DESCRIPT_WEB_RECORDER_ORIGIN: &str = "descript.com";
 const RESTREAM_WEB_STUDIO_ORIGIN: &str = "studio.restream.io";
 const VDO_NINJA_WEB_CALL_ORIGIN: &str = "vdo.ninja";
+const BROWSER_YOU_ARE_SHARING_TITLE: &str = "you are sharing";
+const BROWSER_YOURE_SHARING_TITLE: &str = "you're sharing";
+const BROWSER_SHARING_YOUR_SCREEN_TITLE: &str = "sharing your screen";
+const BROWSER_SHARING_THIS_TAB_TITLE: &str = "sharing this tab";
+const BROWSER_SHARING_A_WINDOW_TITLE: &str = "sharing a window";
+const BROWSER_STOP_SHARING_TITLE: &str = "stop sharing";
 const MACOS_SCREEN_CAPTURE_UI_PROCESS: &str = "screencaptureui";
 const MACOS_SCREEN_CAPTURE_CLI_PROCESS: &str = "screencapture";
 const MACOS_REPLAYD_PROCESS: &str = "replayd";
@@ -122,6 +128,12 @@ const PACKAGE_PRIVACY_SHIELD_WEBVIEW_MARKERS: &[&str] = &[
     "descript.exe",
     "vidyard.exe",
     "clipchamp.exe",
+    BROWSER_YOU_ARE_SHARING_TITLE,
+    BROWSER_YOURE_SHARING_TITLE,
+    BROWSER_SHARING_YOUR_SCREEN_TITLE,
+    BROWSER_SHARING_THIS_TAB_TITLE,
+    BROWSER_SHARING_A_WINDOW_TITLE,
+    BROWSER_STOP_SHARING_TITLE,
     MACOS_SCREEN_CAPTURE_UI_PROCESS,
     MACOS_SCREEN_CAPTURE_CLI_PROCESS,
     MACOS_REPLAYD_PROCESS,
@@ -371,6 +383,12 @@ const WATCHED_SCREEN_SHARE_TITLES: &[&str] = &[
     WHATSAPP_WEB_CALL_ORIGIN,
     "screen sharing",
     "screen share",
+    BROWSER_YOU_ARE_SHARING_TITLE,
+    BROWSER_YOURE_SHARING_TITLE,
+    BROWSER_SHARING_YOUR_SCREEN_TITLE,
+    BROWSER_SHARING_THIS_TAB_TITLE,
+    BROWSER_SHARING_A_WINDOW_TITLE,
+    BROWSER_STOP_SHARING_TITLE,
     "presenting",
     "hackerrank interview",
     "interview - google meet",
@@ -1012,6 +1030,43 @@ mod tests {
     }
 
     #[test]
+    fn detects_browser_sharing_state_titles_from_browser_hosts() {
+        let processes = parse_tasklist_csv(
+            "\"chrome.exe\",\"661\",\"Console\",\"1\",\"64,000 K\",\"Running\",\"DESKTOP\\\\me\",\"0:00:21\",\"You are sharing your screen\"\n\"msedge.exe\",\"662\",\"Console\",\"1\",\"64,000 K\",\"Running\",\"DESKTOP\\\\me\",\"0:00:22\",\"Stop sharing - Google Meet\"\n\"firefox.exe\",\"663\",\"Console\",\"1\",\"64,000 K\",\"Running\",\"DESKTOP\\\\me\",\"0:00:23\",\"Sharing this tab\"\n\"RuntimeBroker.exe\",\"664\",\"Console\",\"1\",\"10,000 K\",\"Running\",\"DESKTOP\\\\me\",\"0:00:01\",\"Stop sharing notes\"",
+        );
+
+        let status = screen_share_status_for_processes(processes);
+
+        assert!(status.active);
+        assert_eq!(
+            status
+                .matched_processes
+                .iter()
+                .map(|process| (process.name.as_str(), process.window_title.as_deref()))
+                .collect::<Vec<_>>(),
+            vec![
+                ("chrome.exe", Some("You are sharing your screen")),
+                ("msedge.exe", Some("Stop sharing - Google Meet")),
+                ("firefox.exe", Some("Sharing this tab"))
+            ]
+        );
+    }
+
+    #[test]
+    fn recognizes_browser_sharing_state_titles() {
+        for title in [
+            "You are sharing your screen",
+            "You're sharing a window",
+            "Sharing your screen",
+            "Sharing this tab",
+            "Sharing a window",
+            "Stop sharing - Google Meet",
+        ] {
+            assert!(is_watched_screen_share_window_title(Some(title)));
+        }
+    }
+
+    #[test]
     fn anchors_webview_markers_for_packaged_privacy_attestation() {
         assert_eq!(
             PACKAGE_PRIVACY_SHIELD_WEBVIEW_MARKERS,
@@ -1057,6 +1112,12 @@ mod tests {
                 "descript.exe",
                 "vidyard.exe",
                 "clipchamp.exe",
+                BROWSER_YOU_ARE_SHARING_TITLE,
+                BROWSER_YOURE_SHARING_TITLE,
+                BROWSER_SHARING_YOUR_SCREEN_TITLE,
+                BROWSER_SHARING_THIS_TAB_TITLE,
+                BROWSER_SHARING_A_WINDOW_TITLE,
+                BROWSER_STOP_SHARING_TITLE,
                 MACOS_SCREEN_CAPTURE_UI_PROCESS,
                 MACOS_SCREEN_CAPTURE_CLI_PROCESS,
                 MACOS_REPLAYD_PROCESS,

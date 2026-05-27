@@ -67,6 +67,12 @@ test("requires packaged web meeting and recording title detector markers", () =>
   assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("descript.exe"));
   assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("vidyard.exe"));
   assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("clipchamp.exe"));
+  assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("you are sharing"));
+  assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("you're sharing"));
+  assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("sharing your screen"));
+  assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("sharing this tab"));
+  assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("sharing a window"));
+  assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("stop sharing"));
 });
 
 test("requires packaged remote-support service detector markers", () => {
@@ -107,6 +113,11 @@ test("requires packaged protection refresh fail-closed marker", () => {
   assert.ok(
     COMMON_PRIVACY_SHIELD_MARKERS.includes(
       "Native privacy shield hid app windows after protection refresh failed closed."
+    )
+  );
+  assert.ok(
+    COMMON_PRIVACY_SHIELD_MARKERS.includes(
+      "Companion app windows stayed hidden because capture exclusion was not proven."
     )
   );
 });
