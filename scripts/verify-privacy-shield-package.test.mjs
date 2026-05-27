@@ -120,6 +120,7 @@ test("requires packaged protection refresh fail-closed marker", () => {
       "Companion app windows stayed hidden because capture exclusion was not proven."
     )
   );
+  assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("Companion window capture exclusion is unsafe."));
 });
 
 test("reports missing packaged native privacy markers", () => {

@@ -27,6 +27,8 @@ pub const PROTECTION_REFRESH_FAIL_CLOSED_MARKER: &str =
     "Native privacy shield hid app windows after protection refresh failed closed.";
 pub const COMPANION_HIDE_UNSAFE_PROTECTION_MARKER: &str =
     "Companion app windows stayed hidden because capture exclusion was not proven.";
+pub const COMPANION_UNSAFE_PROTECTION_MARKER: &str =
+    "Companion window capture exclusion is unsafe.";
 
 pub fn protected_window_labels() -> [&'static str; 2] {
     PROTECTED_WINDOW_LABELS
@@ -257,8 +259,8 @@ fn apply_capture_exclusion_to_companion_windows(
 
     let capture_exclusion_enabled =
         enforce_capture_exclusion_setting(Some(capture_exclusion_enabled));
-    let mut failures = Vec::new();
     let mut missing_required_windows = required_companion_window_labels();
+    let mut protection_results = Vec::new();
 
     for (label, window) in app.webview_windows() {
         if !is_companion_window_label(&label) {
@@ -268,13 +270,35 @@ fn apply_capture_exclusion_to_companion_windows(
         missing_required_windows.retain(|required| *required != label.as_str());
 
         let status = apply_capture_exclusion(&window, capture_exclusion_enabled);
-        if status.capture_exclusion == "failed" {
-            failures.push(format!(
-                "{label} window capture exclusion failed: {}",
-                status
-                    .message
-                    .unwrap_or_else(|| "unknown error".to_string())
-            ));
+        protection_results.push((label, status));
+    }
+
+    let status = companion_capture_exclusion_status(
+        capture_exclusion_enabled,
+        &protection_results,
+        &missing_required_windows,
+    );
+    if status.capture_exclusion == "enabled" {
+        None
+    } else {
+        Some(status.message.unwrap_or_else(|| {
+            "Companion window capture exclusion could not be proven.".to_string()
+        }))
+    }
+}
+
+pub fn companion_capture_exclusion_status(
+    capture_exclusion_enabled: bool,
+    protection_results: &[(String, OverlayProtectionStatus)],
+    missing_required_windows: &[&str],
+) -> OverlayProtectionStatus {
+    let mut failures = Vec::new();
+
+    if capture_exclusion_enabled {
+        for (label, status) in protection_results {
+            if let Some(message) = companion_capture_exclusion_failure_message(label, status) {
+                failures.push(message);
+            }
         }
     }
 
@@ -282,10 +306,26 @@ fn apply_capture_exclusion_to_companion_windows(
         failures.push(format!("{label} window was not found."));
     }
 
-    if failures.is_empty() {
-        None
+    if !failures.is_empty() {
+        return capture_exclusion_failed_status(false, failures.join(" "));
+    }
+
+    if capture_exclusion_enabled {
+        capture_exclusion_enabled_status(false)
     } else {
-        Some(failures.join(" "))
+        capture_exclusion_disabled_status(false)
+    }
+}
+
+fn companion_capture_exclusion_failure_message(
+    label: &str,
+    status: &OverlayProtectionStatus,
+) -> Option<String> {
+    match crate::screen_share::native_privacy_shield_decision_for_overlay_protection(status) {
+        crate::screen_share::NativePrivacyShieldDecision::Allow => None,
+        crate::screen_share::NativePrivacyShieldDecision::Hide { reason } => Some(format!(
+            "{label} {COMPANION_UNSAFE_PROTECTION_MARKER} {reason}"
+        )),
     }
 }
 
@@ -298,9 +338,9 @@ pub fn set_companion_windows_visible(
 
     let capture_exclusion_enabled =
         enforce_capture_exclusion_setting(Some(capture_exclusion_enabled));
-    let mut failures = Vec::new();
     let mut missing_required_windows = required_companion_window_labels();
     let mut companion_windows = Vec::new();
+    let mut protection_results = Vec::new();
 
     for (label, window) in app.webview_windows() {
         if !is_companion_window_label(&label) {
@@ -310,29 +350,15 @@ pub fn set_companion_windows_visible(
         missing_required_windows.retain(|required| *required != label.as_str());
 
         let protection = apply_capture_exclusion(&window, capture_exclusion_enabled);
-        if protection.capture_exclusion == "failed" {
-            failures.push(format!(
-                "{label} window capture exclusion failed: {}",
-                protection
-                    .message
-                    .unwrap_or_else(|| "unknown error".to_string())
-            ));
-        }
-
+        protection_results.push((label.clone(), protection));
         companion_windows.push((label, window));
     }
 
-    for label in missing_required_windows {
-        failures.push(format!("{label} window was not found."));
-    }
-
-    let protection_status = if !failures.is_empty() {
-        capture_exclusion_failed_status(false, failures.join(" "))
-    } else if capture_exclusion_enabled {
-        capture_exclusion_enabled_status(false)
-    } else {
-        capture_exclusion_disabled_status(false)
-    };
+    let protection_status = companion_capture_exclusion_status(
+        capture_exclusion_enabled,
+        &protection_results,
+        &missing_required_windows,
+    );
 
     if visible {
         let gated_status = native_show_privacy_gate_status(

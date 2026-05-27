@@ -1,12 +1,12 @@
 use super::{
     capture_exclusion_disabled_status, capture_exclusion_enabled_status,
-    capture_exclusion_unavailable_status, companion_visibility_success_status,
-    enforce_capture_exclusion_setting, is_companion_window_label, is_overlay_window_label,
-    native_show_privacy_gate_status, protected_window_labels,
-    protection_refresh_fail_closed_message, sanitize_overlay_bounds,
+    capture_exclusion_unavailable_status, companion_capture_exclusion_status,
+    companion_visibility_success_status, enforce_capture_exclusion_setting,
+    is_companion_window_label, is_overlay_window_label, native_show_privacy_gate_status,
+    protected_window_labels, protection_refresh_fail_closed_message, sanitize_overlay_bounds,
     startup_privacy_shield_hide_reason, windows_capture_exclusion_status, OverlayProtectionStatus,
     OverlayWindowBounds, COMPANION_HIDE_UNSAFE_PROTECTION_MARKER,
-    PROTECTION_REFRESH_FAIL_CLOSED_MARKER,
+    COMPANION_UNSAFE_PROTECTION_MARKER, PROTECTION_REFRESH_FAIL_CLOSED_MARKER,
 };
 use crate::screen_share::NativePrivacyShieldDecision;
 
@@ -248,4 +248,40 @@ fn hidden_companion_windows_do_not_report_unsafe_when_protection_is_enabled() {
         .message
         .unwrap()
         .contains(COMPANION_HIDE_UNSAFE_PROTECTION_MARKER));
+}
+
+#[test]
+fn companion_capture_exclusion_fails_closed_for_unsupported_protection() {
+    let protection_results = vec![("main".to_string(), capture_exclusion_unavailable_status())];
+
+    let status = companion_capture_exclusion_status(true, &protection_results, &[]);
+
+    assert_eq!(status.capture_exclusion, "failed");
+    let message = status.message.unwrap();
+    assert!(message.contains(COMPANION_UNSAFE_PROTECTION_MARKER));
+    assert!(message.contains("Capture exclusion is not enforced"));
+    assert!(message.contains("unsupported"));
+}
+
+#[test]
+fn companion_capture_exclusion_fails_closed_for_disabled_protection() {
+    let protection_results = vec![("main".to_string(), capture_exclusion_disabled_status(false))];
+
+    let status = companion_capture_exclusion_status(true, &protection_results, &[]);
+
+    assert_eq!(status.capture_exclusion, "failed");
+    let message = status.message.unwrap();
+    assert!(message.contains(COMPANION_UNSAFE_PROTECTION_MARKER));
+    assert!(message.contains("disabled"));
+}
+
+#[test]
+fn companion_capture_exclusion_requires_required_companion_windows() {
+    let status = companion_capture_exclusion_status(true, &[], &["main"]);
+
+    assert_eq!(status.capture_exclusion, "failed");
+    assert!(status
+        .message
+        .unwrap()
+        .contains("main window was not found"));
 }
