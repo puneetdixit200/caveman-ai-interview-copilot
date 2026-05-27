@@ -19,7 +19,8 @@
         "minWidth": 1024,
         "minHeight": 720,
         "contentProtected": true,
-        "resizable": true
+        "resizable": true,
+        "visible": false
       },
       {
         "label": "overlay",

@@ -144,6 +144,23 @@ test("packaged desktop windows opt into OS content protection before runtime set
   }
 });
 
+test("packaged dashboard stays hidden until the native privacy gate allows startup show", async () => {
+  const tauriConfig = JSON.parse(await readFile("src-tauri/tauri.conf.json", "utf8"));
+  const releaseConfig = JSON.parse(await readFile("src-tauri/tauri.release.conf.json", "utf8"));
+  const libRs = await readFile("src-tauri/src/lib.rs", "utf8");
+  const windowsByLabel = new Map(tauriConfig.app.windows.map((window) => [window.label, window]));
+  const releaseWindowsByLabel = new Map(releaseConfig.app.windows.map((window) => [window.label, window]));
+
+  assert.equal(windowsByLabel.get("main")?.visible, false);
+  assert.equal(releaseWindowsByLabel.get("main")?.visible, false);
+  assert.match(libRs, /overlay::set_companion_windows_visible\(app\.handle\(\),\s*true,\s*true\)/);
+  assert.ok(
+    libRs.indexOf("overlay::configure_overlay_security(app)") <
+      libRs.indexOf("overlay::set_companion_windows_visible(app.handle(), true, true)"),
+    "startup show must run after content protection is applied"
+  );
+});
+
 test("default desktop capability denies raw window visibility bypasses", async () => {
   const capability = JSON.parse(await readFile("src-tauri/capabilities/default.json", "utf8"));
   const permissions = new Set(capability.permissions);
