@@ -64,6 +64,11 @@ const BROWSER_SHARING_YOUR_SCREEN_TITLE: &str = "sharing your screen";
 const BROWSER_SHARING_THIS_TAB_TITLE: &str = "sharing this tab";
 const BROWSER_SHARING_A_WINDOW_TITLE: &str = "sharing a window";
 const BROWSER_STOP_SHARING_TITLE: &str = "stop sharing";
+const BROWSER_YOU_ARE_PRESENTING_TITLE: &str = "you are presenting";
+const BROWSER_YOURE_PRESENTING_TITLE: &str = "you're presenting";
+const BROWSER_PRESENTING_YOUR_SCREEN_TITLE: &str = "presenting your screen";
+const BROWSER_PRESENTING_THIS_TAB_TITLE: &str = "presenting this tab";
+const BROWSER_PRESENTING_A_WINDOW_TITLE: &str = "presenting a window";
 const BROWSER_SCREEN_RECORDING_TITLE: &str = "screen recording";
 const BROWSER_RECORDING_YOUR_SCREEN_TITLE: &str = "recording your screen";
 const BROWSER_RECORDING_SCREEN_TITLE: &str = "recording screen";
@@ -141,6 +146,11 @@ const PACKAGE_PRIVACY_SHIELD_WEBVIEW_MARKERS: &[&str] = &[
     BROWSER_SHARING_THIS_TAB_TITLE,
     BROWSER_SHARING_A_WINDOW_TITLE,
     BROWSER_STOP_SHARING_TITLE,
+    BROWSER_YOU_ARE_PRESENTING_TITLE,
+    BROWSER_YOURE_PRESENTING_TITLE,
+    BROWSER_PRESENTING_YOUR_SCREEN_TITLE,
+    BROWSER_PRESENTING_THIS_TAB_TITLE,
+    BROWSER_PRESENTING_A_WINDOW_TITLE,
     BROWSER_SCREEN_RECORDING_TITLE,
     BROWSER_RECORDING_YOUR_SCREEN_TITLE,
     BROWSER_RECORDING_SCREEN_TITLE,
@@ -400,6 +410,11 @@ const WATCHED_SCREEN_SHARE_TITLES: &[&str] = &[
     BROWSER_SHARING_THIS_TAB_TITLE,
     BROWSER_SHARING_A_WINDOW_TITLE,
     BROWSER_STOP_SHARING_TITLE,
+    BROWSER_YOU_ARE_PRESENTING_TITLE,
+    BROWSER_YOURE_PRESENTING_TITLE,
+    BROWSER_PRESENTING_YOUR_SCREEN_TITLE,
+    BROWSER_PRESENTING_THIS_TAB_TITLE,
+    BROWSER_PRESENTING_A_WINDOW_TITLE,
     BROWSER_SCREEN_RECORDING_TITLE,
     BROWSER_RECORDING_YOUR_SCREEN_TITLE,
     BROWSER_RECORDING_SCREEN_TITLE,
@@ -1078,9 +1093,32 @@ mod tests {
     }
 
     #[test]
+    fn detects_browser_presenting_state_titles_from_browser_hosts() {
+        let processes = parse_tasklist_csv(
+            "\"chrome.exe\",\"665\",\"Console\",\"1\",\"64,000 K\",\"Running\",\"DESKTOP\\\\me\",\"0:00:21\",\"You are presenting your screen\"\n\"msedge.exe\",\"666\",\"Console\",\"1\",\"64,000 K\",\"Running\",\"DESKTOP\\\\me\",\"0:00:22\",\"Presenting this tab - Google Meet\"\n\"firefox.exe\",\"667\",\"Console\",\"1\",\"64,000 K\",\"Running\",\"DESKTOP\\\\me\",\"0:00:23\",\"Presenting a window\"\n\"notepad.exe\",\"668\",\"Console\",\"1\",\"10,000 K\",\"Running\",\"DESKTOP\\\\me\",\"0:00:01\",\"Presenting notes\"",
+        );
+
+        let status = screen_share_status_for_processes(processes);
+
+        assert!(status.active);
+        assert_eq!(
+            status
+                .matched_processes
+                .iter()
+                .map(|process| (process.name.as_str(), process.window_title.as_deref()))
+                .collect::<Vec<_>>(),
+            vec![
+                ("chrome.exe", Some("You are presenting your screen")),
+                ("msedge.exe", Some("Presenting this tab - Google Meet")),
+                ("firefox.exe", Some("Presenting a window"))
+            ]
+        );
+    }
+
+    #[test]
     fn detects_compact_google_meet_and_screen_recording_titles_from_browser_hosts() {
         let processes = parse_tasklist_csv(
-            "\"chrome.exe\",\"665\",\"Console\",\"1\",\"64,000 K\",\"Running\",\"DESKTOP\\\\me\",\"0:00:21\",\"Meet - abc-defg-hij\"\n\"msedge.exe\",\"666\",\"Console\",\"1\",\"64,000 K\",\"Running\",\"DESKTOP\\\\me\",\"0:00:22\",\"Screen recording - Loom\"\n\"firefox.exe\",\"667\",\"Console\",\"1\",\"64,000 K\",\"Running\",\"DESKTOP\\\\me\",\"0:00:23\",\"Recording your screen\"\n\"notepad.exe\",\"668\",\"Console\",\"1\",\"10,000 K\",\"Running\",\"DESKTOP\\\\me\",\"0:00:01\",\"Meet - personal notes\"",
+            "\"chrome.exe\",\"669\",\"Console\",\"1\",\"64,000 K\",\"Running\",\"DESKTOP\\\\me\",\"0:00:21\",\"Meet - abc-defg-hij\"\n\"msedge.exe\",\"670\",\"Console\",\"1\",\"64,000 K\",\"Running\",\"DESKTOP\\\\me\",\"0:00:22\",\"Screen recording - Loom\"\n\"firefox.exe\",\"671\",\"Console\",\"1\",\"64,000 K\",\"Running\",\"DESKTOP\\\\me\",\"0:00:23\",\"Recording your screen\"\n\"notepad.exe\",\"672\",\"Console\",\"1\",\"10,000 K\",\"Running\",\"DESKTOP\\\\me\",\"0:00:01\",\"Meet - personal notes\"",
         );
 
         let status = screen_share_status_for_processes(processes);
@@ -1109,6 +1147,11 @@ mod tests {
             "Sharing this tab",
             "Sharing a window",
             "Stop sharing - Google Meet",
+            "You are presenting your screen",
+            "You're presenting a window",
+            "Presenting your screen",
+            "Presenting this tab",
+            "Presenting a window",
             "Meet - abc-defg-hij",
             "Screen recording - Loom",
             "Recording your screen",
@@ -1171,6 +1214,11 @@ mod tests {
                 BROWSER_SHARING_THIS_TAB_TITLE,
                 BROWSER_SHARING_A_WINDOW_TITLE,
                 BROWSER_STOP_SHARING_TITLE,
+                BROWSER_YOU_ARE_PRESENTING_TITLE,
+                BROWSER_YOURE_PRESENTING_TITLE,
+                BROWSER_PRESENTING_YOUR_SCREEN_TITLE,
+                BROWSER_PRESENTING_THIS_TAB_TITLE,
+                BROWSER_PRESENTING_A_WINDOW_TITLE,
                 BROWSER_SCREEN_RECORDING_TITLE,
                 BROWSER_RECORDING_YOUR_SCREEN_TITLE,
                 BROWSER_RECORDING_SCREEN_TITLE,

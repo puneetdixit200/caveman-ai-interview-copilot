@@ -74,6 +74,11 @@ test("requires packaged web meeting and recording title detector markers", () =>
   assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("sharing this tab"));
   assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("sharing a window"));
   assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("stop sharing"));
+  assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("you are presenting"));
+  assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("you're presenting"));
+  assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("presenting your screen"));
+  assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("presenting this tab"));
+  assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("presenting a window"));
   assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("screen recording"));
   assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("recording your screen"));
   assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("recording screen"));
