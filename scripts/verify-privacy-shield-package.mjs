@@ -29,6 +29,7 @@ export const COMMON_PRIVACY_SHIELD_MARKERS = [
   "Companion app windows stayed hidden because capture exclusion was not proven.",
   "Companion window capture exclusion is unsafe.",
   "Native privacy shield thread failed to start; refusing to run without fail-closed screen-share guard.",
+  "Native privacy shield starts before startup companion window show.",
   "Native privacy shield denied screen OCR capture.",
   "Waiting for app windows to leave capture surfaces before screen OCR capture.",
   "Native privacy shield denied active-window typing during screen-share risk.",

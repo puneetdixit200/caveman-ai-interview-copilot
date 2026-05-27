@@ -197,6 +197,9 @@ test("requires packaged protection refresh fail-closed marker", () => {
       "Native privacy shield thread failed to start; refusing to run without fail-closed screen-share guard."
     )
   );
+  assert.ok(
+    COMMON_PRIVACY_SHIELD_MARKERS.includes("Native privacy shield starts before startup companion window show.")
+  );
 });
 
 test("reports missing packaged native privacy markers", () => {

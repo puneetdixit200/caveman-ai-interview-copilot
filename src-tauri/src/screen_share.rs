@@ -21,6 +21,8 @@ pub struct ScreenShareStatus {
 const NATIVE_PRIVACY_SHIELD_INTERVAL: Duration = Duration::from_millis(250);
 pub const NATIVE_PRIVACY_SHIELD_THREAD_START_FAILED_MARKER: &str =
     "Native privacy shield thread failed to start; refusing to run without fail-closed screen-share guard.";
+pub const NATIVE_PRIVACY_SHIELD_STARTS_BEFORE_INITIAL_SHOW_MARKER: &str =
+    "Native privacy shield starts before startup companion window show.";
 const EDGE_WEBVIEW_HOST_PROCESS: &str = "msedgewebview2.exe";
 const EDGE_PWA_HOST_PROCESS: &str = "msedge_proxy.exe";
 const CHROME_PWA_HOST_PROCESS: &str = "chrome_proxy.exe";
@@ -569,6 +571,8 @@ pub fn native_privacy_shield_decision_for_overlay_protection(
 }
 
 pub fn start_native_privacy_shield(app: tauri::AppHandle) -> anyhow::Result<()> {
+    std::hint::black_box(NATIVE_PRIVACY_SHIELD_STARTS_BEFORE_INITIAL_SHOW_MARKER);
+
     thread::Builder::new()
         .name("screen-share-privacy-shield".to_string())
         .spawn(move || loop {

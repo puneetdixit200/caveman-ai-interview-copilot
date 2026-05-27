@@ -154,12 +154,18 @@ test("packaged dashboard stays hidden until the native privacy gate allows start
   assert.equal(windowsByLabel.get("main")?.visible, false);
   assert.equal(releaseWindowsByLabel.get("main")?.visible, false);
   assert.match(libRs, /let startup_allows_initial_show = overlay::configure_overlay_security\(app\)/);
+  assert.match(libRs, /screen_share::start_native_privacy_shield\(app\.handle\(\)\.clone\(\)\)\?/);
   assert.match(libRs, /if startup_allows_initial_show\s*\{/);
   assert.match(libRs, /overlay::set_companion_windows_visible\(app\.handle\(\),\s*true,\s*true\)/);
   assert.ok(
     libRs.indexOf("let startup_allows_initial_show = overlay::configure_overlay_security(app)") <
+      libRs.indexOf("screen_share::start_native_privacy_shield(app.handle().clone())?"),
+    "startup setup must configure capture protection before starting the privacy shield"
+  );
+  assert.ok(
+    libRs.indexOf("screen_share::start_native_privacy_shield(app.handle().clone())?") <
       libRs.indexOf("if startup_allows_initial_show"),
-    "startup show gate must use the native startup privacy decision"
+    "startup show gate must wait until the native privacy shield thread is running"
   );
   assert.ok(
     libRs.indexOf("if startup_allows_initial_show") <
@@ -203,11 +209,17 @@ test("startup refuses to run when the native privacy shield thread cannot start"
   assert.notEqual(setupStart, -1, "Tauri setup block must exist");
   assert.match(setupBody, /screen_share::start_native_privacy_shield\(app\.handle\(\)\.clone\(\)\)\?/);
   assert.doesNotMatch(setupBody, /let _ = screen_share::start_native_privacy_shield/);
+  assert.ok(
+    setupBody.indexOf("screen_share::start_native_privacy_shield(app.handle().clone())?") <
+      setupBody.indexOf("overlay::set_companion_windows_visible(app.handle(), true, true)"),
+    "startup must refuse before any initial companion window show when shield startup fails"
+  );
   assert.match(screenShareRs, /pub fn start_native_privacy_shield\(app: tauri::AppHandle\) -> anyhow::Result<\(\)>/);
   assert.match(
     screenShareRs,
     /Native privacy shield thread failed to start; refusing to run without fail-closed screen-share guard\./
   );
+  assert.match(screenShareRs, /Native privacy shield starts before startup companion window show\./);
 });
 
 test("native screen OCR capture hides app windows before creating screenshots", async () => {

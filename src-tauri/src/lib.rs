@@ -36,10 +36,10 @@ pub fn run() {
             app.manage(collaboration::CollaborationManager::default());
             app.manage(runtime::RuntimeBudget::default());
             let startup_allows_initial_show = overlay::configure_overlay_security(app);
+            screen_share::start_native_privacy_shield(app.handle().clone())?;
             if startup_allows_initial_show {
                 let _ = overlay::set_companion_windows_visible(app.handle(), true, true);
             }
-            screen_share::start_native_privacy_shield(app.handle().clone())?;
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
