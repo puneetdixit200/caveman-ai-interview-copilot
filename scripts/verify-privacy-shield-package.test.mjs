@@ -12,6 +12,15 @@ import {
   writePrivacyShieldAttestation
 } from "./verify-privacy-shield-package.mjs";
 
+const DESKTOP_PROCESS_TARGETS = ["windows-x64", "macos-x64", "macos-arm64"];
+
+function assertDesktopProcessMarker(marker) {
+  for (const target of DESKTOP_PROCESS_TARGETS) {
+    assert.ok(TARGET_PRIVACY_SHIELD_MARKERS[target].includes(marker), `${target} must require ${marker}`);
+  }
+  assert.ok(!TARGET_PRIVACY_SHIELD_MARKERS["linux-x64"].includes(marker), `linux-x64 must not require ${marker}`);
+}
+
 test("validates packaged native privacy markers from binary content", () => {
   const binary = Buffer.from(`prefix ${COMMON_PRIVACY_SHIELD_MARKERS.join(" middle ")} suffix`);
 
@@ -35,43 +44,43 @@ test("requires packaged Teams and Google Meet WebView detector markers", () => {
 
 test("requires packaged remote screen-share detector markers", () => {
   assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("webexhost.exe"));
-  assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("teamviewer.exe"));
-  assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("anydesk.exe"));
-  assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("rustdesk.exe"));
-  assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("remoting_host.exe"));
-  assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("chrome remote desktop"));
-  assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("vnc viewer"));
-  assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("parsec"));
-  assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("splashtop streamer"));
-  assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("quickassist.exe"));
-  assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("msra.exe"));
-  assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("mstsc.exe"));
-  assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("remotehelp.exe"));
-  assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("logmein"));
-  assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("bomgar-scc.exe"));
-  assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("beyondtrust"));
-  assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("jump desktop"));
-  assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("nomachine"));
-  assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("connectwisecontrol.client.exe"));
+  assertDesktopProcessMarker("teamviewer.exe");
+  assertDesktopProcessMarker("anydesk.exe");
+  assertDesktopProcessMarker("rustdesk.exe");
+  assertDesktopProcessMarker("remoting_host.exe");
+  assertDesktopProcessMarker("chrome remote desktop");
+  assertDesktopProcessMarker("vnc viewer");
+  assertDesktopProcessMarker("parsec");
+  assertDesktopProcessMarker("splashtop streamer");
+  assertDesktopProcessMarker("quickassist.exe");
+  assertDesktopProcessMarker("msra.exe");
+  assertDesktopProcessMarker("mstsc.exe");
+  assertDesktopProcessMarker("remotehelp.exe");
+  assertDesktopProcessMarker("logmein");
+  assertDesktopProcessMarker("bomgar-scc.exe");
+  assertDesktopProcessMarker("beyondtrust");
+  assertDesktopProcessMarker("jump desktop");
+  assertDesktopProcessMarker("nomachine");
+  assertDesktopProcessMarker("connectwisecontrol.client.exe");
   assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("screenconnect.windowsclient.exe"));
   assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("screenconnect.client.exe"));
-  assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("screenconnect.clientservice.exe"));
+  assertDesktopProcessMarker("screenconnect.clientservice.exe");
 });
 
 test("requires packaged desktop meeting app detector markers", () => {
-  assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("skype.exe"));
-  assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("gotomeeting.exe"));
-  assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("g2mcomm.exe"));
-  assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("g2mstart.exe"));
-  assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("bluejeans.exe"));
-  assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("ringcentral.exe"));
-  assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("jitsi meet"));
-  assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("join.me"));
-  assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("around.exe"));
-  assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("mmhmm.exe"));
-  assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("telegram.exe"));
-  assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("signal.exe"));
-  assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("facetime"));
+  assertDesktopProcessMarker("skype.exe");
+  assertDesktopProcessMarker("gotomeeting.exe");
+  assertDesktopProcessMarker("g2mcomm.exe");
+  assertDesktopProcessMarker("g2mstart.exe");
+  assertDesktopProcessMarker("bluejeans.exe");
+  assertDesktopProcessMarker("ringcentral.exe");
+  assertDesktopProcessMarker("jitsi meet");
+  assertDesktopProcessMarker("join.me");
+  assertDesktopProcessMarker("around.exe");
+  assertDesktopProcessMarker("mmhmm.exe");
+  assertDesktopProcessMarker("telegram.exe");
+  assertDesktopProcessMarker("signal.exe");
+  assertDesktopProcessMarker("facetime");
 });
 
 test("requires packaged web meeting and recording title detector markers", () => {
@@ -98,18 +107,18 @@ test("requires packaged web meeting and recording title detector markers", () =>
   assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("descript.com"));
   assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("studio.restream.io"));
   assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("vdo.ninja"));
-  assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("obs64.exe"));
-  assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("obs32.exe"));
-  assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("streamlabs obs"));
-  assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("streamlabs desktop"));
-  assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("quicktime player"));
-  assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("loom.exe"));
-  assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("camtasia.exe"));
-  assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("snagit64.exe"));
-  assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("screenflow"));
-  assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("xsplit.core.exe"));
-  assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("sharex.exe"));
-  assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("bandicam.exe"));
+  assertDesktopProcessMarker("obs64.exe");
+  assertDesktopProcessMarker("obs32.exe");
+  assertDesktopProcessMarker("streamlabs obs");
+  assertDesktopProcessMarker("streamlabs desktop");
+  assertDesktopProcessMarker("quicktime player");
+  assertDesktopProcessMarker("loom.exe");
+  assertDesktopProcessMarker("camtasia.exe");
+  assertDesktopProcessMarker("snagit64.exe");
+  assertDesktopProcessMarker("screenflow");
+  assertDesktopProcessMarker("xsplit.core.exe");
+  assertDesktopProcessMarker("sharex.exe");
+  assertDesktopProcessMarker("bandicam.exe");
   assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("screenpal.exe"));
   assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("screencast-o-matic"));
   assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("descript.exe"));
