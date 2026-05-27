@@ -31,9 +31,13 @@ const SCREENCONNECT_CLIENT_PROCESS: &str = "screenconnect.client.exe";
 const ZOHO_ASSIST_PROCESS: &str = "zohoassist.exe";
 const ZOHO_ASSIST_CONNECT_PROCESS: &str = "za_connect.exe";
 const TEAMS_WEB_MEETING_ORIGIN: &str = "teams.microsoft.com";
+const TEAMS_CONSUMER_WEB_MEETING_ORIGIN: &str = "teams.live.com";
+const TEAMS_CLOUD_WEB_MEETING_ORIGIN: &str = "teams.cloud.microsoft";
 const MEET_WEB_MEETING_ORIGIN: &str = "meet.google.com";
 const ZOOM_WEB_MEETING_ORIGIN: &str = "zoom.us";
 const SLACK_WEB_HUDDLE_ORIGIN: &str = "app.slack.com";
+const DISCORD_WEB_HUDDLE_ORIGIN: &str = "discord.com";
+const WHATSAPP_WEB_CALL_ORIGIN: &str = "web.whatsapp.com";
 const WHEREBY_WEB_MEETING_ORIGIN: &str = "whereby.com";
 const RIVERSIDE_WEB_MEETING_ORIGIN: &str = "riverside.fm";
 const STREAMYARD_WEB_MEETING_ORIGIN: &str = "streamyard.com";
@@ -53,9 +57,13 @@ const PACKAGE_PRIVACY_SHIELD_WEBVIEW_MARKERS: &[&str] = &[
     ZOHO_ASSIST_PROCESS,
     ZOHO_ASSIST_CONNECT_PROCESS,
     TEAMS_WEB_MEETING_ORIGIN,
+    TEAMS_CONSUMER_WEB_MEETING_ORIGIN,
+    TEAMS_CLOUD_WEB_MEETING_ORIGIN,
     MEET_WEB_MEETING_ORIGIN,
     ZOOM_WEB_MEETING_ORIGIN,
     SLACK_WEB_HUDDLE_ORIGIN,
+    DISCORD_WEB_HUDDLE_ORIGIN,
+    WHATSAPP_WEB_CALL_ORIGIN,
     WHEREBY_WEB_MEETING_ORIGIN,
     RIVERSIDE_WEB_MEETING_ORIGIN,
     STREAMYARD_WEB_MEETING_ORIGIN,
@@ -232,6 +240,8 @@ const WATCHED_SCREEN_SHARE_TITLES: &[&str] = &[
     "microsoft teams",
     "teams meeting",
     TEAMS_WEB_MEETING_ORIGIN,
+    TEAMS_CONSUMER_WEB_MEETING_ORIGIN,
+    TEAMS_CLOUD_WEB_MEETING_ORIGIN,
     "zoom meeting",
     ZOOM_WEB_MEETING_ORIGIN,
     "webex meeting",
@@ -249,6 +259,8 @@ const WATCHED_SCREEN_SHARE_TITLES: &[&str] = &[
     "slack huddle",
     SLACK_WEB_HUDDLE_ORIGIN,
     "discord",
+    DISCORD_WEB_HUDDLE_ORIGIN,
+    WHATSAPP_WEB_CALL_ORIGIN,
     "screen sharing",
     "screen share",
     "presenting",
@@ -697,6 +709,49 @@ mod tests {
     }
 
     #[test]
+    fn detects_consumer_teams_and_web_huddle_origins_from_webview_hosts() {
+        let processes = parse_tasklist_csv(
+            "\"msedgewebview2.exe\",\"631\",\"Console\",\"1\",\"64,000 K\",\"Running\",\"DESKTOP\\\\me\",\"0:00:21\",\"teams.live.com/v2/meet/123\"\n\"ApplicationFrameHost.exe\",\"632\",\"Console\",\"1\",\"64,000 K\",\"Running\",\"DESKTOP\\\\me\",\"0:00:22\",\"teams.cloud.microsoft/meet/456\"\n\"msedge_proxy.exe\",\"633\",\"Console\",\"1\",\"64,000 K\",\"Running\",\"DESKTOP\\\\me\",\"0:00:23\",\"discord.com/channels/123/456\"\n\"chrome_proxy.exe\",\"634\",\"Console\",\"1\",\"64,000 K\",\"Running\",\"DESKTOP\\\\me\",\"0:00:24\",\"web.whatsapp.com - Video call\"\n\"RuntimeBroker.exe\",\"635\",\"Console\",\"1\",\"10,000 K\",\"Running\",\"DESKTOP\\\\me\",\"0:00:01\",\"Settings\"",
+        );
+
+        let status = screen_share_status_for_processes(processes);
+
+        assert!(status.active);
+        assert_eq!(
+            status
+                .matched_processes
+                .iter()
+                .map(|process| (process.name.as_str(), process.window_title.as_deref()))
+                .collect::<Vec<_>>(),
+            vec![
+                ("msedgewebview2.exe", Some("teams.live.com/v2/meet/123")),
+                (
+                    "ApplicationFrameHost.exe",
+                    Some("teams.cloud.microsoft/meet/456")
+                ),
+                ("msedge_proxy.exe", Some("discord.com/channels/123/456")),
+                ("chrome_proxy.exe", Some("web.whatsapp.com - Video call"))
+            ]
+        );
+    }
+
+    #[test]
+    fn recognizes_consumer_teams_and_web_huddle_origin_titles() {
+        assert!(is_watched_screen_share_window_title(Some(
+            "teams.live.com/v2/meet/123"
+        )));
+        assert!(is_watched_screen_share_window_title(Some(
+            "teams.cloud.microsoft/meet/456"
+        )));
+        assert!(is_watched_screen_share_window_title(Some(
+            "discord.com/channels/123/456"
+        )));
+        assert!(is_watched_screen_share_window_title(Some(
+            "web.whatsapp.com - Video call"
+        )));
+    }
+
+    #[test]
     fn anchors_webview_markers_for_packaged_privacy_attestation() {
         assert_eq!(
             PACKAGE_PRIVACY_SHIELD_WEBVIEW_MARKERS,
@@ -713,9 +768,13 @@ mod tests {
                 ZOHO_ASSIST_PROCESS,
                 ZOHO_ASSIST_CONNECT_PROCESS,
                 TEAMS_WEB_MEETING_ORIGIN,
+                TEAMS_CONSUMER_WEB_MEETING_ORIGIN,
+                TEAMS_CLOUD_WEB_MEETING_ORIGIN,
                 MEET_WEB_MEETING_ORIGIN,
                 ZOOM_WEB_MEETING_ORIGIN,
                 SLACK_WEB_HUDDLE_ORIGIN,
+                DISCORD_WEB_HUDDLE_ORIGIN,
+                WHATSAPP_WEB_CALL_ORIGIN,
                 WHEREBY_WEB_MEETING_ORIGIN,
                 RIVERSIDE_WEB_MEETING_ORIGIN,
                 STREAMYARD_WEB_MEETING_ORIGIN,
