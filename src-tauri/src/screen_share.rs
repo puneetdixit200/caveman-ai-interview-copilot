@@ -32,6 +32,8 @@ const ZOHO_ASSIST_PROCESS: &str = "zohoassist.exe";
 const ZOHO_ASSIST_CONNECT_PROCESS: &str = "za_connect.exe";
 const TEAMS_WEB_MEETING_ORIGIN: &str = "teams.microsoft.com";
 const MEET_WEB_MEETING_ORIGIN: &str = "meet.google.com";
+const ZOOM_WEB_MEETING_ORIGIN: &str = "zoom.us";
+const SLACK_WEB_HUDDLE_ORIGIN: &str = "app.slack.com";
 const WHEREBY_WEB_MEETING_ORIGIN: &str = "whereby.com";
 const RIVERSIDE_WEB_MEETING_ORIGIN: &str = "riverside.fm";
 const STREAMYARD_WEB_MEETING_ORIGIN: &str = "streamyard.com";
@@ -52,6 +54,8 @@ const PACKAGE_PRIVACY_SHIELD_WEBVIEW_MARKERS: &[&str] = &[
     ZOHO_ASSIST_CONNECT_PROCESS,
     TEAMS_WEB_MEETING_ORIGIN,
     MEET_WEB_MEETING_ORIGIN,
+    ZOOM_WEB_MEETING_ORIGIN,
+    SLACK_WEB_HUDDLE_ORIGIN,
     WHEREBY_WEB_MEETING_ORIGIN,
     RIVERSIDE_WEB_MEETING_ORIGIN,
     STREAMYARD_WEB_MEETING_ORIGIN,
@@ -229,6 +233,7 @@ const WATCHED_SCREEN_SHARE_TITLES: &[&str] = &[
     "teams meeting",
     TEAMS_WEB_MEETING_ORIGIN,
     "zoom meeting",
+    ZOOM_WEB_MEETING_ORIGIN,
     "webex meeting",
     "whereby",
     WHEREBY_WEB_MEETING_ORIGIN,
@@ -242,6 +247,7 @@ const WATCHED_SCREEN_SHARE_TITLES: &[&str] = &[
     "tella",
     TELLA_WEB_RECORDER_ORIGIN,
     "slack huddle",
+    SLACK_WEB_HUDDLE_ORIGIN,
     "discord",
     "screen sharing",
     "screen share",
@@ -659,6 +665,38 @@ mod tests {
     }
 
     #[test]
+    fn detects_zoom_and_slack_web_origins_from_pwa_hosts() {
+        let processes = parse_tasklist_csv(
+            "\"chrome_proxy.exe\",\"621\",\"Console\",\"1\",\"64,000 K\",\"Running\",\"DESKTOP\\\\me\",\"0:00:21\",\"join.zoom.us/wc/123456789\"\n\"msedge_proxy.exe\",\"622\",\"Console\",\"1\",\"64,000 K\",\"Running\",\"DESKTOP\\\\me\",\"0:00:22\",\"app.slack.com/client/T123/C456\"\n\"RuntimeBroker.exe\",\"623\",\"Console\",\"1\",\"10,000 K\",\"Running\",\"DESKTOP\\\\me\",\"0:00:01\",\"Settings\"",
+        );
+
+        let status = screen_share_status_for_processes(processes);
+
+        assert!(status.active);
+        assert_eq!(
+            status
+                .matched_processes
+                .iter()
+                .map(|process| (process.name.as_str(), process.window_title.as_deref()))
+                .collect::<Vec<_>>(),
+            vec![
+                ("chrome_proxy.exe", Some("join.zoom.us/wc/123456789")),
+                ("msedge_proxy.exe", Some("app.slack.com/client/T123/C456"))
+            ]
+        );
+    }
+
+    #[test]
+    fn recognizes_zoom_and_slack_web_origin_titles() {
+        assert!(is_watched_screen_share_window_title(Some(
+            "join.zoom.us/wc/123456789"
+        )));
+        assert!(is_watched_screen_share_window_title(Some(
+            "app.slack.com/client/T123/C456"
+        )));
+    }
+
+    #[test]
     fn anchors_webview_markers_for_packaged_privacy_attestation() {
         assert_eq!(
             PACKAGE_PRIVACY_SHIELD_WEBVIEW_MARKERS,
@@ -676,6 +714,8 @@ mod tests {
                 ZOHO_ASSIST_CONNECT_PROCESS,
                 TEAMS_WEB_MEETING_ORIGIN,
                 MEET_WEB_MEETING_ORIGIN,
+                ZOOM_WEB_MEETING_ORIGIN,
+                SLACK_WEB_HUDDLE_ORIGIN,
                 WHEREBY_WEB_MEETING_ORIGIN,
                 RIVERSIDE_WEB_MEETING_ORIGIN,
                 STREAMYARD_WEB_MEETING_ORIGIN,

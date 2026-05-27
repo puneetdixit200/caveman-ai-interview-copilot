@@ -40,6 +40,8 @@ test("requires packaged remote screen-share detector markers", () => {
 
 test("requires packaged web meeting and recording title detector markers", () => {
   assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("whereby.com"));
+  assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("zoom.us"));
+  assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("app.slack.com"));
   assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("riverside.fm"));
   assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("streamyard.com"));
   assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("livestorm.co"));

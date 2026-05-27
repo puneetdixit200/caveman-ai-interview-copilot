@@ -38,6 +38,8 @@ export const COMMON_PRIVACY_SHIELD_MARKERS = [
   "za_connect.exe",
   "teams.microsoft.com",
   "meet.google.com",
+  "zoom.us",
+  "app.slack.com",
   "whereby.com",
   "riverside.fm",
   "streamyard.com",
