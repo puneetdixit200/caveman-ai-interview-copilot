@@ -1,8 +1,13 @@
 use crate::screen_share::NativePrivacyShieldDecision;
 use base64::{engine::general_purpose::STANDARD, Engine as _};
 use serde::Serialize;
+use std::time::Duration;
 use xcap::image::{codecs::png::PngEncoder, ColorType, ImageEncoder, RgbaImage};
 use xcap::Monitor;
+
+pub const HIDDEN_WINDOW_CAPTURE_SETTLE_DELAY: Duration = Duration::from_millis(120);
+pub const HIDDEN_WINDOW_CAPTURE_SETTLE_MARKER: &str =
+    "Waiting for app windows to leave capture surfaces before screen OCR capture.";
 
 #[derive(Debug, Clone, Serialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
@@ -29,6 +34,11 @@ pub fn capture_screen_frame() -> anyhow::Result<ScreenFrame> {
         monitor_name,
         captured_at_ms: chrono::Utc::now().timestamp_millis(),
     })
+}
+
+pub fn wait_for_app_windows_to_leave_capture_surfaces() {
+    std::hint::black_box(HIDDEN_WINDOW_CAPTURE_SETTLE_MARKER);
+    std::thread::sleep(HIDDEN_WINDOW_CAPTURE_SETTLE_DELAY);
 }
 
 pub fn native_capture_privacy_gate_message(
@@ -99,6 +109,7 @@ fn select_primary_monitor(monitors: Vec<Monitor>) -> anyhow::Result<Monitor> {
 mod tests {
     use super::{
         native_capture_privacy_gate_message, png_data_url_from_rgba_image, primary_monitor_index,
+        HIDDEN_WINDOW_CAPTURE_SETTLE_DELAY, HIDDEN_WINDOW_CAPTURE_SETTLE_MARKER,
     };
     use crate::screen_share::NativePrivacyShieldDecision;
     use xcap::image::{ImageBuffer, Rgba};
@@ -153,5 +164,12 @@ mod tests {
             ),
             None
         );
+    }
+
+    #[test]
+    fn hidden_window_capture_settle_delay_covers_compositor_frames() {
+        assert!(HIDDEN_WINDOW_CAPTURE_SETTLE_DELAY >= std::time::Duration::from_millis(100));
+        assert!(HIDDEN_WINDOW_CAPTURE_SETTLE_DELAY <= std::time::Duration::from_millis(500));
+        assert!(HIDDEN_WINDOW_CAPTURE_SETTLE_MARKER.contains("leave capture surfaces"));
     }
 }

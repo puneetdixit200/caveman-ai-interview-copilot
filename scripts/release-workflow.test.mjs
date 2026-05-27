@@ -195,12 +195,15 @@ test("native screen OCR capture hides app windows before creating screenshots", 
   const commandBody = commandsRs.slice(commandStart, commandsRs.indexOf("#[tauri::command]", commandStart + 1));
   const hideOverlay = commandBody.indexOf("overlay::set_overlay_window_visible(&app_handle, false, true)");
   const hideCompanions = commandBody.indexOf("overlay::set_companion_windows_visible(&app_handle, false, true)");
+  const settleWait = commandBody.indexOf("ocr::wait_for_app_windows_to_leave_capture_surfaces()");
   const captureCall = commandBody.indexOf("ocr::capture_screen_frame()");
 
   assert.notEqual(hideOverlay, -1, "OCR capture must hide overlay window before screenshotting");
   assert.notEqual(hideCompanions, -1, "OCR capture must hide companion app windows before screenshotting");
+  assert.notEqual(settleWait, -1, "OCR capture must wait for hidden app windows to leave capture surfaces");
   assert.ok(hideOverlay < captureCall, "overlay hide must run before native screenshot capture");
   assert.ok(hideCompanions < captureCall, "companion window hide must run before native screenshot capture");
+  assert.ok(settleWait < captureCall, "capture settle wait must run before native screenshot capture");
   assert.match(commandBody, /ocr::native_capture_privacy_gate_message/);
 });
 

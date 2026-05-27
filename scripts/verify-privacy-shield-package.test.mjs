@@ -67,6 +67,14 @@ test("requires packaged Windows display-affinity readback marker", () => {
   assert.ok(TARGET_PRIVACY_SHIELD_MARKERS["windows-x64"].includes("GetWindowDisplayAffinity"));
 });
 
+test("requires packaged OCR capture settle marker", () => {
+  assert.ok(
+    COMMON_PRIVACY_SHIELD_MARKERS.includes(
+      "Waiting for app windows to leave capture surfaces before screen OCR capture."
+    )
+  );
+});
+
 test("reports missing packaged native privacy markers", () => {
   const result = evaluateBinaryPrivacyMarkers(Buffer.from("Capture exclusion is not enforced."), [
     "Capture exclusion is not enforced.",

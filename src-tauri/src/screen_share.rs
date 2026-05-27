@@ -18,7 +18,7 @@ pub struct ScreenShareStatus {
     pub message: Option<String>,
 }
 
-const NATIVE_PRIVACY_SHIELD_INTERVAL: Duration = Duration::from_millis(500);
+const NATIVE_PRIVACY_SHIELD_INTERVAL: Duration = Duration::from_millis(250);
 const EDGE_WEBVIEW_HOST_PROCESS: &str = "msedgewebview2.exe";
 const EDGE_PWA_HOST_PROCESS: &str = "msedge_proxy.exe";
 const CHROME_PWA_HOST_PROCESS: &str = "chrome_proxy.exe";
@@ -1286,6 +1286,6 @@ mod tests {
 
     #[test]
     fn native_privacy_shield_polls_quickly_enough_for_new_share_sessions() {
-        assert!(NATIVE_PRIVACY_SHIELD_INTERVAL <= Duration::from_millis(500));
+        assert!(NATIVE_PRIVACY_SHIELD_INTERVAL <= Duration::from_millis(250));
     }
 }

@@ -25,6 +25,7 @@ export const COMMON_PRIVACY_SHIELD_MARKERS = [
   "Capture exclusion is not enforced:",
   "Native privacy shield denied showing",
   "Native privacy shield denied screen OCR capture.",
+  "Waiting for app windows to leave capture surfaces before screen OCR capture.",
   "msedgewebview2.exe",
   "msedge_proxy.exe",
   "chrome_proxy.exe",

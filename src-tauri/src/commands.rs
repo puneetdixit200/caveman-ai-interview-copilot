@@ -506,6 +506,7 @@ pub fn capture_screen_frame(app_handle: AppHandle) -> Result<ScreenFrame, String
         return Err(message);
     }
 
+    ocr::wait_for_app_windows_to_leave_capture_surfaces();
     ocr::capture_screen_frame().map_err(to_command_error)
 }
 
