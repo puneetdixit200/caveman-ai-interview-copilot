@@ -44,6 +44,7 @@ export interface OverlayProtectionStatus {
 export interface ScreenShareProcess {
   name: string;
   pid?: number | null;
+  windowTitle?: string | null;
 }
 
 export interface ScreenShareStatus {

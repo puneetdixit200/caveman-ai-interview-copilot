@@ -6,6 +6,8 @@ use std::{thread, time::Duration};
 pub struct ScreenShareProcess {
     pub name: String,
     pub pid: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub window_title: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, PartialEq)]
@@ -175,11 +177,29 @@ const WATCHED_SCREEN_SHARE_PROCESSES: &[&str] = &[
     "ecamm live",
 ];
 
+const WATCHED_SCREEN_SHARE_TITLES: &[&str] = &[
+    "google meet",
+    "meet.google.com",
+    "microsoft teams",
+    "teams meeting",
+    "teams.microsoft.com",
+    "zoom meeting",
+    "webex meeting",
+    "slack huddle",
+    "discord",
+    "screen sharing",
+    "screen share",
+    "presenting",
+    "hackerrank interview",
+    "interview - google meet",
+    "interview - microsoft teams",
+];
+
 pub fn detect_screen_share_status() -> anyhow::Result<ScreenShareStatus> {
     #[cfg(target_os = "windows")]
     {
         let output = std::process::Command::new("tasklist")
-            .args(["/FO", "CSV", "/NH"])
+            .args(["/V", "/FO", "CSV", "/NH"])
             .output()?;
 
         if !output.status.success() {
@@ -302,7 +322,10 @@ fn hide_app_windows_for_native_privacy_shield(app: &tauri::AppHandle) {
 fn screen_share_status_for_processes(processes: Vec<ScreenShareProcess>) -> ScreenShareStatus {
     let matched_processes = processes
         .into_iter()
-        .filter(|process| is_watched_screen_share_process(&process.name))
+        .filter(|process| {
+            is_watched_screen_share_process(&process.name)
+                || is_watched_screen_share_window_title(process.window_title.as_deref())
+        })
         .collect::<Vec<_>>();
 
     ScreenShareStatus {
@@ -321,6 +344,18 @@ fn is_watched_screen_share_process(name: &str) -> bool {
     WATCHED_SCREEN_SHARE_PROCESSES
         .iter()
         .any(|candidate| process_name_matches_candidate(&normalized, candidate))
+}
+
+fn is_watched_screen_share_window_title(title: Option<&str>) -> bool {
+    let Some(title) = title else {
+        return false;
+    };
+    let normalized = title.trim().to_ascii_lowercase();
+    !normalized.is_empty()
+        && normalized != "n/a"
+        && WATCHED_SCREEN_SHARE_TITLES
+            .iter()
+            .any(|candidate| normalized.contains(&candidate.to_ascii_lowercase()))
 }
 
 fn process_name_matches_candidate(normalized: &str, candidate: &str) -> bool {
@@ -353,7 +388,15 @@ fn parse_tasklist_csv(output: &str) -> Vec<ScreenShareProcess> {
             let pid = columns
                 .get(1)
                 .and_then(|value| value.trim().parse::<u32>().ok());
-            Some(ScreenShareProcess { name, pid })
+            let window_title = columns
+                .get(8)
+                .map(|value| value.trim().to_string())
+                .filter(|value| !value.is_empty() && value != "N/A");
+            Some(ScreenShareProcess {
+                name,
+                pid,
+                window_title,
+            })
         })
         .collect()
 }
@@ -371,6 +414,7 @@ fn parse_unix_process_list(output: &str) -> Vec<ScreenShareProcess> {
             Some(ScreenShareProcess {
                 name,
                 pid: pid.trim().parse::<u32>().ok(),
+                window_title: None,
             })
         })
         .collect()
@@ -419,8 +463,38 @@ mod tests {
             status.matched_processes,
             vec![ScreenShareProcess {
                 name: "zoom.exe".to_string(),
-                pid: Some(4242)
+                pid: Some(4242),
+                window_title: None,
             }]
+        );
+    }
+
+    #[test]
+    fn detects_windows_meeting_titles_from_webview_and_pwa_hosts() {
+        let processes = parse_tasklist_csv(
+            "\"msedgewebview2.exe\",\"222\",\"Console\",\"1\",\"120,000 K\",\"Running\",\"DESKTOP\\\\me\",\"0:01:02\",\"Microsoft Teams - Interview\"\n\"ApplicationFrameHost.exe\",\"333\",\"Console\",\"1\",\"90,000 K\",\"Running\",\"DESKTOP\\\\me\",\"0:00:33\",\"Google Meet - Candidate Screen\"\n\"chrome_proxy.exe\",\"444\",\"Console\",\"1\",\"55,000 K\",\"Running\",\"DESKTOP\\\\me\",\"0:00:17\",\"HackerRank Interview - Google Meet\"\n\"RuntimeBroker.exe\",\"555\",\"Console\",\"1\",\"10,000 K\",\"Running\",\"DESKTOP\\\\me\",\"0:00:01\",\"Settings\"",
+        );
+
+        let status = screen_share_status_for_processes(processes);
+
+        assert!(status.active);
+        assert_eq!(
+            status
+                .matched_processes
+                .iter()
+                .map(|process| (process.name.as_str(), process.window_title.as_deref()))
+                .collect::<Vec<_>>(),
+            vec![
+                ("msedgewebview2.exe", Some("Microsoft Teams - Interview")),
+                (
+                    "ApplicationFrameHost.exe",
+                    Some("Google Meet - Candidate Screen")
+                ),
+                (
+                    "chrome_proxy.exe",
+                    Some("HackerRank Interview - Google Meet")
+                )
+            ]
         );
     }
 
@@ -437,7 +511,8 @@ mod tests {
             status.matched_processes,
             vec![ScreenShareProcess {
                 name: "/Applications/zoom.us.app/Contents/MacOS/zoom.us".to_string(),
-                pid: Some(4242)
+                pid: Some(4242),
+                window_title: None,
             }]
         );
     }
@@ -448,18 +523,22 @@ mod tests {
             ScreenShareProcess {
                 name: r"C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe".to_string(),
                 pid: Some(1001),
+                window_title: None,
             },
             ScreenShareProcess {
                 name: "/Applications/Microsoft Teams.app/Contents/MacOS/MSTeams".to_string(),
                 pid: Some(1002),
+                window_title: None,
             },
             ScreenShareProcess {
                 name: "/Applications/Safari.app/Contents/MacOS/Safari".to_string(),
                 pid: Some(1003),
+                window_title: None,
             },
             ScreenShareProcess {
                 name: "QuickTime Player".to_string(),
                 pid: Some(1004),
+                window_title: None,
             },
         ];
 
@@ -482,18 +561,22 @@ mod tests {
             ScreenShareProcess {
                 name: "/Applications/Microsoft Teams.app/Contents/Frameworks/Microsoft Teams Helper (Renderer).app/Contents/MacOS/Microsoft Teams Helper (Renderer)".to_string(),
                 pid: Some(1101),
+                window_title: None,
             },
             ScreenShareProcess {
                 name: "/Applications/Google Chrome.app/Contents/Frameworks/Google Chrome Helper (GPU).app/Contents/MacOS/Google Chrome Helper (GPU)".to_string(),
                 pid: Some(1102),
+                window_title: None,
             },
             ScreenShareProcess {
                 name: "/Applications/OBS.app/Contents/Frameworks/OBS Helper (Renderer).app/Contents/MacOS/OBS Helper (Renderer)".to_string(),
                 pid: Some(1103),
+                window_title: None,
             },
             ScreenShareProcess {
                 name: "Google Meet".to_string(),
                 pid: Some(1104),
+                window_title: None,
             },
         ];
 
@@ -516,26 +599,32 @@ mod tests {
             ScreenShareProcess {
                 name: r"C:\\Program Files\\GoToMeeting\\g2mcomm.exe".to_string(),
                 pid: Some(2001),
+                window_title: None,
             },
             ScreenShareProcess {
                 name: "/Applications/TeamViewer.app/Contents/MacOS/TeamViewer".to_string(),
                 pid: Some(2002),
+                window_title: None,
             },
             ScreenShareProcess {
                 name: "AnyDesk.exe".to_string(),
                 pid: Some(2003),
+                window_title: None,
             },
             ScreenShareProcess {
                 name: "/System/Library/CoreServices/Applications/Screen Sharing.app/Contents/MacOS/Screen Sharing".to_string(),
                 pid: Some(2004),
+                window_title: None,
             },
             ScreenShareProcess {
                 name: "remoting_host.exe".to_string(),
                 pid: Some(2005),
+                window_title: None,
             },
             ScreenShareProcess {
                 name: "/Applications/RustDesk.app/Contents/MacOS/RustDesk".to_string(),
                 pid: Some(2006),
+                window_title: None,
             },
         ];
 
@@ -566,34 +655,42 @@ mod tests {
                 name: r"C:\\Users\\candidate\\AppData\\Local\\RingCentral\\RingCentral.exe"
                     .to_string(),
                 pid: Some(3001),
+                window_title: None,
             },
             ScreenShareProcess {
                 name: "/Applications/Jitsi Meet.app/Contents/MacOS/Jitsi Meet".to_string(),
                 pid: Some(3002),
+                window_title: None,
             },
             ScreenShareProcess {
                 name: "WhatsApp.exe".to_string(),
                 pid: Some(3003),
+                window_title: None,
             },
             ScreenShareProcess {
                 name: r"C:\\Windows\\System32\\QuickAssist.exe".to_string(),
                 pid: Some(3004),
+                window_title: None,
             },
             ScreenShareProcess {
                 name: "msra.exe".to_string(),
                 pid: Some(3005),
+                window_title: None,
             },
             ScreenShareProcess {
                 name: "SnippingTool.exe".to_string(),
                 pid: Some(3006),
+                window_title: None,
             },
             ScreenShareProcess {
                 name: "NVIDIA Share.exe".to_string(),
                 pid: Some(3007),
+                window_title: None,
             },
             ScreenShareProcess {
                 name: "/Applications/CleanShot X.app/Contents/MacOS/CleanShot X".to_string(),
                 pid: Some(3008),
+                window_title: None,
             },
         ];
 
@@ -624,6 +721,7 @@ mod tests {
         let status = screen_share_status_for_processes(vec![ScreenShareProcess {
             name: "notepad.exe".to_string(),
             pid: Some(7),
+            window_title: None,
         }]);
 
         assert!(!status.active);
@@ -637,6 +735,7 @@ mod tests {
             matched_processes: vec![ScreenShareProcess {
                 name: "teams.exe".to_string(),
                 pid: Some(42),
+                window_title: None,
             }],
             message: Some("Known screen-sharing or recording process is running.".to_string()),
         };

@@ -24,7 +24,10 @@ export const COMMON_PRIVACY_SHIELD_MARKERS = [
   "Screen-share guard failed closed:",
   "Capture exclusion is not enforced:",
   "Native privacy shield denied showing",
-  "Native privacy shield denied screen OCR capture."
+  "Native privacy shield denied screen OCR capture.",
+  "msedgewebview2.exe",
+  "teams.microsoft.com",
+  "meet.google.com"
 ];
 
 export const TARGET_PRIVACY_SHIELD_MARKERS = {

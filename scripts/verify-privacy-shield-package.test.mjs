@@ -21,6 +21,12 @@ test("validates packaged native privacy markers from binary content", () => {
   assert.deepEqual(result.missingMarkers, []);
 });
 
+test("requires packaged Teams and Google Meet WebView detector markers", () => {
+  assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("msedgewebview2.exe"));
+  assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("teams.microsoft.com"));
+  assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("meet.google.com"));
+});
+
 test("reports missing packaged native privacy markers", () => {
   const result = evaluateBinaryPrivacyMarkers(Buffer.from("Capture exclusion is not enforced."), [
     "Capture exclusion is not enforced.",

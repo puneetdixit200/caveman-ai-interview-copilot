@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { access, readdir, stat } from "node:fs/promises";
+import { access, readFile, readdir, stat } from "node:fs/promises";
 import { execFile } from "node:child_process";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -9,6 +9,7 @@ import { runLocalWhisperSmoke } from "./local-whisper-smoke.mjs";
 import { runObsStealthSmoke } from "./obs-stealth-smoke.mjs";
 import { runOllamaSmoke } from "./ollama-smoke.mjs";
 import { runOpenRouterSmoke } from "./openrouter-smoke.mjs";
+import { TARGET_PRIVACY_SHIELD_MARKERS } from "./verify-privacy-shield-package.mjs";
 
 const execFileAsync = promisify(execFile);
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -121,6 +122,13 @@ export const REQUIRED_ARTIFACTS = [
   }
 ];
 
+const PRIVACY_SHIELD_TARGET_BY_ARTIFACT_ID = new Map([
+  ["privacy-shield-windows-x64", "windows-x64"],
+  ["privacy-shield-macos-arm64", "macos-arm64"],
+  ["privacy-shield-macos-x64", "macos-x64"],
+  ["privacy-shield-linux-x64", "linux-x64"]
+]);
+
 export function parseGhSecretList(output) {
   return String(output)
     .split(/\r?\n/)
@@ -180,24 +188,99 @@ function evaluateSecretCheck(check, available) {
   };
 }
 
-export function evaluateArtifactReadiness(files) {
+export function evaluateArtifactReadiness(files, { privacyShieldAttestations } = {}) {
   const normalizedFiles = files.map((file) => file.replace(/\\/g, "/"));
+  const normalizedAttestations = privacyShieldAttestations
+    ? normalizePrivacyShieldAttestations(privacyShieldAttestations)
+    : undefined;
   const checks = REQUIRED_ARTIFACTS.map((artifact) => {
     const matchedPath = normalizedFiles.find((file) => artifact.pattern.test(file));
+    let status = matchedPath ? "ready" : "blocked";
+    let detail = matchedPath ? matchedPath : `Missing ${artifact.examplePath}`;
+
+    if (matchedPath && normalizedAttestations && PRIVACY_SHIELD_TARGET_BY_ARTIFACT_ID.has(artifact.id)) {
+      const target = PRIVACY_SHIELD_TARGET_BY_ARTIFACT_ID.get(artifact.id);
+      const validation = validatePrivacyShieldAttestationPayload(target, normalizedAttestations.get(matchedPath));
+      if (validation.status !== "ready") {
+        status = "blocked";
+        detail = validation.detail;
+      }
+    }
+
     return {
       id: artifact.id,
       label: artifact.label,
-      status: matchedPath ? "ready" : "blocked",
+      status,
       path: matchedPath,
-      detail: matchedPath ? matchedPath : `Missing ${artifact.examplePath}`
+      detail
     };
   });
   const missingArtifacts = REQUIRED_ARTIFACTS.filter((artifact) => !checks.find((check) => check.id === artifact.id)?.path);
 
   return {
-    status: missingArtifacts.length === 0 ? "ready" : "blocked",
+    status: checks.every((check) => check.status === "ready") ? "ready" : "blocked",
     checks,
     missingArtifacts
+  };
+}
+
+function normalizePrivacyShieldAttestations(attestations) {
+  return new Map(
+    [...attestations.entries()].map(([attestationPath, payload]) => [
+      String(attestationPath).replace(/\\/g, "/"),
+      payload
+    ])
+  );
+}
+
+export function validatePrivacyShieldAttestationPayload(target, payload) {
+  if (!payload) {
+    return {
+      status: "blocked",
+      detail: `Missing readable privacy shield attestation payload for ${target}.`
+    };
+  }
+
+  if (payload.error) {
+    return {
+      status: "blocked",
+      detail: `Could not read privacy shield attestation for ${target}: ${payload.error}`
+    };
+  }
+
+  if (payload.status !== "ready") {
+    return {
+      status: "blocked",
+      detail: `Privacy shield attestation for ${target} is not ready.`
+    };
+  }
+
+  if (payload.target !== target) {
+    return {
+      status: "blocked",
+      detail: `Privacy shield attestation target mismatch: expected ${target}, got ${payload.target ?? "unknown"}.`
+    };
+  }
+
+  if (!Array.isArray(payload.markers)) {
+    return {
+      status: "blocked",
+      detail: `Privacy shield attestation for ${target} does not list packaged markers.`
+    };
+  }
+
+  const requiredMarkers = TARGET_PRIVACY_SHIELD_MARKERS[target] ?? [];
+  const missingMarkers = requiredMarkers.filter((marker) => !payload.markers.includes(marker));
+  if (missingMarkers.length > 0) {
+    return {
+      status: "blocked",
+      detail: `Privacy shield attestation for ${target} is missing packaged markers: ${missingMarkers.join(", ")}`
+    };
+  }
+
+  return {
+    status: "ready",
+    detail: `Privacy shield attestation for ${target} includes required packaged markers.`
   };
 }
 
@@ -242,7 +325,7 @@ export function formatReadinessReport({ secretReadiness, artifactReadiness, live
       detail:
         artifactReadiness.status === "ready"
           ? "Windows x64, macOS Intel, macOS Apple Silicon, and Linux x64 artifacts are present."
-          : `Missing: ${artifactReadiness.missingArtifacts.map((artifact) => artifact.label).join(", ")}`
+          : formatBlockedArtifactReadinessDetail(artifactReadiness)
     },
     ...liveChecks
   ];
@@ -260,6 +343,15 @@ export function formatReadinessReport({ secretReadiness, artifactReadiness, live
   ].join("\n");
 }
 
+function formatBlockedArtifactReadinessDetail(artifactReadiness) {
+  if (artifactReadiness.missingArtifacts.length > 0) {
+    return `Missing: ${artifactReadiness.missingArtifacts.map((artifact) => artifact.label).join(", ")}`;
+  }
+
+  const blockedChecks = artifactReadiness.checks.filter((check) => check.status === "blocked");
+  return blockedChecks.map((check) => `${check.label}: ${check.detail}`).join("; ");
+}
+
 export async function runCommercialReadiness({
   artifactDir,
   artifactRoot = path.join(REPO_ROOT, "release-artifacts"),
@@ -268,7 +360,8 @@ export async function runCommercialReadiness({
 } = {}) {
   const resolvedArtifactDir = artifactDir ? path.resolve(artifactDir) : await findLatestArtifactRun(artifactRoot);
   const files = resolvedArtifactDir ? await listFiles(resolvedArtifactDir) : [];
-  const artifactReadiness = evaluateArtifactReadiness(files);
+  const privacyShieldAttestations = await loadPrivacyShieldAttestations(files);
+  const artifactReadiness = evaluateArtifactReadiness(files, { privacyShieldAttestations });
   const resolvedSecretNames = secretNames ?? (await listGitHubSecretNames());
   const secretReadiness = evaluateSecretReadiness(resolvedSecretNames);
   const liveChecks = skipLive ? skippedLiveChecks() : await runLiveChecks({ secretNames: resolvedSecretNames });
@@ -380,6 +473,25 @@ async function listFiles(root) {
     }
   }
   return output.sort();
+}
+
+async function loadPrivacyShieldAttestations(files) {
+  const attestations = new Map();
+  for (const file of files) {
+    const normalizedFile = file.replace(/\\/g, "/");
+    if (!/\/privacy-shield-[^/]+\.json$/.test(normalizedFile)) {
+      continue;
+    }
+
+    try {
+      attestations.set(normalizedFile, JSON.parse(await readFile(file, "utf8")));
+    } catch (error) {
+      attestations.set(normalizedFile, {
+        error: error instanceof Error ? error.message : String(error)
+      });
+    }
+  }
+  return attestations;
 }
 
 async function exists(candidate) {

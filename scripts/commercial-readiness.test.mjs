@@ -9,6 +9,7 @@ import {
   parseGhSecretList,
   skippedLiveChecks
 } from "./commercial-readiness.mjs";
+import { TARGET_PRIVACY_SHIELD_MARKERS } from "./verify-privacy-shield-package.mjs";
 
 const completeSecrets = [
   "TAURI_SIGNING_PRIVATE_KEY",
@@ -72,6 +73,48 @@ test("requires packaged native privacy shield attestations for every desktop tar
     REQUIRED_ARTIFACTS.filter((artifact) => artifact.id.startsWith("privacy-shield-")).map((artifact) => artifact.id),
     ["privacy-shield-windows-x64", "privacy-shield-macos-arm64", "privacy-shield-macos-x64", "privacy-shield-linux-x64"]
   );
+});
+
+test("blocks privacy shield attestations that lack required packaged detector markers", () => {
+  const files = REQUIRED_ARTIFACTS.map((artifact) => `/tmp/run/${artifact.examplePath}`);
+  const privacyShieldAttestations = new Map(
+    [
+      ["privacy-shield-windows-x64", "windows-x64"],
+      ["privacy-shield-macos-arm64", "macos-arm64"],
+      ["privacy-shield-macos-x64", "macos-x64"],
+      ["privacy-shield-linux-x64", "linux-x64"]
+    ].map(([artifactId, target]) => {
+      const artifact = REQUIRED_ARTIFACTS.find((candidate) => candidate.id === artifactId);
+      return [
+        `/tmp/run/${artifact.examplePath}`,
+        {
+          status: "ready",
+          target,
+          markers: TARGET_PRIVACY_SHIELD_MARKERS[target]
+        }
+      ];
+    })
+  );
+  privacyShieldAttestations.set("/tmp/run/caveman-windows-package-smoke/privacy-shield-windows-x64.json", {
+    status: "ready",
+    target: "windows-x64",
+    markers: ["Screen-share guard failed closed:"]
+  });
+
+  const result = evaluateArtifactReadiness(files, { privacyShieldAttestations });
+
+  assert.equal(result.status, "blocked");
+  assert.match(
+    result.checks.find((check) => check.id === "privacy-shield-windows-x64").detail,
+    /msedgewebview2\.exe/
+  );
+
+  const report = formatReadinessReport({
+    secretReadiness: evaluateSecretReadiness(completeSecrets),
+    artifactReadiness: result,
+    liveChecks: []
+  });
+  assert.match(report, /msedgewebview2\.exe/);
 });
 
 test("reports missing redistributable artifacts by platform", () => {
