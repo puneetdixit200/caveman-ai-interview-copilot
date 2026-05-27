@@ -82,6 +82,9 @@ test("requires packaged web meeting and recording title detector markers", () =>
   assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("screen recording"));
   assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("recording your screen"));
   assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("recording screen"));
+  assert.ok(
+    COMMON_PRIVACY_SHIELD_MARKERS.includes("Screen-share window title guard normalizes UI punctuation before matching.")
+  );
 });
 
 test("requires packaged remote-support service detector markers", () => {

@@ -72,6 +72,8 @@ const BROWSER_PRESENTING_A_WINDOW_TITLE: &str = "presenting a window";
 const BROWSER_SCREEN_RECORDING_TITLE: &str = "screen recording";
 const BROWSER_RECORDING_YOUR_SCREEN_TITLE: &str = "recording your screen";
 const BROWSER_RECORDING_SCREEN_TITLE: &str = "recording screen";
+const WINDOW_TITLE_PUNCTUATION_NORMALIZATION_MARKER: &str =
+    "Screen-share window title guard normalizes UI punctuation before matching.";
 const MACOS_SCREEN_CAPTURE_UI_PROCESS: &str = "screencaptureui";
 const MACOS_SCREEN_CAPTURE_CLI_PROCESS: &str = "screencapture";
 const MACOS_REPLAYD_PROCESS: &str = "replayd";
@@ -154,6 +156,7 @@ const PACKAGE_PRIVACY_SHIELD_WEBVIEW_MARKERS: &[&str] = &[
     BROWSER_SCREEN_RECORDING_TITLE,
     BROWSER_RECORDING_YOUR_SCREEN_TITLE,
     BROWSER_RECORDING_SCREEN_TITLE,
+    WINDOW_TITLE_PUNCTUATION_NORMALIZATION_MARKER,
     MACOS_SCREEN_CAPTURE_UI_PROCESS,
     MACOS_SCREEN_CAPTURE_CLI_PROCESS,
     MACOS_REPLAYD_PROCESS,
@@ -654,12 +657,41 @@ fn is_watched_screen_share_window_title(title: Option<&str>) -> bool {
     let Some(title) = title else {
         return false;
     };
-    let normalized = title.trim().to_ascii_lowercase();
+    let normalized = normalize_screen_share_window_title_for_match(title);
     !normalized.is_empty()
         && normalized != "n/a"
-        && WATCHED_SCREEN_SHARE_TITLES
-            .iter()
-            .any(|candidate| normalized.contains(&candidate.to_ascii_lowercase()))
+        && WATCHED_SCREEN_SHARE_TITLES.iter().any(|candidate| {
+            let candidate = normalize_screen_share_window_title_for_match(candidate);
+            !candidate.is_empty() && normalized.contains(&candidate)
+        })
+}
+
+fn normalize_screen_share_window_title_for_match(value: &str) -> String {
+    let mut normalized = String::new();
+    let mut previous_was_whitespace = false;
+
+    for ch in value.trim().to_lowercase().chars() {
+        let mapped = match ch {
+            '\u{2018}' | '\u{2019}' | '\u{201b}' | '\u{02bc}' | '\u{ff07}' => '\'',
+            '\u{201c}' | '\u{201d}' | '\u{201f}' | '\u{ff02}' => '"',
+            '\u{2010}' | '\u{2011}' | '\u{2012}' | '\u{2013}' | '\u{2014}' | '\u{2212}'
+            | '\u{fe58}' | '\u{fe63}' | '\u{ff0d}' => '-',
+            _ if ch.is_whitespace() => ' ',
+            _ => ch,
+        };
+
+        if mapped == ' ' {
+            if !previous_was_whitespace && !normalized.is_empty() {
+                normalized.push(mapped);
+            }
+            previous_was_whitespace = true;
+        } else {
+            normalized.push(mapped);
+            previous_was_whitespace = false;
+        }
+    }
+
+    normalized
 }
 
 fn process_name_matches_candidate(normalized: &str, candidate: &str) -> bool {
@@ -1162,6 +1194,22 @@ mod tests {
     }
 
     #[test]
+    fn recognizes_browser_sharing_state_titles_with_ui_punctuation_variants() {
+        for title in [
+            "You\u{2019}re sharing your screen",
+            "You\u{2018}re presenting a window",
+            "Sharing\u{00a0}this\u{00a0}tab",
+            "Presenting\u{202f}your\u{202f}screen",
+            "Recording\u{2009}your\u{2009}screen",
+            "Meet \u{2013} abc-defg-hij",
+        ] {
+            assert!(is_watched_screen_share_window_title(Some(title)));
+        }
+
+        assert!(!is_watched_screen_share_window_title(Some("Meet notes")));
+    }
+
+    #[test]
     fn anchors_webview_markers_for_packaged_privacy_attestation() {
         assert_eq!(
             PACKAGE_PRIVACY_SHIELD_WEBVIEW_MARKERS,
@@ -1222,6 +1270,7 @@ mod tests {
                 BROWSER_SCREEN_RECORDING_TITLE,
                 BROWSER_RECORDING_YOUR_SCREEN_TITLE,
                 BROWSER_RECORDING_SCREEN_TITLE,
+                WINDOW_TITLE_PUNCTUATION_NORMALIZATION_MARKER,
                 MACOS_SCREEN_CAPTURE_UI_PROCESS,
                 MACOS_SCREEN_CAPTURE_CLI_PROCESS,
                 MACOS_REPLAYD_PROCESS,

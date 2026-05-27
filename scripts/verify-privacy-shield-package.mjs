@@ -87,6 +87,7 @@ export const COMMON_PRIVACY_SHIELD_MARKERS = [
   "screen recording",
   "recording your screen",
   "recording screen",
+  "Screen-share window title guard normalizes UI punctuation before matching.",
   "screencaptureui",
   "screencapture",
   "replayd",
