@@ -34,8 +34,16 @@ export const COMMON_PRIVACY_SHIELD_MARKERS = [
   "webexhost.exe",
   "screenconnect.windowsclient.exe",
   "screenconnect.client.exe",
+  "zohoassist.exe",
+  "za_connect.exe",
   "teams.microsoft.com",
-  "meet.google.com"
+  "meet.google.com",
+  "whereby.com",
+  "riverside.fm",
+  "streamyard.com",
+  "livestorm.co",
+  "bigbluebutton",
+  "tella.tv"
 ];
 
 export const TARGET_PRIVACY_SHIELD_MARKERS = {

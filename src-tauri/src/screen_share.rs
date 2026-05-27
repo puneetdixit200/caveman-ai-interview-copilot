@@ -28,8 +28,16 @@ const VIVALDI_PWA_HOST_PROCESS: &str = "vivaldi_proxy.exe";
 const WEBEX_HOST_PROCESS: &str = "webexhost.exe";
 const SCREENCONNECT_WINDOWS_CLIENT_PROCESS: &str = "screenconnect.windowsclient.exe";
 const SCREENCONNECT_CLIENT_PROCESS: &str = "screenconnect.client.exe";
+const ZOHO_ASSIST_PROCESS: &str = "zohoassist.exe";
+const ZOHO_ASSIST_CONNECT_PROCESS: &str = "za_connect.exe";
 const TEAMS_WEB_MEETING_ORIGIN: &str = "teams.microsoft.com";
 const MEET_WEB_MEETING_ORIGIN: &str = "meet.google.com";
+const WHEREBY_WEB_MEETING_ORIGIN: &str = "whereby.com";
+const RIVERSIDE_WEB_MEETING_ORIGIN: &str = "riverside.fm";
+const STREAMYARD_WEB_MEETING_ORIGIN: &str = "streamyard.com";
+const LIVESTORM_WEB_MEETING_ORIGIN: &str = "livestorm.co";
+const BIGBLUEBUTTON_MEETING_TITLE: &str = "bigbluebutton";
+const TELLA_WEB_RECORDER_ORIGIN: &str = "tella.tv";
 const PACKAGE_PRIVACY_SHIELD_WEBVIEW_MARKERS: &[&str] = &[
     EDGE_WEBVIEW_HOST_PROCESS,
     EDGE_PWA_HOST_PROCESS,
@@ -40,8 +48,16 @@ const PACKAGE_PRIVACY_SHIELD_WEBVIEW_MARKERS: &[&str] = &[
     WEBEX_HOST_PROCESS,
     SCREENCONNECT_WINDOWS_CLIENT_PROCESS,
     SCREENCONNECT_CLIENT_PROCESS,
+    ZOHO_ASSIST_PROCESS,
+    ZOHO_ASSIST_CONNECT_PROCESS,
     TEAMS_WEB_MEETING_ORIGIN,
     MEET_WEB_MEETING_ORIGIN,
+    WHEREBY_WEB_MEETING_ORIGIN,
+    RIVERSIDE_WEB_MEETING_ORIGIN,
+    STREAMYARD_WEB_MEETING_ORIGIN,
+    LIVESTORM_WEB_MEETING_ORIGIN,
+    BIGBLUEBUTTON_MEETING_TITLE,
+    TELLA_WEB_RECORDER_ORIGIN,
 ];
 
 #[derive(Debug, Clone, PartialEq)]
@@ -186,6 +202,8 @@ const WATCHED_SCREEN_SHARE_PROCESSES: &[&str] = &[
     "screenconnect.clientservice.exe",
     SCREENCONNECT_WINDOWS_CLIENT_PROCESS,
     SCREENCONNECT_CLIENT_PROCESS,
+    ZOHO_ASSIST_PROCESS,
+    ZOHO_ASSIST_CONNECT_PROCESS,
     // Local capture tools are treated as sharing risk when auto-hide is enabled.
     "snippingtool.exe",
     "screenclippinghost.exe",
@@ -212,6 +230,17 @@ const WATCHED_SCREEN_SHARE_TITLES: &[&str] = &[
     TEAMS_WEB_MEETING_ORIGIN,
     "zoom meeting",
     "webex meeting",
+    "whereby",
+    WHEREBY_WEB_MEETING_ORIGIN,
+    "riverside",
+    RIVERSIDE_WEB_MEETING_ORIGIN,
+    "streamyard",
+    STREAMYARD_WEB_MEETING_ORIGIN,
+    "livestorm",
+    LIVESTORM_WEB_MEETING_ORIGIN,
+    BIGBLUEBUTTON_MEETING_TITLE,
+    "tella",
+    TELLA_WEB_RECORDER_ORIGIN,
     "slack huddle",
     "discord",
     "screen sharing",
@@ -412,7 +441,10 @@ fn is_watched_screen_share_window_title(title: Option<&str>) -> bool {
 fn process_name_matches_candidate(normalized: &str, candidate: &str) -> bool {
     normalized == candidate
         || normalized.strip_prefix(candidate).is_some_and(|suffix| {
-            matches!(suffix.as_bytes().first(), Some(b' ' | b'(' | b'-' | b'.'))
+            matches!(
+                suffix.as_bytes().first(),
+                Some(b' ' | b'(' | b'-' | b'.' | b'_')
+            )
         })
 }
 
@@ -592,6 +624,32 @@ mod tests {
     }
 
     #[test]
+    fn detects_additional_web_meeting_and_recorder_titles_from_pwa_hosts() {
+        let processes = parse_tasklist_csv(
+            "\"msedge_proxy.exe\",\"611\",\"Console\",\"1\",\"64,000 K\",\"Running\",\"DESKTOP\\\\me\",\"0:00:21\",\"Whereby - Candidate Interview\"\n\"chrome_proxy.exe\",\"612\",\"Console\",\"1\",\"64,000 K\",\"Running\",\"DESKTOP\\\\me\",\"0:00:22\",\"Riverside Recording Studio\"\n\"brave_proxy.exe\",\"613\",\"Console\",\"1\",\"64,000 K\",\"Running\",\"DESKTOP\\\\me\",\"0:00:23\",\"StreamYard - Live Studio\"\n\"opera_proxy.exe\",\"614\",\"Console\",\"1\",\"64,000 K\",\"Running\",\"DESKTOP\\\\me\",\"0:00:24\",\"Livestorm Webinar Room\"\n\"vivaldi_proxy.exe\",\"615\",\"Console\",\"1\",\"64,000 K\",\"Running\",\"DESKTOP\\\\me\",\"0:00:25\",\"BigBlueButton - Interview Room\"\n\"msedgewebview2.exe\",\"616\",\"Console\",\"1\",\"64,000 K\",\"Running\",\"DESKTOP\\\\me\",\"0:00:26\",\"Tella Screen Recording\"\n\"RuntimeBroker.exe\",\"617\",\"Console\",\"1\",\"10,000 K\",\"Running\",\"DESKTOP\\\\me\",\"0:00:01\",\"Settings\"",
+        );
+
+        let status = screen_share_status_for_processes(processes);
+
+        assert!(status.active);
+        assert_eq!(
+            status
+                .matched_processes
+                .iter()
+                .map(|process| (process.name.as_str(), process.window_title.as_deref()))
+                .collect::<Vec<_>>(),
+            vec![
+                ("msedge_proxy.exe", Some("Whereby - Candidate Interview")),
+                ("chrome_proxy.exe", Some("Riverside Recording Studio")),
+                ("brave_proxy.exe", Some("StreamYard - Live Studio")),
+                ("opera_proxy.exe", Some("Livestorm Webinar Room")),
+                ("vivaldi_proxy.exe", Some("BigBlueButton - Interview Room")),
+                ("msedgewebview2.exe", Some("Tella Screen Recording"))
+            ]
+        );
+    }
+
+    #[test]
     fn anchors_webview_markers_for_packaged_privacy_attestation() {
         assert_eq!(
             PACKAGE_PRIVACY_SHIELD_WEBVIEW_MARKERS,
@@ -605,8 +663,16 @@ mod tests {
                 WEBEX_HOST_PROCESS,
                 SCREENCONNECT_WINDOWS_CLIENT_PROCESS,
                 SCREENCONNECT_CLIENT_PROCESS,
+                ZOHO_ASSIST_PROCESS,
+                ZOHO_ASSIST_CONNECT_PROCESS,
                 TEAMS_WEB_MEETING_ORIGIN,
-                MEET_WEB_MEETING_ORIGIN
+                MEET_WEB_MEETING_ORIGIN,
+                WHEREBY_WEB_MEETING_ORIGIN,
+                RIVERSIDE_WEB_MEETING_ORIGIN,
+                STREAMYARD_WEB_MEETING_ORIGIN,
+                LIVESTORM_WEB_MEETING_ORIGIN,
+                BIGBLUEBUTTON_MEETING_TITLE,
+                TELLA_WEB_RECORDER_ORIGIN
             ]
         );
     }
@@ -810,6 +876,39 @@ mod tests {
                 .map(|process| process.pid)
                 .collect::<Vec<_>>(),
             vec![Some(2501), Some(2502), Some(2503)]
+        );
+    }
+
+    #[test]
+    fn detects_remote_support_service_and_assist_variants() {
+        let processes = vec![
+            ScreenShareProcess {
+                name: "TeamViewer_Service.exe".to_string(),
+                pid: Some(2601),
+                window_title: None,
+            },
+            ScreenShareProcess {
+                name: "ZohoAssist.exe".to_string(),
+                pid: Some(2602),
+                window_title: None,
+            },
+            ScreenShareProcess {
+                name: "ZA_Connect.exe".to_string(),
+                pid: Some(2603),
+                window_title: None,
+            },
+        ];
+
+        let status = screen_share_status_for_processes(processes);
+
+        assert!(status.active);
+        assert_eq!(
+            status
+                .matched_processes
+                .iter()
+                .map(|process| process.pid)
+                .collect::<Vec<_>>(),
+            vec![Some(2601), Some(2602), Some(2603)]
         );
     }
 

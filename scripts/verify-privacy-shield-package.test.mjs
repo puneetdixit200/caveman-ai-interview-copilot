@@ -38,6 +38,20 @@ test("requires packaged remote screen-share detector markers", () => {
   assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("screenconnect.client.exe"));
 });
 
+test("requires packaged web meeting and recording title detector markers", () => {
+  assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("whereby.com"));
+  assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("riverside.fm"));
+  assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("streamyard.com"));
+  assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("livestorm.co"));
+  assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("bigbluebutton"));
+  assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("tella.tv"));
+});
+
+test("requires packaged remote-support service detector markers", () => {
+  assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("zohoassist.exe"));
+  assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("za_connect.exe"));
+});
+
 test("requires packaged Windows display-affinity readback marker", () => {
   assert.ok(TARGET_PRIVACY_SHIELD_MARKERS["windows-x64"].includes("SetWindowDisplayAffinity"));
   assert.ok(TARGET_PRIVACY_SHIELD_MARKERS["windows-x64"].includes("GetWindowDisplayAffinity"));
