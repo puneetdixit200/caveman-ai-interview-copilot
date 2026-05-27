@@ -57,19 +57,19 @@ const MACOS_WINDOW_TITLE_GUARD_MARKER: &str =
 #[cfg(target_os = "macos")]
 const MACOS_VISIBLE_WINDOW_TITLE_SCRIPT: &str = r#"
 set previousDelimiters to AppleScript's text item delimiters
-set rows to {}
+set windowTitleRows to {}
 tell application "System Events"
   repeat with candidateProcess in (processes whose background only is false)
     set processName to name of candidateProcess as text
     set processId to unix id of candidateProcess as text
     repeat with candidateWindow in windows of candidateProcess
       set windowTitle to name of candidateWindow as text
-      if windowTitle is not "" then set end of rows to processId & tab & processName & tab & windowTitle
+      if windowTitle is not "" then set end of windowTitleRows to processId & tab & processName & tab & windowTitle
     end repeat
   end repeat
 end tell
 set AppleScript's text item delimiters to linefeed
-set serializedRows to rows as text
+set serializedRows to windowTitleRows as text
 set AppleScript's text item delimiters to previousDelimiters
 return serializedRows
 "#;
@@ -1141,6 +1141,13 @@ mod tests {
                 .collect::<Vec<_>>(),
             vec![Some(1001), Some(1002)]
         );
+    }
+
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn macos_window_title_script_avoids_system_events_rows_name_collision() {
+        assert!(MACOS_VISIBLE_WINDOW_TITLE_SCRIPT.contains("windowTitleRows"));
+        assert!(!MACOS_VISIBLE_WINDOW_TITLE_SCRIPT.contains("set rows to {}"));
     }
 
     #[test]
