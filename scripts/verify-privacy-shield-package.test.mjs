@@ -23,6 +23,7 @@ test("validates packaged native privacy markers from binary content", () => {
 
 test("requires packaged Teams and Google Meet WebView detector markers", () => {
   assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("msedgewebview2.exe"));
+  assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("msedge_proxy.exe"));
   assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("teams.microsoft.com"));
   assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("meet.google.com"));
 });

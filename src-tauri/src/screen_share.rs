@@ -20,10 +20,12 @@ pub struct ScreenShareStatus {
 
 const NATIVE_PRIVACY_SHIELD_INTERVAL: Duration = Duration::from_millis(500);
 const EDGE_WEBVIEW_HOST_PROCESS: &str = "msedgewebview2.exe";
+const EDGE_PWA_HOST_PROCESS: &str = "msedge_proxy.exe";
 const TEAMS_WEB_MEETING_ORIGIN: &str = "teams.microsoft.com";
 const MEET_WEB_MEETING_ORIGIN: &str = "meet.google.com";
 const PACKAGE_PRIVACY_SHIELD_WEBVIEW_MARKERS: &[&str] = &[
     EDGE_WEBVIEW_HOST_PROCESS,
+    EDGE_PWA_HOST_PROCESS,
     TEAMS_WEB_MEETING_ORIGIN,
     MEET_WEB_MEETING_ORIGIN,
 ];
@@ -205,6 +207,7 @@ const WATCHED_SCREEN_SHARE_TITLES: &[&str] = &[
 
 const SCREEN_SHARE_TITLE_HOST_PROCESSES: &[&str] = &[
     EDGE_WEBVIEW_HOST_PROCESS,
+    EDGE_PWA_HOST_PROCESS,
     "applicationframehost.exe",
     "chrome_proxy.exe",
 ];
@@ -527,11 +530,31 @@ mod tests {
     }
 
     #[test]
+    fn detects_edge_installed_app_meeting_titles_from_pwa_host() {
+        let processes = parse_tasklist_csv(
+            "\"msedge_proxy.exe\",\"555\",\"Console\",\"1\",\"64,000 K\",\"Running\",\"DESKTOP\\\\me\",\"0:00:21\",\"Google Meet - Candidate Screen\"",
+        );
+
+        let status = screen_share_status_for_processes(processes);
+
+        assert!(status.active);
+        assert_eq!(
+            status.matched_processes,
+            vec![ScreenShareProcess {
+                name: "msedge_proxy.exe".to_string(),
+                pid: Some(555),
+                window_title: Some("Google Meet - Candidate Screen".to_string()),
+            }]
+        );
+    }
+
+    #[test]
     fn anchors_webview_markers_for_packaged_privacy_attestation() {
         assert_eq!(
             PACKAGE_PRIVACY_SHIELD_WEBVIEW_MARKERS,
             &[
                 EDGE_WEBVIEW_HOST_PROCESS,
+                EDGE_PWA_HOST_PROCESS,
                 TEAMS_WEB_MEETING_ORIGIN,
                 MEET_WEB_MEETING_ORIGIN
             ]

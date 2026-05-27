@@ -26,6 +26,7 @@ export const COMMON_PRIVACY_SHIELD_MARKERS = [
   "Native privacy shield denied showing",
   "Native privacy shield denied screen OCR capture.",
   "msedgewebview2.exe",
+  "msedge_proxy.exe",
   "teams.microsoft.com",
   "meet.google.com"
 ];
