@@ -2,6 +2,8 @@ use serde::Serialize;
 
 pub const ACTIVE_WINDOW_TYPING_PRIVACY_MARKER: &str =
     "Native privacy shield denied active-window typing during screen-share risk.";
+pub const ACTIVE_WINDOW_TYPING_CAPTURE_PRIVACY_MARKER: &str =
+    "Native privacy shield denied active-window typing because capture exclusion was not proven.";
 
 #[derive(Debug, Clone, Serialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
@@ -39,14 +41,30 @@ pub fn type_text_into_active_window(text: &str) -> anyhow::Result<TypingResult> 
 
 pub fn native_typing_privacy_gate_message(
     screen_share_decision: crate::screen_share::NativePrivacyShieldDecision,
+    capture_exclusion_decision: crate::screen_share::NativePrivacyShieldDecision,
 ) -> Option<String> {
+    let mut reasons = Vec::new();
+
     if let crate::screen_share::NativePrivacyShieldDecision::Hide { reason } = screen_share_decision
     {
         std::hint::black_box(ACTIVE_WINDOW_TYPING_PRIVACY_MARKER);
-        return Some(format!("{ACTIVE_WINDOW_TYPING_PRIVACY_MARKER} {reason}"));
+        reasons.push(format!("{ACTIVE_WINDOW_TYPING_PRIVACY_MARKER} {reason}"));
     }
 
-    None
+    if let crate::screen_share::NativePrivacyShieldDecision::Hide { reason } =
+        capture_exclusion_decision
+    {
+        std::hint::black_box(ACTIVE_WINDOW_TYPING_CAPTURE_PRIVACY_MARKER);
+        reasons.push(format!(
+            "{ACTIVE_WINDOW_TYPING_CAPTURE_PRIVACY_MARKER} {reason}"
+        ));
+    }
+
+    if reasons.is_empty() {
+        None
+    } else {
+        Some(reasons.join(" "))
+    }
 }
 
 pub fn unicode_key_units(text: &str) -> Vec<u16> {
@@ -312,7 +330,8 @@ fn send_unicode_key_units(_units: &[u16]) -> anyhow::Result<()> {
 mod tests {
     use super::{
         active_window_info_from_parts, detect_code_editor, native_typing_privacy_gate_message,
-        unicode_key_units, ACTIVE_WINDOW_TYPING_PRIVACY_MARKER,
+        unicode_key_units, ACTIVE_WINDOW_TYPING_CAPTURE_PRIVACY_MARKER,
+        ACTIVE_WINDOW_TYPING_PRIVACY_MARKER,
     };
     use crate::screen_share::NativePrivacyShieldDecision;
 
@@ -344,9 +363,12 @@ mod tests {
 
     #[test]
     fn native_typing_privacy_gate_blocks_when_screen_share_risk_is_active() {
-        let message = native_typing_privacy_gate_message(NativePrivacyShieldDecision::Hide {
-            reason: "Known screen-sharing or recording process is running.".to_string(),
-        })
+        let message = native_typing_privacy_gate_message(
+            NativePrivacyShieldDecision::Hide {
+                reason: "Known screen-sharing or recording process is running.".to_string(),
+            },
+            NativePrivacyShieldDecision::Allow,
+        )
         .expect("screen-share risk should block active-window typing");
 
         assert!(message.contains(ACTIVE_WINDOW_TYPING_PRIVACY_MARKER));
@@ -354,9 +376,26 @@ mod tests {
     }
 
     #[test]
-    fn native_typing_privacy_gate_allows_when_screen_share_is_clear() {
+    fn native_typing_privacy_gate_blocks_when_capture_exclusion_is_not_proven() {
+        let message = native_typing_privacy_gate_message(
+            NativePrivacyShieldDecision::Allow,
+            NativePrivacyShieldDecision::Hide {
+                reason: "Capture exclusion is not enforced: unsupported.".to_string(),
+            },
+        )
+        .expect("unsafe capture exclusion should block active-window typing");
+
+        assert!(message.contains(ACTIVE_WINDOW_TYPING_CAPTURE_PRIVACY_MARKER));
+        assert!(message.contains("Capture exclusion is not enforced"));
+    }
+
+    #[test]
+    fn native_typing_privacy_gate_allows_when_share_is_clear_and_capture_exclusion_is_proven() {
         assert_eq!(
-            native_typing_privacy_gate_message(NativePrivacyShieldDecision::Allow),
+            native_typing_privacy_gate_message(
+                NativePrivacyShieldDecision::Allow,
+                NativePrivacyShieldDecision::Allow,
+            ),
             None
         );
     }

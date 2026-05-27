@@ -175,6 +175,11 @@ test("requires packaged active-window typing privacy marker", () => {
       "Native privacy shield denied active-window typing during screen-share risk."
     )
   );
+  assert.ok(
+    COMMON_PRIVACY_SHIELD_MARKERS.includes(
+      "Native privacy shield denied active-window typing because capture exclusion was not proven."
+    )
+  );
 });
 
 test("requires packaged protection refresh fail-closed marker", () => {

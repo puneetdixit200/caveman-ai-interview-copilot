@@ -247,22 +247,39 @@ test("native screen OCR capture hides app windows before creating screenshots", 
   assert.match(commandBody, /ocr::native_capture_privacy_gate_message/);
 });
 
-test("native active-window typing fails closed during screen-share risk", async () => {
+test("native active-window typing fails closed during screen-share or capture-exclusion risk", async () => {
   const commandsRs = await readFile("src-tauri/src/commands.rs", "utf8");
   const commandStart = commandsRs.indexOf("pub fn type_text_into_active_window(");
 
   assert.notEqual(commandStart, -1, "active-window typing command must exist");
 
   const commandBody = commandsRs.slice(commandStart, commandsRs.indexOf("#[tauri::command]", commandStart + 1));
+  const appHandleArg = commandBody.indexOf("app_handle: AppHandle");
+  const protectionRefresh = commandBody.indexOf("let protection_status = overlay::protect_overlay_window(&app_handle, true)");
   const gateMessage = commandBody.indexOf("typing::native_typing_privacy_gate_message(");
   const detectShare = commandBody.indexOf("crate::screen_share::detect_screen_share_status()");
+  const captureExclusionDecision = commandBody.indexOf(
+    "crate::screen_share::native_privacy_shield_decision_for_overlay_protection",
+    gateMessage
+  );
+  const hideOverlay = commandBody.indexOf("overlay::set_overlay_window_visible(&app_handle, false, true)");
+  const hideCompanions = commandBody.indexOf("overlay::set_companion_windows_visible(&app_handle, false, true)");
   const typeCall = commandBody.indexOf("typing::type_text_into_active_window(&text)");
 
+  assert.notEqual(appHandleArg, -1, "typing command must receive AppHandle for native privacy controls");
+  assert.notEqual(protectionRefresh, -1, "typing command must refresh capture exclusion before typing");
   assert.notEqual(gateMessage, -1, "typing command must consult the native privacy shield");
   assert.notEqual(detectShare, -1, "typing command must fail closed on screen-share detector state");
+  assert.notEqual(captureExclusionDecision, -1, "typing command must fail closed when capture exclusion is unsafe");
+  assert.notEqual(hideOverlay, -1, "typing denial must hide overlay");
+  assert.notEqual(hideCompanions, -1, "typing denial must hide companion windows");
   assert.notEqual(typeCall, -1, "typing command must still call the platform typing implementation after the gate");
+  assert.ok(protectionRefresh < gateMessage, "capture protection must be refreshed before the typing gate");
   assert.ok(gateMessage < typeCall, "typing privacy gate must run before keyboard input is sent");
   assert.ok(detectShare < typeCall, "screen-share detection must run before keyboard input is sent");
+  assert.ok(captureExclusionDecision < typeCall, "capture-exclusion decision must run before keyboard input is sent");
+  assert.ok(hideOverlay < typeCall, "typing denial hide path must be before any keyboard input");
+  assert.ok(hideCompanions < typeCall, "typing denial companion hide path must be before any keyboard input");
   assert.match(commandBody, /active_window_typing_blocked/);
 });
 

@@ -517,16 +517,23 @@ pub fn get_active_window_info() -> Result<typing::ActiveWindowInfo, String> {
 
 #[tauri::command]
 pub fn type_text_into_active_window(
+    app_handle: AppHandle,
     database: State<'_, Database>,
     text: String,
 ) -> Result<typing::TypingResult, String> {
+    let protection_status = overlay::protect_overlay_window(&app_handle, true);
     let denial = typing::native_typing_privacy_gate_message(
         crate::screen_share::native_privacy_shield_decision(
             crate::screen_share::detect_screen_share_status(),
         ),
+        crate::screen_share::native_privacy_shield_decision_for_overlay_protection(
+            &protection_status,
+        ),
     );
 
     if let Some(message) = denial {
+        let _ = overlay::set_overlay_window_visible(&app_handle, false, true);
+        let _ = overlay::set_companion_windows_visible(&app_handle, false, true);
         record_security_event(
             &database,
             "automation",
