@@ -59,7 +59,8 @@ export const COMMON_PRIVACY_SHIELD_MARKERS = [
   "screencaptureui",
   "screencapture",
   "replayd",
-  "screencapturekitagent"
+  "screencapturekitagent",
+  "macOS window title screen-share guard failed closed:"
 ];
 
 export const TARGET_PRIVACY_SHIELD_MARKERS = {

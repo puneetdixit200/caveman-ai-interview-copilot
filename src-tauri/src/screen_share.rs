@@ -52,6 +52,27 @@ const MACOS_SCREEN_CAPTURE_UI_PROCESS: &str = "screencaptureui";
 const MACOS_SCREEN_CAPTURE_CLI_PROCESS: &str = "screencapture";
 const MACOS_REPLAYD_PROCESS: &str = "replayd";
 const MACOS_SCREEN_CAPTURE_KIT_AGENT_PROCESS: &str = "screencapturekitagent";
+const MACOS_WINDOW_TITLE_GUARD_MARKER: &str =
+    "macOS window title screen-share guard failed closed:";
+#[cfg(target_os = "macos")]
+const MACOS_VISIBLE_WINDOW_TITLE_SCRIPT: &str = r#"
+set previousDelimiters to AppleScript's text item delimiters
+set rows to {}
+tell application "System Events"
+  repeat with candidateProcess in (processes whose background only is false)
+    set processName to name of candidateProcess as text
+    set processId to unix id of candidateProcess as text
+    repeat with candidateWindow in windows of candidateProcess
+      set windowTitle to name of candidateWindow as text
+      if windowTitle is not "" then set end of rows to processId & tab & processName & tab & windowTitle
+    end repeat
+  end repeat
+end tell
+set AppleScript's text item delimiters to linefeed
+set serializedRows to rows as text
+set AppleScript's text item delimiters to previousDelimiters
+return serializedRows
+"#;
 const PACKAGE_PRIVACY_SHIELD_WEBVIEW_MARKERS: &[&str] = &[
     EDGE_WEBVIEW_HOST_PROCESS,
     EDGE_PWA_HOST_PROCESS,
@@ -86,6 +107,7 @@ const PACKAGE_PRIVACY_SHIELD_WEBVIEW_MARKERS: &[&str] = &[
     MACOS_SCREEN_CAPTURE_CLI_PROCESS,
     MACOS_REPLAYD_PROCESS,
     MACOS_SCREEN_CAPTURE_KIT_AGENT_PROCESS,
+    MACOS_WINDOW_TITLE_GUARD_MARKER,
 ];
 
 #[derive(Debug, Clone, PartialEq)]
@@ -360,9 +382,10 @@ pub fn detect_screen_share_status() -> anyhow::Result<ScreenShareStatus> {
             ));
         }
 
-        return Ok(screen_share_status_for_processes(parse_unix_process_list(
-            &String::from_utf8_lossy(&output.stdout),
-        )));
+        let mut processes = parse_unix_process_list(&String::from_utf8_lossy(&output.stdout));
+        processes.extend(detect_macos_visible_window_title_processes()?);
+
+        return Ok(screen_share_status_for_processes(processes));
     }
 
     #[cfg(not(any(target_os = "macos", target_os = "windows")))]
@@ -380,6 +403,34 @@ pub fn detect_screen_share_status() -> anyhow::Result<ScreenShareStatus> {
 
 fn retain_package_privacy_shield_webview_markers() {
     std::hint::black_box(PACKAGE_PRIVACY_SHIELD_WEBVIEW_MARKERS);
+}
+
+#[cfg(target_os = "macos")]
+fn detect_macos_visible_window_title_processes() -> anyhow::Result<Vec<ScreenShareProcess>> {
+    std::hint::black_box(MACOS_WINDOW_TITLE_GUARD_MARKER);
+
+    let output = std::process::Command::new("osascript")
+        .args(["-e", MACOS_VISIBLE_WINDOW_TITLE_SCRIPT])
+        .output()
+        .map_err(|error| anyhow::anyhow!("{MACOS_WINDOW_TITLE_GUARD_MARKER} {error}"))?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        let detail = stderr.trim();
+        return Err(anyhow::anyhow!(
+            "{} {}",
+            MACOS_WINDOW_TITLE_GUARD_MARKER,
+            if detail.is_empty() {
+                "osascript exited without stderr"
+            } else {
+                detail
+            }
+        ));
+    }
+
+    Ok(parse_macos_window_title_rows(&String::from_utf8_lossy(
+        &output.stdout,
+    )))
 }
 
 pub fn native_privacy_shield_decision(
@@ -585,6 +636,30 @@ fn parse_unix_process_list(output: &str) -> Vec<ScreenShareProcess> {
                 name,
                 pid: pid.trim().parse::<u32>().ok(),
                 window_title: None,
+            })
+        })
+        .collect()
+}
+
+fn parse_macos_window_title_rows(output: &str) -> Vec<ScreenShareProcess> {
+    output
+        .lines()
+        .filter_map(|line| {
+            let mut columns = line.splitn(3, '\t');
+            let pid = columns
+                .next()
+                .and_then(|value| value.trim().parse::<u32>().ok());
+            let name = columns.next()?.trim().to_string();
+            let window_title = columns.next()?.trim().to_string();
+
+            if name.is_empty() || window_title.is_empty() {
+                return None;
+            }
+
+            Some(ScreenShareProcess {
+                name,
+                pid,
+                window_title: Some(window_title),
             })
         })
         .collect()
@@ -888,7 +963,8 @@ mod tests {
                 MACOS_SCREEN_CAPTURE_UI_PROCESS,
                 MACOS_SCREEN_CAPTURE_CLI_PROCESS,
                 MACOS_REPLAYD_PROCESS,
-                MACOS_SCREEN_CAPTURE_KIT_AGENT_PROCESS
+                MACOS_SCREEN_CAPTURE_KIT_AGENT_PROCESS,
+                MACOS_WINDOW_TITLE_GUARD_MARKER
             ]
         );
     }
@@ -1029,6 +1105,41 @@ mod tests {
                 .map(|process| process.pid)
                 .collect::<Vec<_>>(),
             vec![Some(1001), Some(1003)]
+        );
+    }
+
+    #[test]
+    fn parses_macos_window_title_rows_for_plain_browser_hosts() {
+        let processes = parse_macos_window_title_rows(
+            "1001\tGoogle Chrome\tGoogle Meet - Candidate Screen\n1002\tSafari\tteams.microsoft.com - Interview\n1003\tNotes\t",
+        );
+
+        assert_eq!(
+            processes,
+            vec![
+                ScreenShareProcess {
+                    name: "Google Chrome".to_string(),
+                    pid: Some(1001),
+                    window_title: Some("Google Meet - Candidate Screen".to_string()),
+                },
+                ScreenShareProcess {
+                    name: "Safari".to_string(),
+                    pid: Some(1002),
+                    window_title: Some("teams.microsoft.com - Interview".to_string()),
+                },
+            ]
+        );
+
+        let status = screen_share_status_for_processes(processes);
+
+        assert!(status.active);
+        assert_eq!(
+            status
+                .matched_processes
+                .iter()
+                .map(|process| process.pid)
+                .collect::<Vec<_>>(),
+            vec![Some(1001), Some(1002)]
         );
     }
 

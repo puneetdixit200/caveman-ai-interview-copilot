@@ -67,6 +67,7 @@ test("requires packaged macOS system capture detector markers", () => {
   assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("screencapture"));
   assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("replayd"));
   assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("screencapturekitagent"));
+  assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("macOS window title screen-share guard failed closed:"));
 });
 
 test("requires packaged Windows display-affinity readback marker", () => {
