@@ -65,6 +65,10 @@ const BROWSER_YOURE_SHARING_TITLE: &str = "you're sharing";
 const BROWSER_SHARING_YOUR_SCREEN_TITLE: &str = "sharing your screen";
 const BROWSER_SHARING_THIS_TAB_TITLE: &str = "sharing this tab";
 const BROWSER_SHARING_A_WINDOW_TITLE: &str = "sharing a window";
+const BROWSER_THIS_TAB_IS_BEING_SHARED_TITLE: &str = "this tab is being shared";
+const BROWSER_THIS_WINDOW_IS_BEING_SHARED_TITLE: &str = "this window is being shared";
+const BROWSER_THIS_SCREEN_IS_BEING_SHARED_TITLE: &str = "this screen is being shared";
+const BROWSER_SCREEN_IS_BEING_SHARED_TITLE: &str = "screen is being shared";
 const BROWSER_STOP_SHARING_TITLE: &str = "stop sharing";
 const BROWSER_YOU_ARE_PRESENTING_TITLE: &str = "you are presenting";
 const BROWSER_YOURE_PRESENTING_TITLE: &str = "you're presenting";
@@ -74,6 +78,8 @@ const BROWSER_PRESENTING_A_WINDOW_TITLE: &str = "presenting a window";
 const BROWSER_SCREEN_RECORDING_TITLE: &str = "screen recording";
 const BROWSER_RECORDING_YOUR_SCREEN_TITLE: &str = "recording your screen";
 const BROWSER_RECORDING_SCREEN_TITLE: &str = "recording screen";
+const BROWSER_SCREEN_IS_BEING_RECORDED_TITLE: &str = "screen is being recorded";
+const BROWSER_BEING_RECORDED_TITLE: &str = "being recorded";
 const WINDOW_TITLE_PUNCTUATION_NORMALIZATION_MARKER: &str =
     "Screen-share window title guard normalizes UI punctuation before matching.";
 const MACOS_SCREEN_CAPTURE_UI_PROCESS: &str = "screencaptureui";
@@ -149,6 +155,10 @@ const PACKAGE_PRIVACY_SHIELD_WEBVIEW_MARKERS: &[&str] = &[
     BROWSER_SHARING_YOUR_SCREEN_TITLE,
     BROWSER_SHARING_THIS_TAB_TITLE,
     BROWSER_SHARING_A_WINDOW_TITLE,
+    BROWSER_THIS_TAB_IS_BEING_SHARED_TITLE,
+    BROWSER_THIS_WINDOW_IS_BEING_SHARED_TITLE,
+    BROWSER_THIS_SCREEN_IS_BEING_SHARED_TITLE,
+    BROWSER_SCREEN_IS_BEING_SHARED_TITLE,
     BROWSER_STOP_SHARING_TITLE,
     BROWSER_YOU_ARE_PRESENTING_TITLE,
     BROWSER_YOURE_PRESENTING_TITLE,
@@ -158,6 +168,8 @@ const PACKAGE_PRIVACY_SHIELD_WEBVIEW_MARKERS: &[&str] = &[
     BROWSER_SCREEN_RECORDING_TITLE,
     BROWSER_RECORDING_YOUR_SCREEN_TITLE,
     BROWSER_RECORDING_SCREEN_TITLE,
+    BROWSER_SCREEN_IS_BEING_RECORDED_TITLE,
+    BROWSER_BEING_RECORDED_TITLE,
     WINDOW_TITLE_PUNCTUATION_NORMALIZATION_MARKER,
     MACOS_SCREEN_CAPTURE_UI_PROCESS,
     MACOS_SCREEN_CAPTURE_CLI_PROCESS,
@@ -414,6 +426,10 @@ const WATCHED_SCREEN_SHARE_TITLES: &[&str] = &[
     BROWSER_SHARING_YOUR_SCREEN_TITLE,
     BROWSER_SHARING_THIS_TAB_TITLE,
     BROWSER_SHARING_A_WINDOW_TITLE,
+    BROWSER_THIS_TAB_IS_BEING_SHARED_TITLE,
+    BROWSER_THIS_WINDOW_IS_BEING_SHARED_TITLE,
+    BROWSER_THIS_SCREEN_IS_BEING_SHARED_TITLE,
+    BROWSER_SCREEN_IS_BEING_SHARED_TITLE,
     BROWSER_STOP_SHARING_TITLE,
     BROWSER_YOU_ARE_PRESENTING_TITLE,
     BROWSER_YOURE_PRESENTING_TITLE,
@@ -423,6 +439,8 @@ const WATCHED_SCREEN_SHARE_TITLES: &[&str] = &[
     BROWSER_SCREEN_RECORDING_TITLE,
     BROWSER_RECORDING_YOUR_SCREEN_TITLE,
     BROWSER_RECORDING_SCREEN_TITLE,
+    BROWSER_SCREEN_IS_BEING_RECORDED_TITLE,
+    BROWSER_BEING_RECORDED_TITLE,
     "presenting",
     "hackerrank interview",
     "interview - google meet",
@@ -1108,7 +1126,7 @@ mod tests {
     #[test]
     fn detects_browser_sharing_state_titles_from_browser_hosts() {
         let processes = parse_tasklist_csv(
-            "\"chrome.exe\",\"661\",\"Console\",\"1\",\"64,000 K\",\"Running\",\"DESKTOP\\\\me\",\"0:00:21\",\"You are sharing your screen\"\n\"msedge.exe\",\"662\",\"Console\",\"1\",\"64,000 K\",\"Running\",\"DESKTOP\\\\me\",\"0:00:22\",\"Stop sharing - Google Meet\"\n\"firefox.exe\",\"663\",\"Console\",\"1\",\"64,000 K\",\"Running\",\"DESKTOP\\\\me\",\"0:00:23\",\"Sharing this tab\"\n\"RuntimeBroker.exe\",\"664\",\"Console\",\"1\",\"10,000 K\",\"Running\",\"DESKTOP\\\\me\",\"0:00:01\",\"Stop sharing notes\"",
+            "\"chrome.exe\",\"661\",\"Console\",\"1\",\"64,000 K\",\"Running\",\"DESKTOP\\\\me\",\"0:00:21\",\"You are sharing your screen\"\n\"msedge.exe\",\"662\",\"Console\",\"1\",\"64,000 K\",\"Running\",\"DESKTOP\\\\me\",\"0:00:22\",\"Stop sharing - Google Meet\"\n\"firefox.exe\",\"663\",\"Console\",\"1\",\"64,000 K\",\"Running\",\"DESKTOP\\\\me\",\"0:00:23\",\"Sharing this tab\"\n\"brave.exe\",\"664\",\"Console\",\"1\",\"64,000 K\",\"Running\",\"DESKTOP\\\\me\",\"0:00:24\",\"This window is being shared\"\n\"RuntimeBroker.exe\",\"665\",\"Console\",\"1\",\"10,000 K\",\"Running\",\"DESKTOP\\\\me\",\"0:00:01\",\"Stop sharing notes\"",
         );
 
         let status = screen_share_status_for_processes(processes);
@@ -1123,7 +1141,8 @@ mod tests {
             vec![
                 ("chrome.exe", Some("You are sharing your screen")),
                 ("msedge.exe", Some("Stop sharing - Google Meet")),
-                ("firefox.exe", Some("Sharing this tab"))
+                ("firefox.exe", Some("Sharing this tab")),
+                ("brave.exe", Some("This window is being shared"))
             ]
         );
     }
@@ -1182,6 +1201,10 @@ mod tests {
             "Sharing your screen",
             "Sharing this tab",
             "Sharing a window",
+            "This tab is being shared",
+            "This window is being shared",
+            "This screen is being shared",
+            "Your screen is being shared",
             "Stop sharing - Google Meet",
             "You are presenting your screen",
             "You're presenting a window",
@@ -1192,6 +1215,8 @@ mod tests {
             "Screen recording - Loom",
             "Recording your screen",
             "Recording screen",
+            "Your screen is being recorded",
+            "Meeting is being recorded",
         ] {
             assert!(is_watched_screen_share_window_title(Some(title)));
         }
@@ -1203,8 +1228,10 @@ mod tests {
             "You\u{2019}re sharing your screen",
             "You\u{2018}re presenting a window",
             "Sharing\u{00a0}this\u{00a0}tab",
+            "This\u{202f}tab\u{202f}is\u{202f}being\u{202f}shared",
             "Presenting\u{202f}your\u{202f}screen",
             "Recording\u{2009}your\u{2009}screen",
+            "Your\u{2009}screen\u{2009}is\u{2009}being\u{2009}recorded",
             "Meet \u{2013} abc-defg-hij",
         ] {
             assert!(is_watched_screen_share_window_title(Some(title)));
@@ -1265,6 +1292,10 @@ mod tests {
                 BROWSER_SHARING_YOUR_SCREEN_TITLE,
                 BROWSER_SHARING_THIS_TAB_TITLE,
                 BROWSER_SHARING_A_WINDOW_TITLE,
+                BROWSER_THIS_TAB_IS_BEING_SHARED_TITLE,
+                BROWSER_THIS_WINDOW_IS_BEING_SHARED_TITLE,
+                BROWSER_THIS_SCREEN_IS_BEING_SHARED_TITLE,
+                BROWSER_SCREEN_IS_BEING_SHARED_TITLE,
                 BROWSER_STOP_SHARING_TITLE,
                 BROWSER_YOU_ARE_PRESENTING_TITLE,
                 BROWSER_YOURE_PRESENTING_TITLE,
@@ -1274,6 +1305,8 @@ mod tests {
                 BROWSER_SCREEN_RECORDING_TITLE,
                 BROWSER_RECORDING_YOUR_SCREEN_TITLE,
                 BROWSER_RECORDING_SCREEN_TITLE,
+                BROWSER_SCREEN_IS_BEING_RECORDED_TITLE,
+                BROWSER_BEING_RECORDED_TITLE,
                 WINDOW_TITLE_PUNCTUATION_NORMALIZATION_MARKER,
                 MACOS_SCREEN_CAPTURE_UI_PROCESS,
                 MACOS_SCREEN_CAPTURE_CLI_PROCESS,
