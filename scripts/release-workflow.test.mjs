@@ -161,6 +161,27 @@ test("packaged dashboard stays hidden until the native privacy gate allows start
   );
 });
 
+test("startup setup hides app windows when native privacy cannot be proven", async () => {
+  const overlayRs = await readFile("src-tauri/src/overlay/mod.rs", "utf8");
+  const configureStart = overlayRs.indexOf("pub fn configure_overlay_security(app: &mut tauri::App)");
+  const startupDecisionStart = overlayRs.indexOf("pub fn startup_privacy_shield_hide_reason");
+
+  assert.notEqual(configureStart, -1, "native startup security setup must exist");
+  assert.notEqual(startupDecisionStart, -1, "startup setup must expose a testable privacy decision");
+
+  const configureBody = overlayRs.slice(configureStart, startupDecisionStart);
+  assert.match(configureBody, /protection_statuses\.push\(apply_capture_exclusion\(&window,\s*true\)\)/);
+  assert.match(configureBody, /startup_privacy_shield_hide_reason\(/);
+  assert.ok(
+    configureBody.indexOf("protection_statuses.push(apply_capture_exclusion(&window, true))") <
+      configureBody.indexOf("startup_privacy_shield_hide_reason("),
+    "startup hide decision must use the actual capture-exclusion setup results"
+  );
+  assert.match(configureBody, /crate::screen_share::detect_screen_share_status\(\)/);
+  assert.match(configureBody, /window\.hide\(\)/);
+  assert.match(overlayRs.slice(startupDecisionStart), /native_privacy_shield_decision_for_overlay_protection/);
+});
+
 test("native screen OCR capture hides app windows before creating screenshots", async () => {
   const commandsRs = await readFile("src-tauri/src/commands.rs", "utf8");
   const commandStart = commandsRs.indexOf("pub fn capture_screen_frame(app_handle: AppHandle)");

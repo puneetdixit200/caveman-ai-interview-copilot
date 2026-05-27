@@ -43,9 +43,10 @@ pub fn is_companion_window_label(label: &str) -> bool {
 pub fn configure_overlay_security(app: &mut tauri::App) {
     use tauri::Manager;
 
+    let mut protection_statuses = Vec::new();
     for (label, window) in app.webview_windows() {
         let _ = window.set_content_protected(true);
-        let _ = apply_capture_exclusion(&window, true);
+        protection_statuses.push(apply_capture_exclusion(&window, true));
 
         if is_overlay_window_label(&label) {
             let _ = window.set_always_on_top(true);
@@ -54,6 +55,47 @@ pub fn configure_overlay_security(app: &mut tauri::App) {
             let _ = window.set_shadow(false);
             let _ = window.set_ignore_cursor_events(true);
         }
+    }
+
+    let startup_hide_reason = startup_privacy_shield_hide_reason(
+        &protection_statuses,
+        crate::screen_share::native_privacy_shield_decision(
+            crate::screen_share::detect_screen_share_status(),
+        ),
+    );
+
+    if startup_hide_reason.is_some() {
+        for (_, window) in app.webview_windows() {
+            let _ = window.hide();
+        }
+    }
+}
+
+pub fn startup_privacy_shield_hide_reason(
+    protection_statuses: &[OverlayProtectionStatus],
+    screen_share_decision: crate::screen_share::NativePrivacyShieldDecision,
+) -> Option<String> {
+    let mut reasons = Vec::new();
+    if let crate::screen_share::NativePrivacyShieldDecision::Hide { reason } = screen_share_decision
+    {
+        reasons.push(reason);
+    }
+
+    for status in protection_statuses {
+        if let crate::screen_share::NativePrivacyShieldDecision::Hide { reason } =
+            crate::screen_share::native_privacy_shield_decision_for_overlay_protection(status)
+        {
+            reasons.push(reason);
+        }
+    }
+
+    if reasons.is_empty() {
+        None
+    } else {
+        Some(format!(
+            "Startup privacy shield hid app windows. {}",
+            reasons.join(" ")
+        ))
     }
 }
 

@@ -2,8 +2,8 @@ use super::{
     capture_exclusion_disabled_status, capture_exclusion_enabled_status,
     capture_exclusion_unavailable_status, enforce_capture_exclusion_setting,
     is_companion_window_label, is_overlay_window_label, native_show_privacy_gate_status,
-    protected_window_labels, sanitize_overlay_bounds, windows_capture_exclusion_status,
-    OverlayProtectionStatus, OverlayWindowBounds,
+    protected_window_labels, sanitize_overlay_bounds, startup_privacy_shield_hide_reason,
+    windows_capture_exclusion_status, OverlayProtectionStatus, OverlayWindowBounds,
 };
 use crate::screen_share::NativePrivacyShieldDecision;
 
@@ -155,4 +155,40 @@ fn native_visibility_gate_names_companion_windows_when_blocking_companion_show()
         .message
         .unwrap()
         .contains("Native privacy shield denied showing companion app windows"));
+}
+
+#[test]
+fn startup_privacy_shield_hides_when_screen_share_is_already_running() {
+    let reason = startup_privacy_shield_hide_reason(
+        &[capture_exclusion_enabled_status(false)],
+        NativePrivacyShieldDecision::Hide {
+            reason: "Known screen-sharing or recording process is running.".to_string(),
+        },
+    )
+    .expect("startup should hide when a screen-share process is already active");
+
+    assert!(reason.contains("Known screen-sharing or recording process is running"));
+}
+
+#[test]
+fn startup_privacy_shield_hides_when_capture_exclusion_is_not_proven() {
+    let reason = startup_privacy_shield_hide_reason(
+        &[capture_exclusion_unavailable_status()],
+        NativePrivacyShieldDecision::Allow,
+    )
+    .expect("startup should hide when OS capture exclusion is unsupported");
+
+    assert!(reason.contains("Capture exclusion is not enforced"));
+    assert!(reason.contains("unsupported"));
+}
+
+#[test]
+fn startup_privacy_shield_allows_when_capture_exclusion_is_enabled_and_share_is_clear() {
+    assert_eq!(
+        startup_privacy_shield_hide_reason(
+            &[capture_exclusion_enabled_status(false)],
+            NativePrivacyShieldDecision::Allow,
+        ),
+        None
+    );
 }
