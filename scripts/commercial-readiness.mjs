@@ -94,6 +94,30 @@ export const REQUIRED_ARTIFACTS = [
     label: "SHA-256 checksum manifest",
     examplePath: "SHA256SUMS",
     pattern: /(^|\/)SHA256SUMS$/
+  },
+  {
+    id: "privacy-shield-windows-x64",
+    label: "Windows x64 privacy shield attestation",
+    examplePath: "caveman-windows-package-smoke/privacy-shield-windows-x64.json",
+    pattern: /(^|\/)caveman-windows-package-smoke\/privacy-shield-windows-x64\.json$/
+  },
+  {
+    id: "privacy-shield-macos-arm64",
+    label: "macOS Apple Silicon privacy shield attestation",
+    examplePath: "caveman-macos-arm64-package-smoke/privacy-shield-macos-arm64.json",
+    pattern: /(^|\/)caveman-macos-arm64-package-smoke\/privacy-shield-macos-arm64\.json$/
+  },
+  {
+    id: "privacy-shield-macos-x64",
+    label: "macOS Intel privacy shield attestation",
+    examplePath: "caveman-macos-intel-package-smoke/privacy-shield-macos-x64.json",
+    pattern: /(^|\/)caveman-macos-intel-package-smoke\/privacy-shield-macos-x64\.json$/
+  },
+  {
+    id: "privacy-shield-linux-x64",
+    label: "Linux x64 privacy shield attestation",
+    examplePath: "caveman-linux-package-smoke/privacy-shield-linux-x64.json",
+    pattern: /(^|\/)caveman-linux-package-smoke\/privacy-shield-linux-x64\.json$/
   }
 ];
 

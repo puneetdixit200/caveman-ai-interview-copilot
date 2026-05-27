@@ -443,3 +443,24 @@ test("desktop package smoke workflow builds macOS and Windows installers without
   assert.doesNotMatch(workflow, /softprops\/action-gh-release/);
   assert.doesNotMatch(workflow, /TAURI_SIGNING_PRIVATE_KEY/);
 });
+
+test("desktop package smoke uploads privacy shield attestations from every target", async () => {
+  const workflow = await readFile(desktopSmokeWorkflowPath, "utf8");
+  const packageJson = JSON.parse(await readFile("package.json", "utf8"));
+
+  assert.match(packageJson.scripts["test:release"], /verify-privacy-shield-package\.test\.mjs/);
+  assert.match(packageJson.scripts["package:verify-privacy-shield"], /verify-privacy-shield-package\.mjs/);
+
+  for (const target of ["windows-x64", "macos-x64", "macos-arm64", "linux-x64"]) {
+    assert.match(
+      workflow,
+      new RegExp(`verify-privacy-shield-package\\.mjs --target ${target} --write-attestation`),
+      `${target} package smoke must verify native privacy shield markers`
+    );
+    assert.match(
+      workflow,
+      new RegExp(`privacy-shield-${target}\\.json`),
+      `${target} package smoke must upload privacy shield attestation`
+    );
+  }
+});

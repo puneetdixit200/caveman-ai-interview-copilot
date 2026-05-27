@@ -67,6 +67,13 @@ test("verifies all redistributable package artifacts for target platforms", () =
   assert.equal(result.missingArtifacts.length, 0);
 });
 
+test("requires packaged native privacy shield attestations for every desktop target", () => {
+  assert.deepEqual(
+    REQUIRED_ARTIFACTS.filter((artifact) => artifact.id.startsWith("privacy-shield-")).map((artifact) => artifact.id),
+    ["privacy-shield-windows-x64", "privacy-shield-macos-arm64", "privacy-shield-macos-x64", "privacy-shield-linux-x64"]
+  );
+});
+
 test("reports missing redistributable artifacts by platform", () => {
   const result = evaluateArtifactReadiness([
     "/tmp/run/caveman-windows-package-smoke/nsis/Caveman_0.1.1_x64-setup.exe"
@@ -83,7 +90,11 @@ test("reports missing redistributable artifacts by platform", () => {
       "macos-x64-sidecar",
       "linux-appimage",
       "linux-deb",
-      "checksums"
+      "checksums",
+      "privacy-shield-windows-x64",
+      "privacy-shield-macos-arm64",
+      "privacy-shield-macos-x64",
+      "privacy-shield-linux-x64"
     ]
   );
 });
