@@ -48,6 +48,10 @@ const STREAMYARD_WEB_MEETING_ORIGIN: &str = "streamyard.com";
 const LIVESTORM_WEB_MEETING_ORIGIN: &str = "livestorm.co";
 const BIGBLUEBUTTON_MEETING_TITLE: &str = "bigbluebutton";
 const TELLA_WEB_RECORDER_ORIGIN: &str = "tella.tv";
+const MACOS_SCREEN_CAPTURE_UI_PROCESS: &str = "screencaptureui";
+const MACOS_SCREEN_CAPTURE_CLI_PROCESS: &str = "screencapture";
+const MACOS_REPLAYD_PROCESS: &str = "replayd";
+const MACOS_SCREEN_CAPTURE_KIT_AGENT_PROCESS: &str = "screencapturekitagent";
 const PACKAGE_PRIVACY_SHIELD_WEBVIEW_MARKERS: &[&str] = &[
     EDGE_WEBVIEW_HOST_PROCESS,
     EDGE_PWA_HOST_PROCESS,
@@ -78,6 +82,10 @@ const PACKAGE_PRIVACY_SHIELD_WEBVIEW_MARKERS: &[&str] = &[
     LIVESTORM_WEB_MEETING_ORIGIN,
     BIGBLUEBUTTON_MEETING_TITLE,
     TELLA_WEB_RECORDER_ORIGIN,
+    MACOS_SCREEN_CAPTURE_UI_PROCESS,
+    MACOS_SCREEN_CAPTURE_CLI_PROCESS,
+    MACOS_REPLAYD_PROCESS,
+    MACOS_SCREEN_CAPTURE_KIT_AGENT_PROCESS,
 ];
 
 #[derive(Debug, Clone, PartialEq)]
@@ -236,6 +244,10 @@ const WATCHED_SCREEN_SHARE_PROCESSES: &[&str] = &[
     "cleanshot x",
     "kap",
     "screen studio",
+    MACOS_SCREEN_CAPTURE_UI_PROCESS,
+    MACOS_SCREEN_CAPTURE_CLI_PROCESS,
+    MACOS_REPLAYD_PROCESS,
+    MACOS_SCREEN_CAPTURE_KIT_AGENT_PROCESS,
     "screenpresso.exe",
     "camtasiarecorder.exe",
     "techsmith capture",
@@ -836,7 +848,11 @@ mod tests {
                 STREAMYARD_WEB_MEETING_ORIGIN,
                 LIVESTORM_WEB_MEETING_ORIGIN,
                 BIGBLUEBUTTON_MEETING_TITLE,
-                TELLA_WEB_RECORDER_ORIGIN
+                TELLA_WEB_RECORDER_ORIGIN,
+                MACOS_SCREEN_CAPTURE_UI_PROCESS,
+                MACOS_SCREEN_CAPTURE_CLI_PROCESS,
+                MACOS_REPLAYD_PROCESS,
+                MACOS_SCREEN_CAPTURE_KIT_AGENT_PROCESS
             ]
         );
     }
@@ -876,6 +892,30 @@ mod tests {
                 pid: Some(4242),
                 window_title: None,
             }]
+        );
+    }
+
+    #[test]
+    fn detects_macos_system_screen_capture_agents_from_unix_process_list() {
+        let processes = parse_unix_process_list(
+            " 500 /System/Library/CoreServices/screencaptureui\n 501 /usr/sbin/screencapture\n 502 /usr/libexec/replayd\n 503 /System/Library/PrivateFrameworks/ScreenCaptureKit.framework/ScreenCaptureKitAgent\n 504 /Applications/Notes.app/Contents/MacOS/Notes",
+        );
+
+        let status = screen_share_status_for_processes(processes);
+
+        assert!(status.active);
+        assert_eq!(
+            status
+                .matched_processes
+                .iter()
+                .map(|process| process.name.as_str())
+                .collect::<Vec<_>>(),
+            vec![
+                "/System/Library/CoreServices/screencaptureui",
+                "/usr/sbin/screencapture",
+                "/usr/libexec/replayd",
+                "/System/Library/PrivateFrameworks/ScreenCaptureKit.framework/ScreenCaptureKitAgent",
+            ]
         );
     }
 

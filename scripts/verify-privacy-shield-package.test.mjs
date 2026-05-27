@@ -62,6 +62,13 @@ test("requires packaged remote-support service detector markers", () => {
   assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("za_connect.exe"));
 });
 
+test("requires packaged macOS system capture detector markers", () => {
+  assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("screencaptureui"));
+  assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("screencapture"));
+  assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("replayd"));
+  assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("screencapturekitagent"));
+});
+
 test("requires packaged Windows display-affinity readback marker", () => {
   assert.ok(TARGET_PRIVACY_SHIELD_MARKERS["windows-x64"].includes("SetWindowDisplayAffinity"));
   assert.ok(TARGET_PRIVACY_SHIELD_MARKERS["windows-x64"].includes("GetWindowDisplayAffinity"));

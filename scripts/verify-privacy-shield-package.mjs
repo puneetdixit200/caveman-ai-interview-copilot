@@ -55,7 +55,11 @@ export const COMMON_PRIVACY_SHIELD_MARKERS = [
   "streamyard.com",
   "livestorm.co",
   "bigbluebutton",
-  "tella.tv"
+  "tella.tv",
+  "screencaptureui",
+  "screencapture",
+  "replayd",
+  "screencapturekitagent"
 ];
 
 export const TARGET_PRIVACY_SHIELD_MARKERS = {
