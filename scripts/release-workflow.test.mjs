@@ -327,6 +327,70 @@ test("overlay bounds updates preflight privacy before moving a visible window", 
   assert.match(overlayRs, /Overlay bounds update refused before capture exclusion was proven\./);
 });
 
+test("native overlay show rechecks privacy after the OS visibility transition", async () => {
+  const overlayRs = await readFile("src-tauri/src/overlay/mod.rs", "utf8");
+  const commandStart = overlayRs.indexOf("pub fn set_overlay_window_visible(");
+  const commandEnd = overlayRs.indexOf("pub fn native_show_privacy_gate_status", commandStart);
+
+  assert.notEqual(commandStart, -1, "overlay visibility command must exist");
+  assert.notEqual(commandEnd, -1, "overlay visibility command body must be bounded by show gate helper");
+
+  const commandBody = overlayRs.slice(commandStart, commandEnd);
+  const showCall = commandBody.indexOf("window.show()");
+  const postShowRecheck = commandBody.indexOf("let post_show_status = protect_overlay_window(app, capture_exclusion_enabled)");
+  const postShowGate = commandBody.indexOf(
+    "post_show_privacy_recheck_message(\n            &post_show_status,\n            OVERLAY_POST_SHOW_UNSAFE_PROTECTION_MARKER"
+  );
+  const revertOverlay = commandBody.indexOf("window.hide()", postShowGate);
+  const hideCompanions = commandBody.indexOf(
+    "set_companion_windows_visible(app, false, capture_exclusion_enabled)",
+    postShowGate
+  );
+
+  assert.notEqual(showCall, -1, "overlay visibility command must still call native show");
+  assert.notEqual(postShowRecheck, -1, "overlay show must refresh native protection after show");
+  assert.notEqual(postShowGate, -1, "overlay show must inspect the post-show protection result");
+  assert.notEqual(revertOverlay, -1, "unsafe post-show state must hide the overlay again");
+  assert.notEqual(hideCompanions, -1, "unsafe post-show state must hide companion windows too");
+  assert.ok(showCall < postShowRecheck, "post-show protection refresh must happen after native show");
+  assert.ok(postShowRecheck < postShowGate, "post-show gate must use refreshed protection status");
+  assert.ok(postShowGate < revertOverlay, "post-show denial must run before reverting overlay visibility");
+  assert.ok(postShowGate < hideCompanions, "post-show denial must run before hiding companion windows");
+  assert.match(
+    overlayRs,
+    /Overlay show was reverted because capture exclusion was not proven after visibility changed\./
+  );
+});
+
+test("native companion show rechecks privacy after the OS visibility transition", async () => {
+  const overlayRs = await readFile("src-tauri/src/overlay/mod.rs", "utf8");
+  const commandStart = overlayRs.indexOf("pub fn set_companion_windows_visible(");
+  const commandEnd = overlayRs.indexOf("pub fn companion_visibility_success_status", commandStart);
+
+  assert.notEqual(commandStart, -1, "companion visibility command must exist");
+  assert.notEqual(commandEnd, -1, "companion visibility command body must be bounded by status helper");
+
+  const commandBody = overlayRs.slice(commandStart, commandEnd);
+  const showCall = commandBody.indexOf("window.show()");
+  const postShowRecheck = commandBody.indexOf("let post_show_protection_results = companion_windows");
+  const postShowGate = commandBody.indexOf(
+    "post_show_privacy_recheck_message(\n            &post_show_status,\n            COMPANION_POST_SHOW_UNSAFE_PROTECTION_MARKER"
+  );
+  const revertCompanions = commandBody.indexOf("window.hide()", postShowGate);
+
+  assert.notEqual(showCall, -1, "companion visibility command must still call native show");
+  assert.notEqual(postShowRecheck, -1, "companion show must refresh native protection after show");
+  assert.notEqual(postShowGate, -1, "companion show must inspect the post-show protection result");
+  assert.notEqual(revertCompanions, -1, "unsafe post-show state must hide companions again");
+  assert.ok(showCall < postShowRecheck, "post-show protection refresh must happen after native show");
+  assert.ok(postShowRecheck < postShowGate, "post-show gate must use refreshed companion protection status");
+  assert.ok(postShowGate < revertCompanions, "post-show denial must run before reverting companions");
+  assert.match(
+    overlayRs,
+    /Companion app window show was reverted because capture exclusion was not proven after visibility changed\./
+  );
+});
+
 test("default desktop capability denies raw window visibility bypasses", async () => {
   const capability = JSON.parse(await readFile("src-tauri/capabilities/default.json", "utf8"));
   const permissions = new Set(capability.permissions);

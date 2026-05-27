@@ -33,6 +33,10 @@ pub const COMPANION_UNSAFE_PROTECTION_MARKER: &str =
     "Companion window capture exclusion is unsafe.";
 pub const BOUNDS_UPDATE_UNSAFE_PROTECTION_MARKER: &str =
     "Overlay bounds update refused before capture exclusion was proven.";
+pub const OVERLAY_POST_SHOW_UNSAFE_PROTECTION_MARKER: &str =
+    "Overlay show was reverted because capture exclusion was not proven after visibility changed.";
+pub const COMPANION_POST_SHOW_UNSAFE_PROTECTION_MARKER: &str =
+    "Companion app window show was reverted because capture exclusion was not proven after visibility changed.";
 
 pub fn protected_window_labels() -> [&'static str; 2] {
     PROTECTED_WINDOW_LABELS
@@ -447,6 +451,47 @@ pub fn set_companion_windows_visible(
         ));
     }
 
+    if visible {
+        let post_show_protection_results = companion_windows
+            .iter()
+            .map(|(label, window)| {
+                (
+                    label.clone(),
+                    apply_capture_exclusion(window, capture_exclusion_enabled),
+                )
+            })
+            .collect::<Vec<_>>();
+        let post_show_status = companion_capture_exclusion_status(
+            capture_exclusion_enabled,
+            &post_show_protection_results,
+            &missing_required_windows,
+        );
+
+        if let Some(message) = post_show_privacy_recheck_message(
+            &post_show_status,
+            COMPANION_POST_SHOW_UNSAFE_PROTECTION_MARKER,
+        ) {
+            let mut messages = vec![message];
+            for (label, window) in &companion_windows {
+                if let Err(error) = window.hide() {
+                    messages.push(format!("{label} window post-show hide failed: {error}"));
+                }
+            }
+
+            let mut hidden_status = post_show_status;
+            hidden_status.visible = false;
+            hidden_status.message =
+                Some(join_status_messages(hidden_status.message.take(), messages));
+            return companion_window_status(hidden_status);
+        }
+
+        return companion_visibility_success_status(
+            visible,
+            capture_exclusion_enabled,
+            post_show_status,
+        );
+    }
+
     companion_visibility_success_status(visible, capture_exclusion_enabled, protection_status)
 }
 
@@ -529,6 +574,26 @@ pub fn set_overlay_window_visible(
         status.message = Some(format!("Overlay visibility update failed: {error}"));
     }
 
+    if visible && status.visible {
+        let post_show_status = protect_overlay_window(app, capture_exclusion_enabled);
+        if let Some(message) = post_show_privacy_recheck_message(
+            &post_show_status,
+            OVERLAY_POST_SHOW_UNSAFE_PROTECTION_MARKER,
+        ) {
+            let _ = window.hide();
+            let _ = set_companion_windows_visible(app, false, capture_exclusion_enabled);
+            let mut hidden_status = post_show_status;
+            hidden_status.visible = false;
+            hidden_status.message = Some(join_status_messages(
+                hidden_status.message.take(),
+                vec![message],
+            ));
+            return hidden_status;
+        }
+
+        return post_show_status;
+    }
+
     status
 }
 
@@ -564,6 +629,18 @@ pub fn native_show_privacy_gate_status(
         reasons.join(" ")
     ));
     status
+}
+
+pub fn post_show_privacy_recheck_message(
+    status: &OverlayProtectionStatus,
+    marker: &str,
+) -> Option<String> {
+    match crate::screen_share::native_privacy_shield_decision_for_overlay_protection(status) {
+        crate::screen_share::NativePrivacyShieldDecision::Allow => None,
+        crate::screen_share::NativePrivacyShieldDecision::Hide { reason } => {
+            Some(format!("{marker} {reason}"))
+        }
+    }
 }
 
 fn companion_window_status(mut status: OverlayProtectionStatus) -> OverlayProtectionStatus {

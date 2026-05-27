@@ -197,6 +197,16 @@ test("requires packaged protection refresh fail-closed marker", () => {
   );
   assert.ok(
     COMMON_PRIVACY_SHIELD_MARKERS.includes(
+      "Overlay show was reverted because capture exclusion was not proven after visibility changed."
+    )
+  );
+  assert.ok(
+    COMMON_PRIVACY_SHIELD_MARKERS.includes(
+      "Companion app window show was reverted because capture exclusion was not proven after visibility changed."
+    )
+  );
+  assert.ok(
+    COMMON_PRIVACY_SHIELD_MARKERS.includes(
       "Native privacy shield thread failed to start; refusing to run without fail-closed screen-share guard."
     )
   );

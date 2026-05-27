@@ -3,11 +3,12 @@ use super::{
     capture_exclusion_enabled_status, capture_exclusion_unavailable_status,
     companion_capture_exclusion_status, companion_visibility_success_status,
     enforce_capture_exclusion_setting, is_companion_window_label, is_overlay_window_label,
-    native_show_privacy_gate_status, protected_window_labels,
+    native_show_privacy_gate_status, post_show_privacy_recheck_message, protected_window_labels,
     protection_refresh_fail_closed_message, sanitize_overlay_bounds,
     startup_privacy_shield_hide_reason, windows_capture_exclusion_status, OverlayProtectionStatus,
     OverlayWindowBounds, BOUNDS_UPDATE_UNSAFE_PROTECTION_MARKER,
-    COMPANION_HIDE_UNSAFE_PROTECTION_MARKER, COMPANION_UNSAFE_PROTECTION_MARKER,
+    COMPANION_HIDE_UNSAFE_PROTECTION_MARKER, COMPANION_POST_SHOW_UNSAFE_PROTECTION_MARKER,
+    COMPANION_UNSAFE_PROTECTION_MARKER, OVERLAY_POST_SHOW_UNSAFE_PROTECTION_MARKER,
     PROTECTION_REFRESH_FAIL_CLOSED_MARKER, STARTUP_PRIVACY_SHIELD_DENIED_INITIAL_SHOW_MARKER,
 };
 use crate::screen_share::NativePrivacyShieldDecision;
@@ -259,6 +260,40 @@ fn bounds_update_gate_allows_when_share_clear_and_capture_exclusion_enabled() {
         bounds_update_privacy_gate_message(
             &capture_exclusion_enabled_status(false),
             NativePrivacyShieldDecision::Allow,
+        ),
+        None
+    );
+}
+
+#[test]
+fn post_show_privacy_recheck_blocks_when_capture_exclusion_is_not_proven() {
+    let overlay_message = post_show_privacy_recheck_message(
+        &capture_exclusion_unavailable_status(),
+        OVERLAY_POST_SHOW_UNSAFE_PROTECTION_MARKER,
+    )
+    .expect("overlay show must be reverted when post-show protection is unsafe");
+
+    assert!(overlay_message.contains(OVERLAY_POST_SHOW_UNSAFE_PROTECTION_MARKER));
+    assert!(overlay_message.contains("Capture exclusion is not enforced"));
+    assert!(overlay_message.contains("unsupported"));
+
+    let companion_message = post_show_privacy_recheck_message(
+        &capture_exclusion_disabled_status(true),
+        COMPANION_POST_SHOW_UNSAFE_PROTECTION_MARKER,
+    )
+    .expect("companion show must be reverted when post-show protection is unsafe");
+
+    assert!(companion_message.contains(COMPANION_POST_SHOW_UNSAFE_PROTECTION_MARKER));
+    assert!(companion_message.contains("Capture exclusion is not enforced"));
+    assert!(companion_message.contains("disabled"));
+}
+
+#[test]
+fn post_show_privacy_recheck_allows_when_capture_exclusion_is_enabled() {
+    assert_eq!(
+        post_show_privacy_recheck_message(
+            &capture_exclusion_enabled_status(true),
+            OVERLAY_POST_SHOW_UNSAFE_PROTECTION_MARKER,
         ),
         None
     );
