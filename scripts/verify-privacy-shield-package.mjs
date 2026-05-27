@@ -31,7 +31,7 @@ export const COMMON_PRIVACY_SHIELD_MARKERS = [
 ];
 
 export const TARGET_PRIVACY_SHIELD_MARKERS = {
-  "windows-x64": [...COMMON_PRIVACY_SHIELD_MARKERS, "SetWindowDisplayAffinity"],
+  "windows-x64": [...COMMON_PRIVACY_SHIELD_MARKERS, "SetWindowDisplayAffinity", "GetWindowDisplayAffinity"],
   "macos-x64": [...COMMON_PRIVACY_SHIELD_MARKERS, "set_content_protected", "macOS rejected NSWindow content protection"],
   "macos-arm64": [...COMMON_PRIVACY_SHIELD_MARKERS, "set_content_protected", "macOS rejected NSWindow content protection"],
   "linux-x64": [...COMMON_PRIVACY_SHIELD_MARKERS, "Capture exclusion is only implemented on Windows and macOS"]

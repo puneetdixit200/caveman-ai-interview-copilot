@@ -27,6 +27,11 @@ test("requires packaged Teams and Google Meet WebView detector markers", () => {
   assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("meet.google.com"));
 });
 
+test("requires packaged Windows display-affinity readback marker", () => {
+  assert.ok(TARGET_PRIVACY_SHIELD_MARKERS["windows-x64"].includes("SetWindowDisplayAffinity"));
+  assert.ok(TARGET_PRIVACY_SHIELD_MARKERS["windows-x64"].includes("GetWindowDisplayAffinity"));
+});
+
 test("reports missing packaged native privacy markers", () => {
   const result = evaluateBinaryPrivacyMarkers(Buffer.from("Capture exclusion is not enforced."), [
     "Capture exclusion is not enforced.",

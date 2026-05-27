@@ -95,13 +95,24 @@ fn treats_every_non_overlay_window_as_sensitive_companion_window() {
 
 #[test]
 fn reports_enabled_capture_exclusion_when_windows_uses_legacy_monitor_fallback() {
-    let status = windows_capture_exclusion_status(false, false, true);
+    let status = windows_capture_exclusion_status(false, false, false, true, true);
 
     assert_eq!(status.capture_exclusion, "enabled");
     assert!(status
         .message
         .unwrap()
         .contains("legacy WDA_MONITOR fallback"));
+}
+
+#[test]
+fn windows_capture_exclusion_fails_closed_when_readback_does_not_confirm_exclusion() {
+    let status = windows_capture_exclusion_status(false, true, false, false, false);
+
+    assert_eq!(status.capture_exclusion, "failed");
+    assert!(status
+        .message
+        .unwrap()
+        .contains("Windows display-affinity readback did not confirm capture exclusion"));
 }
 
 #[test]

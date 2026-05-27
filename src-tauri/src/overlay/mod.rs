@@ -449,7 +449,8 @@ fn apply_capture_exclusion(
     capture_exclusion_enabled: bool,
 ) -> OverlayProtectionStatus {
     use windows::Win32::UI::WindowsAndMessaging::{
-        SetWindowDisplayAffinity, WDA_EXCLUDEFROMCAPTURE, WDA_MONITOR, WDA_NONE,
+        GetWindowDisplayAffinity, SetWindowDisplayAffinity, WDA_EXCLUDEFROMCAPTURE, WDA_MONITOR,
+        WDA_NONE,
     };
 
     match window.hwnd() {
@@ -467,13 +468,33 @@ fn apply_capture_exclusion(
 
             let exclude_from_capture_ok =
                 unsafe { SetWindowDisplayAffinity(hwnd, WDA_EXCLUDEFROMCAPTURE) }.is_ok();
-            if exclude_from_capture_ok {
-                return windows_capture_exclusion_status(false, true, false);
+            let exclude_from_capture_confirmed = if exclude_from_capture_ok {
+                let mut affinity = 0u32;
+                unsafe { GetWindowDisplayAffinity(hwnd, &mut affinity) }.is_ok()
+                    && affinity == WDA_EXCLUDEFROMCAPTURE.0
+            } else {
+                false
+            };
+            if exclude_from_capture_confirmed {
+                return windows_capture_exclusion_status(false, true, true, false, false);
             }
 
             let monitor_fallback_ok =
                 unsafe { SetWindowDisplayAffinity(hwnd, WDA_MONITOR) }.is_ok();
-            windows_capture_exclusion_status(false, false, monitor_fallback_ok)
+            let monitor_fallback_confirmed = if monitor_fallback_ok {
+                let mut affinity = 0u32;
+                unsafe { GetWindowDisplayAffinity(hwnd, &mut affinity) }.is_ok()
+                    && affinity == WDA_MONITOR.0
+            } else {
+                false
+            };
+            windows_capture_exclusion_status(
+                false,
+                exclude_from_capture_ok,
+                exclude_from_capture_confirmed,
+                monitor_fallback_ok,
+                monitor_fallback_confirmed,
+            )
         }
         Err(error) => capture_exclusion_failed_status(false, error.to_string()),
     }
@@ -481,14 +502,16 @@ fn apply_capture_exclusion(
 
 pub fn windows_capture_exclusion_status(
     visible: bool,
-    exclude_from_capture_ok: bool,
-    monitor_fallback_ok: bool,
+    exclude_from_capture_set_ok: bool,
+    exclude_from_capture_confirmed: bool,
+    monitor_fallback_set_ok: bool,
+    monitor_fallback_confirmed: bool,
 ) -> OverlayProtectionStatus {
-    if exclude_from_capture_ok {
+    if exclude_from_capture_set_ok && exclude_from_capture_confirmed {
         return capture_exclusion_enabled_status(visible);
     }
 
-    if monitor_fallback_ok {
+    if monitor_fallback_set_ok && monitor_fallback_confirmed {
         let mut status = capture_exclusion_enabled_status(visible);
         status.message = Some(
             "Windows applied legacy WDA_MONITOR fallback; screen captures should blank the window instead of showing content."
@@ -499,7 +522,11 @@ pub fn windows_capture_exclusion_status(
 
     capture_exclusion_failed_status(
         visible,
-        "Windows rejected WDA_EXCLUDEFROMCAPTURE and legacy WDA_MONITOR fallback.".to_string(),
+        if exclude_from_capture_set_ok || monitor_fallback_set_ok {
+            "Windows display-affinity readback did not confirm capture exclusion.".to_string()
+        } else {
+            "Windows rejected WDA_EXCLUDEFROMCAPTURE and legacy WDA_MONITOR fallback.".to_string()
+        },
     )
 }
 
