@@ -38,6 +38,10 @@ const ZOOM_WEB_MEETING_ORIGIN: &str = "zoom.us";
 const SLACK_WEB_HUDDLE_ORIGIN: &str = "app.slack.com";
 const DISCORD_WEB_HUDDLE_ORIGIN: &str = "discord.com";
 const WHATSAPP_WEB_CALL_ORIGIN: &str = "web.whatsapp.com";
+const WEBEX_WEB_MEETING_ORIGIN: &str = "webex.com";
+const GOTO_WEB_MEETING_ORIGIN: &str = "meet.goto.com";
+const JITSI_WEB_MEETING_ORIGIN: &str = "meet.jit.si";
+const AMAZON_CHIME_WEB_MEETING_ORIGIN: &str = "app.chime.aws";
 const WHEREBY_WEB_MEETING_ORIGIN: &str = "whereby.com";
 const RIVERSIDE_WEB_MEETING_ORIGIN: &str = "riverside.fm";
 const STREAMYARD_WEB_MEETING_ORIGIN: &str = "streamyard.com";
@@ -64,6 +68,10 @@ const PACKAGE_PRIVACY_SHIELD_WEBVIEW_MARKERS: &[&str] = &[
     SLACK_WEB_HUDDLE_ORIGIN,
     DISCORD_WEB_HUDDLE_ORIGIN,
     WHATSAPP_WEB_CALL_ORIGIN,
+    WEBEX_WEB_MEETING_ORIGIN,
+    GOTO_WEB_MEETING_ORIGIN,
+    JITSI_WEB_MEETING_ORIGIN,
+    AMAZON_CHIME_WEB_MEETING_ORIGIN,
     WHEREBY_WEB_MEETING_ORIGIN,
     RIVERSIDE_WEB_MEETING_ORIGIN,
     STREAMYARD_WEB_MEETING_ORIGIN,
@@ -245,6 +253,10 @@ const WATCHED_SCREEN_SHARE_TITLES: &[&str] = &[
     "zoom meeting",
     ZOOM_WEB_MEETING_ORIGIN,
     "webex meeting",
+    WEBEX_WEB_MEETING_ORIGIN,
+    GOTO_WEB_MEETING_ORIGIN,
+    JITSI_WEB_MEETING_ORIGIN,
+    AMAZON_CHIME_WEB_MEETING_ORIGIN,
     "whereby",
     WHEREBY_WEB_MEETING_ORIGIN,
     "riverside",
@@ -752,6 +764,46 @@ mod tests {
     }
 
     #[test]
+    fn detects_additional_browser_meeting_origins_from_pwa_hosts() {
+        let processes = parse_tasklist_csv(
+            "\"msedge_proxy.exe\",\"641\",\"Console\",\"1\",\"64,000 K\",\"Running\",\"DESKTOP\\\\me\",\"0:00:21\",\"web.webex.com/meet/jane\"\n\"chrome_proxy.exe\",\"642\",\"Console\",\"1\",\"64,000 K\",\"Running\",\"DESKTOP\\\\me\",\"0:00:22\",\"meet.goto.com/123456789\"\n\"brave_proxy.exe\",\"643\",\"Console\",\"1\",\"64,000 K\",\"Running\",\"DESKTOP\\\\me\",\"0:00:23\",\"meet.jit.si/candidate-room\"\n\"msedgewebview2.exe\",\"644\",\"Console\",\"1\",\"64,000 K\",\"Running\",\"DESKTOP\\\\me\",\"0:00:24\",\"app.chime.aws/meetings/abc\"\n\"RuntimeBroker.exe\",\"645\",\"Console\",\"1\",\"10,000 K\",\"Running\",\"DESKTOP\\\\me\",\"0:00:01\",\"Settings\"",
+        );
+
+        let status = screen_share_status_for_processes(processes);
+
+        assert!(status.active);
+        assert_eq!(
+            status
+                .matched_processes
+                .iter()
+                .map(|process| (process.name.as_str(), process.window_title.as_deref()))
+                .collect::<Vec<_>>(),
+            vec![
+                ("msedge_proxy.exe", Some("web.webex.com/meet/jane")),
+                ("chrome_proxy.exe", Some("meet.goto.com/123456789")),
+                ("brave_proxy.exe", Some("meet.jit.si/candidate-room")),
+                ("msedgewebview2.exe", Some("app.chime.aws/meetings/abc"))
+            ]
+        );
+    }
+
+    #[test]
+    fn recognizes_additional_browser_meeting_origin_titles() {
+        assert!(is_watched_screen_share_window_title(Some(
+            "web.webex.com/meet/jane"
+        )));
+        assert!(is_watched_screen_share_window_title(Some(
+            "meet.goto.com/123456789"
+        )));
+        assert!(is_watched_screen_share_window_title(Some(
+            "meet.jit.si/candidate-room"
+        )));
+        assert!(is_watched_screen_share_window_title(Some(
+            "app.chime.aws/meetings/abc"
+        )));
+    }
+
+    #[test]
     fn anchors_webview_markers_for_packaged_privacy_attestation() {
         assert_eq!(
             PACKAGE_PRIVACY_SHIELD_WEBVIEW_MARKERS,
@@ -775,6 +827,10 @@ mod tests {
                 SLACK_WEB_HUDDLE_ORIGIN,
                 DISCORD_WEB_HUDDLE_ORIGIN,
                 WHATSAPP_WEB_CALL_ORIGIN,
+                WEBEX_WEB_MEETING_ORIGIN,
+                GOTO_WEB_MEETING_ORIGIN,
+                JITSI_WEB_MEETING_ORIGIN,
+                AMAZON_CHIME_WEB_MEETING_ORIGIN,
                 WHEREBY_WEB_MEETING_ORIGIN,
                 RIVERSIDE_WEB_MEETING_ORIGIN,
                 STREAMYARD_WEB_MEETING_ORIGIN,

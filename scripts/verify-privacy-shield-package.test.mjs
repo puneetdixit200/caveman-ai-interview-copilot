@@ -46,6 +46,10 @@ test("requires packaged web meeting and recording title detector markers", () =>
   assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("teams.cloud.microsoft"));
   assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("discord.com"));
   assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("web.whatsapp.com"));
+  assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("webex.com"));
+  assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("meet.goto.com"));
+  assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("meet.jit.si"));
+  assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("app.chime.aws"));
   assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("riverside.fm"));
   assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("streamyard.com"));
   assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("livestorm.co"));
