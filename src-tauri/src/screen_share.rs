@@ -36,6 +36,7 @@ const TEAMS_WEB_MEETING_ORIGIN: &str = "teams.microsoft.com";
 const TEAMS_CONSUMER_WEB_MEETING_ORIGIN: &str = "teams.live.com";
 const TEAMS_CLOUD_WEB_MEETING_ORIGIN: &str = "teams.cloud.microsoft";
 const MEET_WEB_MEETING_ORIGIN: &str = "meet.google.com";
+const GOOGLE_MEET_SHORT_TITLE_PREFIX: &str = "meet - ";
 const ZOOM_WEB_MEETING_ORIGIN: &str = "zoom.us";
 const SLACK_WEB_HUDDLE_ORIGIN: &str = "app.slack.com";
 const DISCORD_WEB_HUDDLE_ORIGIN: &str = "discord.com";
@@ -63,6 +64,9 @@ const BROWSER_SHARING_YOUR_SCREEN_TITLE: &str = "sharing your screen";
 const BROWSER_SHARING_THIS_TAB_TITLE: &str = "sharing this tab";
 const BROWSER_SHARING_A_WINDOW_TITLE: &str = "sharing a window";
 const BROWSER_STOP_SHARING_TITLE: &str = "stop sharing";
+const BROWSER_SCREEN_RECORDING_TITLE: &str = "screen recording";
+const BROWSER_RECORDING_YOUR_SCREEN_TITLE: &str = "recording your screen";
+const BROWSER_RECORDING_SCREEN_TITLE: &str = "recording screen";
 const MACOS_SCREEN_CAPTURE_UI_PROCESS: &str = "screencaptureui";
 const MACOS_SCREEN_CAPTURE_CLI_PROCESS: &str = "screencapture";
 const MACOS_REPLAYD_PROCESS: &str = "replayd";
@@ -104,6 +108,7 @@ const PACKAGE_PRIVACY_SHIELD_WEBVIEW_MARKERS: &[&str] = &[
     TEAMS_CONSUMER_WEB_MEETING_ORIGIN,
     TEAMS_CLOUD_WEB_MEETING_ORIGIN,
     MEET_WEB_MEETING_ORIGIN,
+    GOOGLE_MEET_SHORT_TITLE_PREFIX,
     ZOOM_WEB_MEETING_ORIGIN,
     SLACK_WEB_HUDDLE_ORIGIN,
     DISCORD_WEB_HUDDLE_ORIGIN,
@@ -136,6 +141,9 @@ const PACKAGE_PRIVACY_SHIELD_WEBVIEW_MARKERS: &[&str] = &[
     BROWSER_SHARING_THIS_TAB_TITLE,
     BROWSER_SHARING_A_WINDOW_TITLE,
     BROWSER_STOP_SHARING_TITLE,
+    BROWSER_SCREEN_RECORDING_TITLE,
+    BROWSER_RECORDING_YOUR_SCREEN_TITLE,
+    BROWSER_RECORDING_SCREEN_TITLE,
     MACOS_SCREEN_CAPTURE_UI_PROCESS,
     MACOS_SCREEN_CAPTURE_CLI_PROCESS,
     MACOS_REPLAYD_PROCESS,
@@ -347,6 +355,7 @@ const TITLE_ONLY_SCREEN_SHARE_PROCESSES: &[&str] = &[
 const WATCHED_SCREEN_SHARE_TITLES: &[&str] = &[
     "google meet",
     MEET_WEB_MEETING_ORIGIN,
+    GOOGLE_MEET_SHORT_TITLE_PREFIX,
     "microsoft teams",
     "teams meeting",
     TEAMS_WEB_MEETING_ORIGIN,
@@ -391,6 +400,9 @@ const WATCHED_SCREEN_SHARE_TITLES: &[&str] = &[
     BROWSER_SHARING_THIS_TAB_TITLE,
     BROWSER_SHARING_A_WINDOW_TITLE,
     BROWSER_STOP_SHARING_TITLE,
+    BROWSER_SCREEN_RECORDING_TITLE,
+    BROWSER_RECORDING_YOUR_SCREEN_TITLE,
+    BROWSER_RECORDING_SCREEN_TITLE,
     "presenting",
     "hackerrank interview",
     "interview - google meet",
@@ -1066,6 +1078,29 @@ mod tests {
     }
 
     #[test]
+    fn detects_compact_google_meet_and_screen_recording_titles_from_browser_hosts() {
+        let processes = parse_tasklist_csv(
+            "\"chrome.exe\",\"665\",\"Console\",\"1\",\"64,000 K\",\"Running\",\"DESKTOP\\\\me\",\"0:00:21\",\"Meet - abc-defg-hij\"\n\"msedge.exe\",\"666\",\"Console\",\"1\",\"64,000 K\",\"Running\",\"DESKTOP\\\\me\",\"0:00:22\",\"Screen recording - Loom\"\n\"firefox.exe\",\"667\",\"Console\",\"1\",\"64,000 K\",\"Running\",\"DESKTOP\\\\me\",\"0:00:23\",\"Recording your screen\"\n\"notepad.exe\",\"668\",\"Console\",\"1\",\"10,000 K\",\"Running\",\"DESKTOP\\\\me\",\"0:00:01\",\"Meet - personal notes\"",
+        );
+
+        let status = screen_share_status_for_processes(processes);
+
+        assert!(status.active);
+        assert_eq!(
+            status
+                .matched_processes
+                .iter()
+                .map(|process| (process.name.as_str(), process.window_title.as_deref()))
+                .collect::<Vec<_>>(),
+            vec![
+                ("chrome.exe", Some("Meet - abc-defg-hij")),
+                ("msedge.exe", Some("Screen recording - Loom")),
+                ("firefox.exe", Some("Recording your screen"))
+            ]
+        );
+    }
+
+    #[test]
     fn recognizes_browser_sharing_state_titles() {
         for title in [
             "You are sharing your screen",
@@ -1074,6 +1109,10 @@ mod tests {
             "Sharing this tab",
             "Sharing a window",
             "Stop sharing - Google Meet",
+            "Meet - abc-defg-hij",
+            "Screen recording - Loom",
+            "Recording your screen",
+            "Recording screen",
         ] {
             assert!(is_watched_screen_share_window_title(Some(title)));
         }
@@ -1099,6 +1138,7 @@ mod tests {
                 TEAMS_CONSUMER_WEB_MEETING_ORIGIN,
                 TEAMS_CLOUD_WEB_MEETING_ORIGIN,
                 MEET_WEB_MEETING_ORIGIN,
+                GOOGLE_MEET_SHORT_TITLE_PREFIX,
                 ZOOM_WEB_MEETING_ORIGIN,
                 SLACK_WEB_HUDDLE_ORIGIN,
                 DISCORD_WEB_HUDDLE_ORIGIN,
@@ -1131,6 +1171,9 @@ mod tests {
                 BROWSER_SHARING_THIS_TAB_TITLE,
                 BROWSER_SHARING_A_WINDOW_TITLE,
                 BROWSER_STOP_SHARING_TITLE,
+                BROWSER_SCREEN_RECORDING_TITLE,
+                BROWSER_RECORDING_YOUR_SCREEN_TITLE,
+                BROWSER_RECORDING_SCREEN_TITLE,
                 MACOS_SCREEN_CAPTURE_UI_PROCESS,
                 MACOS_SCREEN_CAPTURE_CLI_PROCESS,
                 MACOS_REPLAYD_PROCESS,

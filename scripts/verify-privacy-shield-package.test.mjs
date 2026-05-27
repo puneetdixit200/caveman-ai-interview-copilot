@@ -30,6 +30,7 @@ test("requires packaged Teams and Google Meet WebView detector markers", () => {
   assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("vivaldi_proxy.exe"));
   assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("teams.microsoft.com"));
   assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("meet.google.com"));
+  assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("meet - "));
 });
 
 test("requires packaged remote screen-share detector markers", () => {
@@ -73,6 +74,9 @@ test("requires packaged web meeting and recording title detector markers", () =>
   assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("sharing this tab"));
   assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("sharing a window"));
   assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("stop sharing"));
+  assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("screen recording"));
+  assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("recording your screen"));
+  assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("recording screen"));
 });
 
 test("requires packaged remote-support service detector markers", () => {
