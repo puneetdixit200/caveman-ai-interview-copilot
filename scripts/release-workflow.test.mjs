@@ -183,6 +183,35 @@ test("native screen OCR capture hides app windows before creating screenshots", 
   assert.match(commandBody, /ocr::native_capture_privacy_gate_message/);
 });
 
+test("native privacy commands do not expose a capture-exclusion off switch", async () => {
+  const commandsRs = await readFile("src-tauri/src/commands.rs", "utf8");
+  const overlayRs = await readFile("src-tauri/src/overlay/mod.rs", "utf8");
+
+  assert.match(overlayRs, /pub fn enforce_capture_exclusion_setting/);
+
+  for (const command of [
+    "protect_overlay_window",
+    "set_overlay_window_visible",
+    "set_companion_windows_visible",
+    "set_overlay_window_bounds"
+  ]) {
+    const commandStart = commandsRs.indexOf(`pub fn ${command}`);
+    assert.notEqual(commandStart, -1, `${command} must exist`);
+    const commandBody = commandsRs.slice(commandStart, commandsRs.indexOf("#[tauri::command]", commandStart + 1));
+
+    assert.match(
+      commandBody,
+      /overlay::enforce_capture_exclusion_setting\(capture_exclusion_enabled\)/,
+      `${command} must force capture exclusion before calling overlay APIs`
+    );
+    assert.doesNotMatch(
+      commandBody,
+      /capture_exclusion_enabled\.unwrap_or\(true\)/,
+      `${command} must not honor false capture-exclusion requests`
+    );
+  }
+});
+
 test("default desktop capability denies raw window visibility bypasses", async () => {
   const capability = JSON.parse(await readFile("src-tauri/capabilities/default.json", "utf8"));
   const permissions = new Set(capability.permissions);

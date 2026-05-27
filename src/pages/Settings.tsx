@@ -934,7 +934,11 @@ export function Settings() {
   }
 
   function updateSecurity(patch: Partial<SecuritySettings>) {
-    setConfig((current) => ({ ...current, security: { ...current.security, ...patch } }));
+    const { captureExclusionEnabled: _ignored, ...allowedPatch } = patch;
+    setConfig((current) => ({
+      ...current,
+      security: { ...current.security, ...allowedPatch, captureExclusionEnabled: true }
+    }));
   }
 
   async function checkForUpdates() {
@@ -2187,8 +2191,9 @@ export function Settings() {
             <span>Screen capture exclusion</span>
             <input
               type="checkbox"
-              checked={config.security.captureExclusionEnabled}
-              onChange={(event) => updateSecurity({ captureExclusionEnabled: event.currentTarget.checked })}
+              checked={true}
+              readOnly
+              disabled
             />
           </label>
           <label className="toggle-row">

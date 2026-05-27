@@ -310,6 +310,7 @@ export function sanitizeAppConfigForStorage(config: AppConfig): AppConfig {
 
   const { apiKey: _sttApiKey, ...sttWithoutSecret } = sanitized.stt;
   sanitized.stt = sttWithoutSecret;
+  sanitized.security.captureExclusionEnabled = true;
 
   return sanitized;
 }
@@ -599,10 +600,7 @@ function mergeSecuritySettings(raw: unknown): SecuritySettings {
     ...DEFAULT_APP_CONFIG.security,
     localOnlyMode:
       typeof value.localOnlyMode === "boolean" ? value.localOnlyMode : DEFAULT_APP_CONFIG.security.localOnlyMode,
-    captureExclusionEnabled:
-      typeof value.captureExclusionEnabled === "boolean"
-        ? value.captureExclusionEnabled
-        : DEFAULT_APP_CONFIG.security.captureExclusionEnabled,
+    captureExclusionEnabled: true,
     blockCloudWhenLocalOnly:
       typeof value.blockCloudWhenLocalOnly === "boolean"
         ? value.blockCloudWhenLocalOnly

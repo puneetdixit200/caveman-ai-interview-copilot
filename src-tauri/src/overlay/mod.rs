@@ -28,6 +28,10 @@ pub fn protected_window_labels() -> [&'static str; 2] {
     PROTECTED_WINDOW_LABELS
 }
 
+pub fn enforce_capture_exclusion_setting(_requested: Option<bool>) -> bool {
+    true
+}
+
 pub fn is_overlay_window_label(label: &str) -> bool {
     label == "overlay"
 }
@@ -69,6 +73,8 @@ pub fn set_overlay_window_bounds(
 ) -> anyhow::Result<OverlayWindowBounds> {
     use tauri::Manager;
 
+    let capture_exclusion_enabled =
+        enforce_capture_exclusion_setting(Some(capture_exclusion_enabled));
     let window = app
         .get_webview_window("overlay")
         .ok_or_else(|| anyhow::anyhow!("Overlay window was not found."))?;
@@ -115,6 +121,8 @@ pub fn protect_overlay_window(
 ) -> OverlayProtectionStatus {
     use tauri::Manager;
 
+    let capture_exclusion_enabled =
+        enforce_capture_exclusion_setting(Some(capture_exclusion_enabled));
     let Some(window) = app.get_webview_window("overlay") else {
         return OverlayProtectionStatus {
             always_on_top: false,
@@ -157,6 +165,8 @@ fn apply_capture_exclusion_to_companion_windows(
 ) -> Option<String> {
     use tauri::Manager;
 
+    let capture_exclusion_enabled =
+        enforce_capture_exclusion_setting(Some(capture_exclusion_enabled));
     let mut failures = Vec::new();
     let mut missing_required_windows = required_companion_window_labels();
 
@@ -196,6 +206,8 @@ pub fn set_companion_windows_visible(
 ) -> OverlayProtectionStatus {
     use tauri::Manager;
 
+    let capture_exclusion_enabled =
+        enforce_capture_exclusion_setting(Some(capture_exclusion_enabled));
     let mut failures = Vec::new();
     let mut missing_required_windows = required_companion_window_labels();
     let mut companion_windows = Vec::new();
@@ -289,6 +301,8 @@ pub fn set_overlay_window_visible(
 ) -> OverlayProtectionStatus {
     use tauri::Manager;
 
+    let capture_exclusion_enabled =
+        enforce_capture_exclusion_setting(Some(capture_exclusion_enabled));
     let Some(window) = app.get_webview_window("overlay") else {
         return OverlayProtectionStatus {
             always_on_top: false,

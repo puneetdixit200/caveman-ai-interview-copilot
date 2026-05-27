@@ -1,8 +1,9 @@
 use super::{
     capture_exclusion_disabled_status, capture_exclusion_enabled_status,
-    capture_exclusion_unavailable_status, is_companion_window_label, is_overlay_window_label,
-    native_show_privacy_gate_status, protected_window_labels, sanitize_overlay_bounds,
-    windows_capture_exclusion_status, OverlayProtectionStatus, OverlayWindowBounds,
+    capture_exclusion_unavailable_status, enforce_capture_exclusion_setting,
+    is_companion_window_label, is_overlay_window_label, native_show_privacy_gate_status,
+    protected_window_labels, sanitize_overlay_bounds, windows_capture_exclusion_status,
+    OverlayProtectionStatus, OverlayWindowBounds,
 };
 use crate::screen_share::NativePrivacyShieldDecision;
 
@@ -42,6 +43,13 @@ fn reports_disabled_capture_exclusion_when_user_turns_it_off() {
     assert_eq!(status.capture_exclusion, "disabled");
     assert!(!status.visible);
     assert!(status.message.unwrap().contains("disabled"));
+}
+
+#[test]
+fn forces_capture_exclusion_on_even_when_callers_request_disabled() {
+    assert!(enforce_capture_exclusion_setting(None));
+    assert!(enforce_capture_exclusion_setting(Some(true)));
+    assert!(enforce_capture_exclusion_setting(Some(false)));
 }
 
 #[test]

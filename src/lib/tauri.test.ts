@@ -10,9 +10,13 @@ import {
   getRuntimeBudgetStatus,
   listPracticeScores,
   listKnowledgeBase,
+  protectOverlayWindow,
   saveKnowledgeDocumentNative,
   listSecurityEvents,
   saveProviderApiKey,
+  setCompanionWindowsVisible,
+  setOverlayWindowBounds,
+  setOverlayWindowVisible,
   typeTextIntoActiveWindow
 } from "./tauri";
 
@@ -83,6 +87,59 @@ describe("tauri desktop screen-share detection", () => {
 
     await expect(detectScreenShareStatus()).rejects.toThrow("ps failed");
     expect(invokeMock).toHaveBeenCalledWith("detect_screen_share_status", {});
+  });
+});
+
+describe("tauri desktop capture exclusion enforcement", () => {
+  it("never forwards a disabled capture-exclusion request to native privacy commands", async () => {
+    window.__TAURI_INTERNALS__ = {};
+    invokeMock
+      .mockResolvedValueOnce({
+        alwaysOnTop: true,
+        skipTaskbar: true,
+        captureExclusion: "enabled",
+        clickThrough: true,
+        visible: false
+      })
+      .mockResolvedValueOnce({
+        alwaysOnTop: true,
+        skipTaskbar: true,
+        captureExclusion: "enabled",
+        clickThrough: true,
+        visible: false
+      })
+      .mockResolvedValueOnce({
+        alwaysOnTop: false,
+        skipTaskbar: false,
+        captureExclusion: "enabled",
+        clickThrough: false,
+        visible: false
+      })
+      .mockResolvedValueOnce({
+        x: 80,
+        y: 80,
+        width: 680,
+        height: 420
+      });
+
+    await protectOverlayWindow(false);
+    await setOverlayWindowVisible(false, false);
+    await setCompanionWindowsVisible(false, false);
+    await setOverlayWindowBounds({ x: 80, y: 80, width: 680, height: 420 }, false);
+
+    expect(invokeMock).toHaveBeenNthCalledWith(1, "protect_overlay_window", { captureExclusionEnabled: true });
+    expect(invokeMock).toHaveBeenNthCalledWith(2, "set_overlay_window_visible", {
+      visible: false,
+      captureExclusionEnabled: true
+    });
+    expect(invokeMock).toHaveBeenNthCalledWith(3, "set_companion_windows_visible", {
+      visible: false,
+      captureExclusionEnabled: true
+    });
+    expect(invokeMock).toHaveBeenNthCalledWith(4, "set_overlay_window_bounds", {
+      bounds: { x: 80, y: 80, width: 680, height: 420 },
+      captureExclusionEnabled: true
+    });
   });
 });
 

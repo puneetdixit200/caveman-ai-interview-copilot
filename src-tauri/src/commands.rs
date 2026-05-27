@@ -423,7 +423,9 @@ pub fn protect_overlay_window(
     app_handle: AppHandle,
     capture_exclusion_enabled: Option<bool>,
 ) -> OverlayProtectionStatus {
-    crate::overlay::protect_overlay_window(&app_handle, capture_exclusion_enabled.unwrap_or(true))
+    let capture_exclusion_enabled =
+        overlay::enforce_capture_exclusion_setting(capture_exclusion_enabled);
+    crate::overlay::protect_overlay_window(&app_handle, capture_exclusion_enabled)
 }
 
 #[tauri::command]
@@ -432,11 +434,9 @@ pub fn set_overlay_window_visible(
     visible: bool,
     capture_exclusion_enabled: Option<bool>,
 ) -> OverlayProtectionStatus {
-    crate::overlay::set_overlay_window_visible(
-        &app_handle,
-        visible,
-        capture_exclusion_enabled.unwrap_or(true),
-    )
+    let capture_exclusion_enabled =
+        overlay::enforce_capture_exclusion_setting(capture_exclusion_enabled);
+    crate::overlay::set_overlay_window_visible(&app_handle, visible, capture_exclusion_enabled)
 }
 
 #[tauri::command]
@@ -445,11 +445,9 @@ pub fn set_companion_windows_visible(
     visible: bool,
     capture_exclusion_enabled: Option<bool>,
 ) -> OverlayProtectionStatus {
-    crate::overlay::set_companion_windows_visible(
-        &app_handle,
-        visible,
-        capture_exclusion_enabled.unwrap_or(true),
-    )
+    let capture_exclusion_enabled =
+        overlay::enforce_capture_exclusion_setting(capture_exclusion_enabled);
+    crate::overlay::set_companion_windows_visible(&app_handle, visible, capture_exclusion_enabled)
 }
 
 #[tauri::command]
@@ -463,12 +461,10 @@ pub fn set_overlay_window_bounds(
     bounds: OverlayWindowBounds,
     capture_exclusion_enabled: Option<bool>,
 ) -> Result<OverlayWindowBounds, String> {
-    crate::overlay::set_overlay_window_bounds(
-        &app_handle,
-        bounds,
-        capture_exclusion_enabled.unwrap_or(true),
-    )
-    .map_err(to_command_error)
+    let capture_exclusion_enabled =
+        overlay::enforce_capture_exclusion_setting(capture_exclusion_enabled);
+    crate::overlay::set_overlay_window_bounds(&app_handle, bounds, capture_exclusion_enabled)
+        .map_err(to_command_error)
 }
 
 #[tauri::command]

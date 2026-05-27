@@ -202,6 +202,20 @@ describe("appConfig", () => {
     });
   });
 
+  it("keeps screen capture exclusion enforced when stored settings try to disable it", () => {
+    const parsed = parseAppConfig(
+      JSON.stringify({
+        security: {
+          ...DEFAULT_APP_CONFIG.security,
+          captureExclusionEnabled: false
+        }
+      })
+    );
+
+    expect(parsed.security.captureExclusionEnabled).toBe(true);
+    expect(JSON.parse(serializeAppConfig(parsed)).security.captureExclusionEnabled).toBe(true);
+  });
+
   it("defaults live interview features to commercial local-first settings", () => {
     const config = parseAppConfig(undefined);
 

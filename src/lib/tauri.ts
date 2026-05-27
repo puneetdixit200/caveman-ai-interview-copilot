@@ -736,32 +736,38 @@ export async function getRuntimeBudgetStatus(): Promise<RuntimeBudgetStatus> {
 }
 
 export async function protectOverlayWindow(captureExclusionEnabled = true): Promise<OverlayProtectionStatus> {
-  return invokeOrFallback<OverlayProtectionStatus>("protect_overlay_window", { captureExclusionEnabled }, () => ({
-    alwaysOnTop: false,
-    skipTaskbar: false,
-    captureExclusion: captureExclusionEnabled ? "unsupported" : "disabled",
-    clickThrough: false,
-    visible: false,
-    message: captureExclusionEnabled
-      ? "Native overlay protection is available only inside the Tauri desktop app."
-      : "Capture exclusion is disabled in Security settings."
-  }));
+  const enforcedCaptureExclusion = enforceCaptureExclusion(captureExclusionEnabled);
+  return invokeOrFallback<OverlayProtectionStatus>(
+    "protect_overlay_window",
+    { captureExclusionEnabled: enforcedCaptureExclusion },
+    () => ({
+      alwaysOnTop: false,
+      skipTaskbar: false,
+      captureExclusion: enforcedCaptureExclusion ? "unsupported" : "disabled",
+      clickThrough: false,
+      visible: false,
+      message: enforcedCaptureExclusion
+        ? "Native overlay protection is available only inside the Tauri desktop app."
+        : "Capture exclusion is disabled in Security settings."
+    })
+  );
 }
 
 export async function setOverlayWindowVisible(
   visible: boolean,
   captureExclusionEnabled = true
 ): Promise<OverlayProtectionStatus> {
+  const enforcedCaptureExclusion = enforceCaptureExclusion(captureExclusionEnabled);
   return invokeOrFallback<OverlayProtectionStatus>(
     "set_overlay_window_visible",
-    { visible, captureExclusionEnabled },
+    { visible, captureExclusionEnabled: enforcedCaptureExclusion },
     () => ({
       alwaysOnTop: false,
       skipTaskbar: false,
-      captureExclusion: captureExclusionEnabled ? "unsupported" : "disabled",
+      captureExclusion: enforcedCaptureExclusion ? "unsupported" : "disabled",
       clickThrough: false,
       visible,
-      message: captureExclusionEnabled
+      message: enforcedCaptureExclusion
         ? "Native overlay visibility is available only inside the Tauri desktop app."
         : "Capture exclusion is disabled in Security settings."
     })
@@ -772,16 +778,17 @@ export async function setCompanionWindowsVisible(
   visible: boolean,
   captureExclusionEnabled = true
 ): Promise<OverlayProtectionStatus> {
+  const enforcedCaptureExclusion = enforceCaptureExclusion(captureExclusionEnabled);
   return invokeOrFallback<OverlayProtectionStatus>(
     "set_companion_windows_visible",
-    { visible, captureExclusionEnabled },
+    { visible, captureExclusionEnabled: enforcedCaptureExclusion },
     () => ({
       alwaysOnTop: false,
       skipTaskbar: false,
-      captureExclusion: captureExclusionEnabled ? "unsupported" : "disabled",
+      captureExclusion: enforcedCaptureExclusion ? "unsupported" : "disabled",
       clickThrough: false,
       visible,
-      message: captureExclusionEnabled
+      message: enforcedCaptureExclusion
         ? "Native companion window visibility is available only inside the Tauri desktop app."
         : "Capture exclusion is disabled in Security settings."
     })
@@ -801,11 +808,16 @@ export async function setOverlayWindowBounds(
   bounds: OverlayWindowBounds,
   captureExclusionEnabled = true
 ): Promise<OverlayWindowBounds> {
+  const enforcedCaptureExclusion = enforceCaptureExclusion(captureExclusionEnabled);
   return invokeOrFallback<OverlayWindowBounds>(
     "set_overlay_window_bounds",
-    { bounds, captureExclusionEnabled },
+    { bounds, captureExclusionEnabled: enforcedCaptureExclusion },
     () => bounds
   );
+}
+
+function enforceCaptureExclusion(_requested: boolean): boolean {
+  return true;
 }
 
 export async function detectScreenShareStatus(): Promise<ScreenShareStatus> {

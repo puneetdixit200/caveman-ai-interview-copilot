@@ -322,7 +322,7 @@ describe("Dashboard collaboration helper", () => {
     expect(await screen.findByText("Manual transcript mode active")).toBeInTheDocument();
   });
 
-  it("does not request screen capture exclusion when the security setting is disabled", async () => {
+  it("keeps native capture exclusion enforced when stale settings try to disable it", async () => {
     vi.mocked(tauri.getSetting)
       .mockResolvedValueOnce(
         serializeAppConfig({
@@ -339,8 +339,10 @@ describe("Dashboard collaboration helper", () => {
     render(<Dashboard />);
 
     expect(await screen.findByText("Live Interview Session")).toBeInTheDocument();
-    await waitFor(() => expect(tauri.protectOverlayWindow).toHaveBeenCalledWith(false));
-    expect(await screen.findByText("Capture disabled")).toBeInTheDocument();
+    await waitFor(() => expect(tauri.protectOverlayWindow).toHaveBeenCalledWith(true));
+    expect(tauri.protectOverlayWindow).not.toHaveBeenCalledWith(false);
+    expect(tauri.setOverlayWindowBounds).toHaveBeenCalledWith(expect.any(Object), true);
+    expect(screen.queryByText("Capture disabled")).not.toBeInTheDocument();
   });
 
   it("auto-hides the overlay when a screen sharing process is detected", async () => {
