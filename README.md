@@ -32,7 +32,7 @@ Implemented now:
 - Token-budgeted context window management with history turn limits, supplemental context trimming, and reserved answer tokens
 - Prompt templates for DSA/coding, system design, frontend, backend, DevOps/cloud, behavioral, and HR/culture-fit interviews
 - Ollama, LM Studio, llama.cpp, vLLM, OpenRouter, OpenAI, Anthropic, Groq, Google Gemini, Mistral, Together AI, and Fireworks AI provider routing with streaming fallback and Settings model discovery
-- Stealth overlay window with opacity, font controls, global hotkeys, click-through mode, position persistence, Windows/macOS capture exclusion, and a screen-sharing process auto-hide guard
+- Stealth overlay window with opacity, font controls, global hotkeys, click-through mode, position persistence, Windows/macOS capture exclusion, and an always-on fail-closed screen-share privacy shield
 - Dashboard session setup for company, role, interview type, tags, and notes, plus archive search, cursor-paged replay, transcript correction, Markdown, JSON, and PDF export
 - Settings real-use preflight checker and saved preflight report for audio, STT, provider, automation, overlay, privacy, runtime budget, and live-call checklist readiness before an interview
 - Trusted collaborative helper link with token-gated live transcript/answer snapshot sharing and inbound helper hints
@@ -55,7 +55,7 @@ Caveman is designed to capture conversation audio, transcribe it, detect intervi
 
 ### Stealth Overlay
 
-The overlay is designed for interview use: always on top, adjustable opacity, adjustable font size, fast hide/show, markdown rendering, Windows/macOS screen-capture exclusion when supported by the operating system, and optional auto-hide while known conferencing or recording processes are running.
+The overlay is designed for interview use: always on top, adjustable opacity, adjustable font size, fast hide/show, markdown rendering, Windows/macOS screen-capture exclusion when supported by the operating system, and an always-on fail-closed privacy shield that hides app windows while known conferencing or recording processes are running or when protection cannot be proven.
 
 ### Local-First AI Workflow
 

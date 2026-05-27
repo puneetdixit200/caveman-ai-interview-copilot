@@ -491,6 +491,47 @@ describe("Dashboard collaboration helper", () => {
     ).toBeInTheDocument();
   });
 
+  it("keeps companion windows hidden when the native overlay show gate denies visibility", async () => {
+    useOverlayStore.setState({ visible: false });
+    vi.mocked(tauri.getSetting)
+      .mockResolvedValueOnce(serializeAppConfig(DEFAULT_APP_CONFIG))
+      .mockResolvedValueOnce(undefined)
+      .mockResolvedValueOnce(undefined);
+    vi.mocked(tauri.protectOverlayWindow).mockResolvedValue({
+      alwaysOnTop: true,
+      skipTaskbar: true,
+      captureExclusion: "enabled",
+      clickThrough: true,
+      visible: false
+    });
+    vi.mocked(tauri.detectScreenShareStatus).mockResolvedValue({
+      active: false,
+      matchedProcesses: []
+    });
+    const user = userEvent.setup();
+
+    render(<Dashboard />);
+
+    expect(await screen.findByText("Live Interview Session")).toBeInTheDocument();
+    await waitFor(() => expect(tauri.detectScreenShareStatus).toHaveBeenCalled());
+    vi.mocked(tauri.setOverlayWindowVisible).mockClear();
+    vi.mocked(tauri.setCompanionWindowsVisible).mockClear();
+    vi.mocked(tauri.setOverlayWindowVisible).mockResolvedValueOnce({
+      alwaysOnTop: true,
+      skipTaskbar: true,
+      captureExclusion: "enabled",
+      clickThrough: true,
+      visible: false,
+      message: "Native privacy shield denied showing the overlay. Screen-share guard failed closed: tasklist failed"
+    });
+
+    await user.click(screen.getByRole("button", { name: "Show Overlay" }));
+
+    await waitFor(() => expect(tauri.setOverlayWindowVisible).toHaveBeenCalledWith(true, true));
+    expect(tauri.setCompanionWindowsVisible).toHaveBeenCalledWith(false, true);
+    expect(tauri.setCompanionWindowsVisible).not.toHaveBeenCalledWith(true, true);
+  });
+
   it("auto-hides the overlay when screen sharing detection fails closed", async () => {
     vi.mocked(tauri.getSetting)
       .mockResolvedValueOnce(

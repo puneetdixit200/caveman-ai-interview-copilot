@@ -308,7 +308,7 @@ const WATCHED_SCREEN_SHARE_PROCESSES: &[&str] = &[
     SCREENCONNECT_CLIENT_PROCESS,
     ZOHO_ASSIST_PROCESS,
     ZOHO_ASSIST_CONNECT_PROCESS,
-    // Local capture tools are treated as sharing risk when auto-hide is enabled.
+    // Local capture tools are treated as sharing risk by the always-on privacy shield.
     "snippingtool.exe",
     "screenclippinghost.exe",
     "gamebar.exe",

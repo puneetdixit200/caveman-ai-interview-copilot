@@ -193,13 +193,15 @@ export function Dashboard() {
       setVisible(nextVisible);
       const status = await setOverlayWindowVisible(nextVisible, config.security.captureExclusionEnabled);
 
-      if (nextVisible) {
+      if (nextVisible && status.visible && status.captureExclusion === "enabled") {
         await setCompanionWindowsVisible(true, config.security.captureExclusionEnabled);
+      } else if (nextVisible) {
+        await setCompanionWindowsVisible(false, config.security.captureExclusionEnabled);
       }
       setOverlayProtection(status);
       setOverlayMessage(status.message ?? (nextVisible ? "Overlay shown" : "Overlay hidden"));
 
-      if (isRunningInTauri() && status.visible !== nextVisible) {
+      if (status.visible !== nextVisible) {
         setVisible(status.visible);
       }
     },
