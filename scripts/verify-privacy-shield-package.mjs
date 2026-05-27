@@ -28,6 +28,7 @@ export const COMMON_PRIVACY_SHIELD_MARKERS = [
   "Startup privacy shield denied initial companion window show.",
   "Companion app windows stayed hidden because capture exclusion was not proven.",
   "Companion window capture exclusion is unsafe.",
+  "Overlay bounds update refused before capture exclusion was proven.",
   "Native privacy shield thread failed to start; refusing to run without fail-closed screen-share guard.",
   "Native privacy shield starts before startup companion window show.",
   "Native privacy shield denied screen OCR capture.",
@@ -428,7 +429,10 @@ export async function main(argv = process.argv.slice(2)) {
   }
 }
 
-if (import.meta.url === pathToFileURL(process.argv[1]).href) {
+const isCliEntrypoint =
+  typeof process.argv[1] === "string" && import.meta.url === pathToFileURL(process.argv[1]).href;
+
+if (isCliEntrypoint) {
   main().catch((error) => {
     console.error(error instanceof Error ? error.message : String(error));
     process.exitCode = 1;

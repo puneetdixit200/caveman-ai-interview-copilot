@@ -532,6 +532,47 @@ describe("Dashboard collaboration helper", () => {
     expect(tauri.setCompanionWindowsVisible).not.toHaveBeenCalledWith(true, true);
   });
 
+  it("does not continue showing the overlay when bounds preflight fails privacy", async () => {
+    useOverlayStore.setState({ visible: false });
+    vi.mocked(tauri.getSetting)
+      .mockResolvedValueOnce(serializeAppConfig(DEFAULT_APP_CONFIG))
+      .mockResolvedValueOnce(undefined)
+      .mockResolvedValueOnce(undefined);
+    vi.mocked(tauri.protectOverlayWindow).mockResolvedValue({
+      alwaysOnTop: true,
+      skipTaskbar: true,
+      captureExclusion: "enabled",
+      clickThrough: true,
+      visible: false
+    });
+    vi.mocked(tauri.detectScreenShareStatus).mockResolvedValue({
+      active: false,
+      matchedProcesses: []
+    });
+    const user = userEvent.setup();
+
+    render(<Dashboard />);
+
+    expect(await screen.findByText("Live Interview Session")).toBeInTheDocument();
+    await waitFor(() => expect(tauri.setOverlayWindowBounds).toHaveBeenCalled());
+    vi.mocked(tauri.setOverlayWindowBounds).mockClear();
+    vi.mocked(tauri.setOverlayWindowVisible).mockClear();
+    vi.mocked(tauri.setCompanionWindowsVisible).mockClear();
+    vi.mocked(tauri.setOverlayWindowBounds).mockRejectedValueOnce(
+      new Error("Overlay bounds update refused before capture exclusion was proven.")
+    );
+
+    await user.click(screen.getByRole("button", { name: "Show Overlay" }));
+
+    await waitFor(() =>
+      expect(screen.getByText("Overlay bounds update refused before capture exclusion was proven.")).toBeInTheDocument()
+    );
+    expect(tauri.setOverlayWindowVisible).toHaveBeenCalledWith(false, true);
+    expect(tauri.setOverlayWindowVisible).not.toHaveBeenCalledWith(true, true);
+    expect(tauri.setCompanionWindowsVisible).toHaveBeenCalledWith(false, true);
+    expect(tauri.setCompanionWindowsVisible).not.toHaveBeenCalledWith(true, true);
+  });
+
   it("auto-hides the overlay when screen sharing detection fails closed", async () => {
     vi.mocked(tauri.getSetting)
       .mockResolvedValueOnce(

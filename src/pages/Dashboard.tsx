@@ -171,7 +171,16 @@ export function Dashboard() {
   const setNativeOverlayVisible = useCallback(
     async (nextVisible: boolean) => {
       if (nextVisible) {
-        await setOverlayWindowBounds(config.overlay.bounds, config.security.captureExclusionEnabled);
+        try {
+          await setOverlayWindowBounds(config.overlay.bounds, config.security.captureExclusionEnabled);
+        } catch (error) {
+          const hiddenStatus = await setOverlayWindowVisible(false, config.security.captureExclusionEnabled);
+          await setCompanionWindowsVisible(false, config.security.captureExclusionEnabled);
+          setOverlayProtection(hiddenStatus);
+          setOverlayMessage(error instanceof Error ? error.message : String(error));
+          setVisible(false);
+          return;
+        }
         const status = await protectOverlayWindow(config.security.captureExclusionEnabled);
         const guardStatus = await detectScreenShareStatusFailClosed();
         setScreenShareStatus(guardStatus);

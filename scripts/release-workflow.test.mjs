@@ -295,6 +295,38 @@ test("native privacy commands do not expose a capture-exclusion off switch", asy
   }
 });
 
+test("overlay bounds updates preflight privacy before moving a visible window", async () => {
+  const overlayRs = await readFile("src-tauri/src/overlay/mod.rs", "utf8");
+  const commandStart = overlayRs.indexOf("pub fn set_overlay_window_bounds(");
+  const commandEnd = overlayRs.indexOf("pub fn sanitize_overlay_bounds", commandStart);
+
+  assert.notEqual(commandStart, -1, "overlay bounds command must exist");
+  assert.notEqual(commandEnd, -1, "overlay bounds command body must be bounded by sanitize helper");
+
+  const commandBody = overlayRs.slice(commandStart, commandEnd);
+  const protectionRefresh = commandBody.indexOf("let protection_status = protect_overlay_window(app, capture_exclusion_enabled)");
+  const gateCheck = commandBody.indexOf("bounds_update_privacy_gate_message(");
+  const hideOverlay = commandBody.indexOf("window.hide()");
+  const hideCompanions = commandBody.indexOf("set_companion_windows_visible(app, false, capture_exclusion_enabled)");
+  const sanitizeBounds = commandBody.indexOf("let bounds = sanitize_overlay_bounds(bounds)");
+  const setPosition = commandBody.indexOf("window.set_position");
+  const setSize = commandBody.indexOf("window.set_size");
+
+  assert.notEqual(protectionRefresh, -1, "bounds updates must refresh native protection first");
+  assert.notEqual(gateCheck, -1, "bounds updates must check the native privacy gate");
+  assert.notEqual(hideOverlay, -1, "bounds updates must hide overlay on privacy denial");
+  assert.notEqual(hideCompanions, -1, "bounds updates must hide companion windows on privacy denial");
+  assert.notEqual(setPosition, -1, "bounds updates must still be able to move safe overlays");
+  assert.notEqual(setSize, -1, "bounds updates must still be able to resize safe overlays");
+  assert.ok(protectionRefresh < gateCheck, "capture protection must be refreshed before the bounds gate");
+  assert.ok(gateCheck < sanitizeBounds, "bounds must not be sanitized or applied until privacy is proven");
+  assert.ok(gateCheck < setPosition, "bounds must not move the overlay before privacy is proven");
+  assert.ok(gateCheck < setSize, "bounds must not resize the overlay before privacy is proven");
+  assert.ok(hideOverlay < sanitizeBounds, "privacy denial must hide overlay before any bounds update path continues");
+  assert.ok(hideCompanions < sanitizeBounds, "privacy denial must hide companions before any bounds update path continues");
+  assert.match(overlayRs, /Overlay bounds update refused before capture exclusion was proven\./);
+});
+
 test("default desktop capability denies raw window visibility bypasses", async () => {
   const capability = JSON.parse(await readFile("src-tauri/capabilities/default.json", "utf8"));
   const permissions = new Set(capability.permissions);

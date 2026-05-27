@@ -1,13 +1,14 @@
 use super::{
-    capture_exclusion_disabled_status, capture_exclusion_enabled_status,
-    capture_exclusion_unavailable_status, companion_capture_exclusion_status,
-    companion_visibility_success_status, enforce_capture_exclusion_setting,
-    is_companion_window_label, is_overlay_window_label, native_show_privacy_gate_status,
-    protected_window_labels, protection_refresh_fail_closed_message, sanitize_overlay_bounds,
+    bounds_update_privacy_gate_message, capture_exclusion_disabled_status,
+    capture_exclusion_enabled_status, capture_exclusion_unavailable_status,
+    companion_capture_exclusion_status, companion_visibility_success_status,
+    enforce_capture_exclusion_setting, is_companion_window_label, is_overlay_window_label,
+    native_show_privacy_gate_status, protected_window_labels,
+    protection_refresh_fail_closed_message, sanitize_overlay_bounds,
     startup_privacy_shield_hide_reason, windows_capture_exclusion_status, OverlayProtectionStatus,
-    OverlayWindowBounds, COMPANION_HIDE_UNSAFE_PROTECTION_MARKER,
-    COMPANION_UNSAFE_PROTECTION_MARKER, PROTECTION_REFRESH_FAIL_CLOSED_MARKER,
-    STARTUP_PRIVACY_SHIELD_DENIED_INITIAL_SHOW_MARKER,
+    OverlayWindowBounds, BOUNDS_UPDATE_UNSAFE_PROTECTION_MARKER,
+    COMPANION_HIDE_UNSAFE_PROTECTION_MARKER, COMPANION_UNSAFE_PROTECTION_MARKER,
+    PROTECTION_REFRESH_FAIL_CLOSED_MARKER, STARTUP_PRIVACY_SHIELD_DENIED_INITIAL_SHOW_MARKER,
 };
 use crate::screen_share::NativePrivacyShieldDecision;
 
@@ -224,6 +225,41 @@ fn protection_refresh_fails_closed_when_capture_exclusion_is_not_proven() {
 fn protection_refresh_allows_when_capture_exclusion_is_enabled() {
     assert_eq!(
         protection_refresh_fail_closed_message(&capture_exclusion_enabled_status(false)),
+        None
+    );
+}
+
+#[test]
+fn bounds_update_gate_blocks_when_share_or_capture_risk_is_active() {
+    let blocked_by_share = bounds_update_privacy_gate_message(
+        &capture_exclusion_enabled_status(false),
+        NativePrivacyShieldDecision::Hide {
+            reason: "Known screen-sharing or recording process is running.".to_string(),
+        },
+    )
+    .expect("bounds update should be denied during screen-share risk");
+
+    assert!(blocked_by_share.contains(BOUNDS_UPDATE_UNSAFE_PROTECTION_MARKER));
+    assert!(blocked_by_share.contains("Known screen-sharing or recording process"));
+
+    let blocked_by_capture = bounds_update_privacy_gate_message(
+        &capture_exclusion_unavailable_status(),
+        NativePrivacyShieldDecision::Allow,
+    )
+    .expect("bounds update should be denied when capture exclusion is not proven");
+
+    assert!(blocked_by_capture.contains(BOUNDS_UPDATE_UNSAFE_PROTECTION_MARKER));
+    assert!(blocked_by_capture.contains("Capture exclusion is not enforced"));
+    assert!(blocked_by_capture.contains("unsupported"));
+}
+
+#[test]
+fn bounds_update_gate_allows_when_share_clear_and_capture_exclusion_enabled() {
+    assert_eq!(
+        bounds_update_privacy_gate_message(
+            &capture_exclusion_enabled_status(false),
+            NativePrivacyShieldDecision::Allow,
+        ),
         None
     );
 }

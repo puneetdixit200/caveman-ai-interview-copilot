@@ -141,6 +141,21 @@ describe("tauri desktop capture exclusion enforcement", () => {
       captureExclusionEnabled: true
     });
   });
+
+  it("propagates native overlay bounds privacy denials inside the desktop app", async () => {
+    window.__TAURI_INTERNALS__ = {};
+    invokeMock.mockRejectedValueOnce(
+      new Error("Overlay bounds update refused before capture exclusion was proven.")
+    );
+
+    await expect(
+      setOverlayWindowBounds({ x: 80, y: 80, width: 680, height: 420 }, true)
+    ).rejects.toThrow("Overlay bounds update refused before capture exclusion was proven.");
+    expect(invokeMock).toHaveBeenCalledWith("set_overlay_window_bounds", {
+      bounds: { x: 80, y: 80, width: 680, height: 420 },
+      captureExclusionEnabled: true
+    });
+  });
 });
 
 describe("tauri fallback practice scores", () => {

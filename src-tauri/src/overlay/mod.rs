@@ -31,6 +31,8 @@ pub const COMPANION_HIDE_UNSAFE_PROTECTION_MARKER: &str =
     "Companion app windows stayed hidden because capture exclusion was not proven.";
 pub const COMPANION_UNSAFE_PROTECTION_MARKER: &str =
     "Companion window capture exclusion is unsafe.";
+pub const BOUNDS_UPDATE_UNSAFE_PROTECTION_MARKER: &str =
+    "Overlay bounds update refused before capture exclusion was proven.";
 
 pub fn protected_window_labels() -> [&'static str; 2] {
     PROTECTED_WINDOW_LABELS
@@ -132,11 +134,52 @@ pub fn set_overlay_window_bounds(
     let window = app
         .get_webview_window("overlay")
         .ok_or_else(|| anyhow::anyhow!("Overlay window was not found."))?;
+
+    let protection_status = protect_overlay_window(app, capture_exclusion_enabled);
+    if let Some(message) = bounds_update_privacy_gate_message(
+        &protection_status,
+        crate::screen_share::native_privacy_shield_decision(
+            crate::screen_share::detect_screen_share_status(),
+        ),
+    ) {
+        let _ = window.hide();
+        let _ = set_companion_windows_visible(app, false, capture_exclusion_enabled);
+        return Err(anyhow::anyhow!(message));
+    }
+
     let bounds = sanitize_overlay_bounds(bounds);
     window.set_position(PhysicalPosition::new(bounds.x, bounds.y))?;
     window.set_size(PhysicalSize::new(bounds.width, bounds.height))?;
     let _ = protect_overlay_window(app, capture_exclusion_enabled);
     read_overlay_window_bounds(&window)
+}
+
+pub fn bounds_update_privacy_gate_message(
+    protection_status: &OverlayProtectionStatus,
+    screen_share_decision: crate::screen_share::NativePrivacyShieldDecision,
+) -> Option<String> {
+    let mut reasons = Vec::new();
+    if let crate::screen_share::NativePrivacyShieldDecision::Hide { reason } = screen_share_decision
+    {
+        reasons.push(reason);
+    }
+
+    if let crate::screen_share::NativePrivacyShieldDecision::Hide { reason } =
+        crate::screen_share::native_privacy_shield_decision_for_overlay_protection(
+            protection_status,
+        )
+    {
+        reasons.push(reason);
+    }
+
+    if reasons.is_empty() {
+        None
+    } else {
+        Some(format!(
+            "{BOUNDS_UPDATE_UNSAFE_PROTECTION_MARKER} {}",
+            reasons.join(" ")
+        ))
+    }
 }
 
 pub fn sanitize_overlay_bounds(bounds: OverlayWindowBounds) -> OverlayWindowBounds {

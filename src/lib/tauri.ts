@@ -810,7 +810,7 @@ export async function setOverlayWindowBounds(
   captureExclusionEnabled = true
 ): Promise<OverlayWindowBounds> {
   const enforcedCaptureExclusion = enforceCaptureExclusion(captureExclusionEnabled);
-  return invokeOrFallback<OverlayWindowBounds>(
+  return invokeStrictOrFallback<OverlayWindowBounds>(
     "set_overlay_window_bounds",
     { bounds, captureExclusionEnabled: enforcedCaptureExclusion },
     () => bounds
