@@ -439,6 +439,15 @@ fn is_watched_screen_share_window_title(title: Option<&str>) -> bool {
 }
 
 fn process_name_matches_candidate(normalized: &str, candidate: &str) -> bool {
+    process_name_matches_candidate_literal(normalized, candidate)
+        || candidate
+            .strip_suffix(".exe")
+            .is_some_and(|candidate_stem| {
+                process_name_matches_candidate_literal(normalized, candidate_stem)
+            })
+}
+
+fn process_name_matches_candidate_literal(normalized: &str, candidate: &str) -> bool {
     normalized == candidate
         || normalized.strip_prefix(candidate).is_some_and(|suffix| {
             matches!(
@@ -909,6 +918,44 @@ mod tests {
                 .map(|process| process.pid)
                 .collect::<Vec<_>>(),
             vec![Some(2601), Some(2602), Some(2603)]
+        );
+    }
+
+    #[test]
+    fn detects_exe_detector_candidates_reported_without_extension() {
+        let processes = vec![
+            ScreenShareProcess {
+                name: "ScreenConnect.Client".to_string(),
+                pid: Some(2701),
+                window_title: None,
+            },
+            ScreenShareProcess {
+                name: "ZohoAssist".to_string(),
+                pid: Some(2702),
+                window_title: None,
+            },
+            ScreenShareProcess {
+                name: "QuickAssist".to_string(),
+                pid: Some(2703),
+                window_title: None,
+            },
+            ScreenShareProcess {
+                name: "TeamViewer_Service".to_string(),
+                pid: Some(2704),
+                window_title: None,
+            },
+        ];
+
+        let status = screen_share_status_for_processes(processes);
+
+        assert!(status.active);
+        assert_eq!(
+            status
+                .matched_processes
+                .iter()
+                .map(|process| process.pid)
+                .collect::<Vec<_>>(),
+            vec![Some(2701), Some(2702), Some(2703), Some(2704)]
         );
     }
 
