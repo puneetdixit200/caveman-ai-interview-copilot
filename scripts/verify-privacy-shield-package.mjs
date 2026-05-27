@@ -31,6 +31,9 @@ export const COMMON_PRIVACY_SHIELD_MARKERS = [
   "brave_proxy.exe",
   "opera_proxy.exe",
   "vivaldi_proxy.exe",
+  "webexhost.exe",
+  "screenconnect.windowsclient.exe",
+  "screenconnect.client.exe",
   "teams.microsoft.com",
   "meet.google.com"
 ];

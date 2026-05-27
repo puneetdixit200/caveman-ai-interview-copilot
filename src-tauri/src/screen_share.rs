@@ -25,6 +25,9 @@ const CHROME_PWA_HOST_PROCESS: &str = "chrome_proxy.exe";
 const BRAVE_PWA_HOST_PROCESS: &str = "brave_proxy.exe";
 const OPERA_PWA_HOST_PROCESS: &str = "opera_proxy.exe";
 const VIVALDI_PWA_HOST_PROCESS: &str = "vivaldi_proxy.exe";
+const WEBEX_HOST_PROCESS: &str = "webexhost.exe";
+const SCREENCONNECT_WINDOWS_CLIENT_PROCESS: &str = "screenconnect.windowsclient.exe";
+const SCREENCONNECT_CLIENT_PROCESS: &str = "screenconnect.client.exe";
 const TEAMS_WEB_MEETING_ORIGIN: &str = "teams.microsoft.com";
 const MEET_WEB_MEETING_ORIGIN: &str = "meet.google.com";
 const PACKAGE_PRIVACY_SHIELD_WEBVIEW_MARKERS: &[&str] = &[
@@ -34,6 +37,9 @@ const PACKAGE_PRIVACY_SHIELD_WEBVIEW_MARKERS: &[&str] = &[
     BRAVE_PWA_HOST_PROCESS,
     OPERA_PWA_HOST_PROCESS,
     VIVALDI_PWA_HOST_PROCESS,
+    WEBEX_HOST_PROCESS,
+    SCREENCONNECT_WINDOWS_CLIENT_PROCESS,
+    SCREENCONNECT_CLIENT_PROCESS,
     TEAMS_WEB_MEETING_ORIGIN,
     MEET_WEB_MEETING_ORIGIN,
 ];
@@ -61,6 +67,7 @@ const WATCHED_SCREEN_SHARE_PROCESSES: &[&str] = &[
     "skype.exe",
     "skype",
     "webexmta.exe",
+    WEBEX_HOST_PROCESS,
     "webex",
     "ciscocollabhost.exe",
     "cisco webex meetings",
@@ -177,6 +184,8 @@ const WATCHED_SCREEN_SHARE_PROCESSES: &[&str] = &[
     "nxserver",
     "connectwisecontrol.client.exe",
     "screenconnect.clientservice.exe",
+    SCREENCONNECT_WINDOWS_CLIENT_PROCESS,
+    SCREENCONNECT_CLIENT_PROCESS,
     // Local capture tools are treated as sharing risk when auto-hide is enabled.
     "snippingtool.exe",
     "screenclippinghost.exe",
@@ -593,6 +602,9 @@ mod tests {
                 BRAVE_PWA_HOST_PROCESS,
                 OPERA_PWA_HOST_PROCESS,
                 VIVALDI_PWA_HOST_PROCESS,
+                WEBEX_HOST_PROCESS,
+                SCREENCONNECT_WINDOWS_CLIENT_PROCESS,
+                SCREENCONNECT_CLIENT_PROCESS,
                 TEAMS_WEB_MEETING_ORIGIN,
                 MEET_WEB_MEETING_ORIGIN
             ]
@@ -765,6 +777,39 @@ mod tests {
                 Some(2005),
                 Some(2006)
             ]
+        );
+    }
+
+    #[test]
+    fn detects_webex_and_screenconnect_screen_share_variants() {
+        let processes = vec![
+            ScreenShareProcess {
+                name: r"C:\\Program Files\\Webex\\WebexHost.exe".to_string(),
+                pid: Some(2501),
+                window_title: None,
+            },
+            ScreenShareProcess {
+                name: "ScreenConnect.WindowsClient.exe".to_string(),
+                pid: Some(2502),
+                window_title: None,
+            },
+            ScreenShareProcess {
+                name: "ScreenConnect.Client.exe".to_string(),
+                pid: Some(2503),
+                window_title: None,
+            },
+        ];
+
+        let status = screen_share_status_for_processes(processes);
+
+        assert!(status.active);
+        assert_eq!(
+            status
+                .matched_processes
+                .iter()
+                .map(|process| process.pid)
+                .collect::<Vec<_>>(),
+            vec![Some(2501), Some(2502), Some(2503)]
         );
     }
 
