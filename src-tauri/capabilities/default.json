@@ -3,5 +3,21 @@
   "identifier": "default",
   "description": "Default Caveman desktop permissions",
   "windows": ["main", "overlay"],
-  "permissions": ["core:default", "updater:default", "process:allow-restart"]
+  "permissions": [
+    "core:default",
+    "core:window:deny-create",
+    "core:window:deny-show",
+    "core:window:deny-hide",
+    "core:window:deny-set-content-protected",
+    "core:window:deny-set-always-on-top",
+    "core:window:deny-set-skip-taskbar",
+    "core:webview:deny-create-webview",
+    "core:webview:deny-create-webview-window",
+    "core:webview:deny-webview-show",
+    "core:webview:deny-webview-hide",
+    "core:webview:deny-webview-close",
+    "core:webview:deny-reparent",
+    "updater:default",
+    "process:allow-restart"
+  ]
 }

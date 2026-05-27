@@ -144,6 +144,28 @@ test("packaged desktop windows opt into OS content protection before runtime set
   }
 });
 
+test("default desktop capability denies raw window visibility bypasses", async () => {
+  const capability = JSON.parse(await readFile("src-tauri/capabilities/default.json", "utf8"));
+  const permissions = new Set(capability.permissions);
+
+  for (const permission of [
+    "core:window:deny-create",
+    "core:window:deny-show",
+    "core:window:deny-hide",
+    "core:window:deny-set-content-protected",
+    "core:window:deny-set-always-on-top",
+    "core:window:deny-set-skip-taskbar",
+    "core:webview:deny-create-webview",
+    "core:webview:deny-create-webview-window",
+    "core:webview:deny-webview-show",
+    "core:webview:deny-webview-hide",
+    "core:webview:deny-webview-close",
+    "core:webview:deny-reparent"
+  ]) {
+    assert.ok(permissions.has(permission), `${permission} must be denied so webview code cannot bypass native privacy gates`);
+  }
+});
+
 test("release workflow builds macOS and Linux packages before publishing one release", async () => {
   const workflow = await readFile(workflowPath, "utf8");
 
