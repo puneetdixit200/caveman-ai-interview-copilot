@@ -24,6 +24,7 @@ export const COMMON_PRIVACY_SHIELD_MARKERS = [
   "Screen-share guard failed closed:",
   "Capture exclusion is not enforced:",
   "Native privacy shield denied showing",
+  "Native privacy shield hid app windows after protection refresh failed closed.",
   "Native privacy shield denied screen OCR capture.",
   "Waiting for app windows to leave capture surfaces before screen OCR capture.",
   "Native privacy shield denied active-window typing during screen-share risk.",

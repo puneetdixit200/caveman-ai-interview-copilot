@@ -103,6 +103,14 @@ test("requires packaged active-window typing privacy marker", () => {
   );
 });
 
+test("requires packaged protection refresh fail-closed marker", () => {
+  assert.ok(
+    COMMON_PRIVACY_SHIELD_MARKERS.includes(
+      "Native privacy shield hid app windows after protection refresh failed closed."
+    )
+  );
+});
+
 test("reports missing packaged native privacy markers", () => {
   const result = evaluateBinaryPrivacyMarkers(Buffer.from("Capture exclusion is not enforced."), [
     "Capture exclusion is not enforced.",

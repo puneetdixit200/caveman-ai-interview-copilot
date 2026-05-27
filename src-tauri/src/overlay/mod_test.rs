@@ -2,8 +2,9 @@ use super::{
     capture_exclusion_disabled_status, capture_exclusion_enabled_status,
     capture_exclusion_unavailable_status, enforce_capture_exclusion_setting,
     is_companion_window_label, is_overlay_window_label, native_show_privacy_gate_status,
-    protected_window_labels, sanitize_overlay_bounds, startup_privacy_shield_hide_reason,
-    windows_capture_exclusion_status, OverlayProtectionStatus, OverlayWindowBounds,
+    protected_window_labels, protection_refresh_fail_closed_message, sanitize_overlay_bounds,
+    startup_privacy_shield_hide_reason, windows_capture_exclusion_status, OverlayProtectionStatus,
+    OverlayWindowBounds, PROTECTION_REFRESH_FAIL_CLOSED_MARKER,
 };
 use crate::screen_share::NativePrivacyShieldDecision;
 
@@ -200,6 +201,24 @@ fn startup_privacy_shield_allows_when_capture_exclusion_is_enabled_and_share_is_
             &[capture_exclusion_enabled_status(false)],
             NativePrivacyShieldDecision::Allow,
         ),
+        None
+    );
+}
+
+#[test]
+fn protection_refresh_fails_closed_when_capture_exclusion_is_not_proven() {
+    let message = protection_refresh_fail_closed_message(&capture_exclusion_unavailable_status())
+        .expect("protection refresh should fail closed when capture exclusion is unavailable");
+
+    assert!(message.contains(PROTECTION_REFRESH_FAIL_CLOSED_MARKER));
+    assert!(message.contains("Capture exclusion is not enforced"));
+    assert!(message.contains("unsupported"));
+}
+
+#[test]
+fn protection_refresh_allows_when_capture_exclusion_is_enabled() {
+    assert_eq!(
+        protection_refresh_fail_closed_message(&capture_exclusion_enabled_status(false)),
         None
     );
 }

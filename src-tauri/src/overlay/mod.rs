@@ -23,6 +23,8 @@ pub struct OverlayWindowBounds {
 }
 
 pub const PROTECTED_WINDOW_LABELS: [&str; 2] = ["main", "overlay"];
+pub const PROTECTION_REFRESH_FAIL_CLOSED_MARKER: &str =
+    "Native privacy shield hid app windows after protection refresh failed closed.";
 
 pub fn protected_window_labels() -> [&'static str; 2] {
     PROTECTED_WINDOW_LABELS
@@ -198,7 +200,51 @@ pub fn protect_overlay_window(
         });
     }
 
+    if let Some(message) = protection_refresh_fail_closed_message(&status) {
+        let mut messages = vec![message];
+        if let Err(error) = window.hide() {
+            messages.push(format!("Overlay fail-closed hide failed: {error}"));
+        }
+        messages.extend(hide_companion_windows_for_fail_closed(app));
+        status.visible = false;
+        status.message = Some(join_status_messages(status.message.take(), messages));
+    }
+
     status
+}
+
+pub fn protection_refresh_fail_closed_message(status: &OverlayProtectionStatus) -> Option<String> {
+    match crate::screen_share::native_privacy_shield_decision_for_overlay_protection(status) {
+        crate::screen_share::NativePrivacyShieldDecision::Allow => None,
+        crate::screen_share::NativePrivacyShieldDecision::Hide { reason } => {
+            Some(format!("{PROTECTION_REFRESH_FAIL_CLOSED_MARKER} {reason}"))
+        }
+    }
+}
+
+fn join_status_messages(existing: Option<String>, additions: Vec<String>) -> String {
+    existing
+        .into_iter()
+        .chain(additions)
+        .filter(|message| !message.trim().is_empty())
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
+fn hide_companion_windows_for_fail_closed(app: &tauri::AppHandle) -> Vec<String> {
+    use tauri::Manager;
+
+    let mut failures = Vec::new();
+    for (label, window) in app.webview_windows() {
+        if !is_companion_window_label(&label) {
+            continue;
+        }
+
+        if let Err(error) = window.hide() {
+            failures.push(format!("{label} window fail-closed hide failed: {error}"));
+        }
+    }
+    failures
 }
 
 fn apply_capture_exclusion_to_companion_windows(
