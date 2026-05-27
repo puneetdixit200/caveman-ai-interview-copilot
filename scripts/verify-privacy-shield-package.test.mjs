@@ -55,6 +55,18 @@ test("requires packaged web meeting and recording title detector markers", () =>
   assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("livestorm.co"));
   assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("bigbluebutton"));
   assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("tella.tv"));
+  assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("screenpal.com"));
+  assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("veed.io"));
+  assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("clipchamp.com"));
+  assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("vidyard.com"));
+  assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("descript.com"));
+  assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("studio.restream.io"));
+  assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("vdo.ninja"));
+  assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("screenpal.exe"));
+  assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("screencast-o-matic"));
+  assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("descript.exe"));
+  assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("vidyard.exe"));
+  assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("clipchamp.exe"));
 });
 
 test("requires packaged remote-support service detector markers", () => {

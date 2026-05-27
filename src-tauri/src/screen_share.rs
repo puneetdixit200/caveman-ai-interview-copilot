@@ -48,6 +48,13 @@ const STREAMYARD_WEB_MEETING_ORIGIN: &str = "streamyard.com";
 const LIVESTORM_WEB_MEETING_ORIGIN: &str = "livestorm.co";
 const BIGBLUEBUTTON_MEETING_TITLE: &str = "bigbluebutton";
 const TELLA_WEB_RECORDER_ORIGIN: &str = "tella.tv";
+const SCREENPAL_WEB_RECORDER_ORIGIN: &str = "screenpal.com";
+const VEED_WEB_RECORDER_ORIGIN: &str = "veed.io";
+const CLIPCHAMP_WEB_RECORDER_ORIGIN: &str = "clipchamp.com";
+const VIDYARD_WEB_RECORDER_ORIGIN: &str = "vidyard.com";
+const DESCRIPT_WEB_RECORDER_ORIGIN: &str = "descript.com";
+const RESTREAM_WEB_STUDIO_ORIGIN: &str = "studio.restream.io";
+const VDO_NINJA_WEB_CALL_ORIGIN: &str = "vdo.ninja";
 const MACOS_SCREEN_CAPTURE_UI_PROCESS: &str = "screencaptureui";
 const MACOS_SCREEN_CAPTURE_CLI_PROCESS: &str = "screencapture";
 const MACOS_REPLAYD_PROCESS: &str = "replayd";
@@ -103,6 +110,18 @@ const PACKAGE_PRIVACY_SHIELD_WEBVIEW_MARKERS: &[&str] = &[
     LIVESTORM_WEB_MEETING_ORIGIN,
     BIGBLUEBUTTON_MEETING_TITLE,
     TELLA_WEB_RECORDER_ORIGIN,
+    SCREENPAL_WEB_RECORDER_ORIGIN,
+    VEED_WEB_RECORDER_ORIGIN,
+    CLIPCHAMP_WEB_RECORDER_ORIGIN,
+    VIDYARD_WEB_RECORDER_ORIGIN,
+    DESCRIPT_WEB_RECORDER_ORIGIN,
+    RESTREAM_WEB_STUDIO_ORIGIN,
+    VDO_NINJA_WEB_CALL_ORIGIN,
+    "screenpal.exe",
+    "screencast-o-matic",
+    "descript.exe",
+    "vidyard.exe",
+    "clipchamp.exe",
     MACOS_SCREEN_CAPTURE_UI_PROCESS,
     MACOS_SCREEN_CAPTURE_CLI_PROCESS,
     MACOS_REPLAYD_PROCESS,
@@ -273,6 +292,16 @@ const WATCHED_SCREEN_SHARE_PROCESSES: &[&str] = &[
     "screenpresso.exe",
     "camtasiarecorder.exe",
     "techsmith capture",
+    "screenpal.exe",
+    "screenpal",
+    "screencast-o-matic.exe",
+    "screencast-o-matic",
+    "descript.exe",
+    "descript",
+    "vidyard.exe",
+    "vidyard",
+    "clipchamp.exe",
+    "clipchamp",
     "ecamm live",
 ];
 
@@ -327,6 +356,14 @@ const WATCHED_SCREEN_SHARE_TITLES: &[&str] = &[
     BIGBLUEBUTTON_MEETING_TITLE,
     "tella",
     TELLA_WEB_RECORDER_ORIGIN,
+    "screenpal",
+    SCREENPAL_WEB_RECORDER_ORIGIN,
+    VEED_WEB_RECORDER_ORIGIN,
+    CLIPCHAMP_WEB_RECORDER_ORIGIN,
+    VIDYARD_WEB_RECORDER_ORIGIN,
+    DESCRIPT_WEB_RECORDER_ORIGIN,
+    RESTREAM_WEB_STUDIO_ORIGIN,
+    VDO_NINJA_WEB_CALL_ORIGIN,
     "slack huddle",
     SLACK_WEB_HUDDLE_ORIGIN,
     "discord",
@@ -927,6 +964,54 @@ mod tests {
     }
 
     #[test]
+    fn detects_web_recorder_and_studio_origins_from_pwa_hosts() {
+        let processes = parse_tasklist_csv(
+            "\"msedge_proxy.exe\",\"651\",\"Console\",\"1\",\"64,000 K\",\"Running\",\"DESKTOP\\\\me\",\"0:00:21\",\"screenpal.com/record - Screen Recorder\"\n\"chrome_proxy.exe\",\"652\",\"Console\",\"1\",\"64,000 K\",\"Running\",\"DESKTOP\\\\me\",\"0:00:22\",\"veed.io/tools/screen-recorder\"\n\"brave_proxy.exe\",\"653\",\"Console\",\"1\",\"64,000 K\",\"Running\",\"DESKTOP\\\\me\",\"0:00:23\",\"clipchamp.com/record-screen\"\n\"opera_proxy.exe\",\"654\",\"Console\",\"1\",\"64,000 K\",\"Running\",\"DESKTOP\\\\me\",\"0:00:24\",\"vidyard.com/record\"\n\"vivaldi_proxy.exe\",\"655\",\"Console\",\"1\",\"64,000 K\",\"Running\",\"DESKTOP\\\\me\",\"0:00:25\",\"descript.com/record\"\n\"msedgewebview2.exe\",\"656\",\"Console\",\"1\",\"64,000 K\",\"Running\",\"DESKTOP\\\\me\",\"0:00:26\",\"studio.restream.io/live-studio\"\n\"ApplicationFrameHost.exe\",\"657\",\"Console\",\"1\",\"64,000 K\",\"Running\",\"DESKTOP\\\\me\",\"0:00:27\",\"vdo.ninja/?room=candidate\"\n\"RuntimeBroker.exe\",\"658\",\"Console\",\"1\",\"10,000 K\",\"Running\",\"DESKTOP\\\\me\",\"0:00:01\",\"Settings\"",
+        );
+
+        let status = screen_share_status_for_processes(processes);
+
+        assert!(status.active);
+        assert_eq!(
+            status
+                .matched_processes
+                .iter()
+                .map(|process| (process.name.as_str(), process.window_title.as_deref()))
+                .collect::<Vec<_>>(),
+            vec![
+                (
+                    "msedge_proxy.exe",
+                    Some("screenpal.com/record - Screen Recorder")
+                ),
+                ("chrome_proxy.exe", Some("veed.io/tools/screen-recorder")),
+                ("brave_proxy.exe", Some("clipchamp.com/record-screen")),
+                ("opera_proxy.exe", Some("vidyard.com/record")),
+                ("vivaldi_proxy.exe", Some("descript.com/record")),
+                ("msedgewebview2.exe", Some("studio.restream.io/live-studio")),
+                (
+                    "ApplicationFrameHost.exe",
+                    Some("vdo.ninja/?room=candidate")
+                )
+            ]
+        );
+    }
+
+    #[test]
+    fn recognizes_web_recorder_and_studio_origin_titles() {
+        for title in [
+            "screenpal.com/record - Screen Recorder",
+            "veed.io/tools/screen-recorder",
+            "clipchamp.com/record-screen",
+            "vidyard.com/record",
+            "descript.com/record",
+            "studio.restream.io/live-studio",
+            "vdo.ninja/?room=candidate",
+        ] {
+            assert!(is_watched_screen_share_window_title(Some(title)));
+        }
+    }
+
+    #[test]
     fn anchors_webview_markers_for_packaged_privacy_attestation() {
         assert_eq!(
             PACKAGE_PRIVACY_SHIELD_WEBVIEW_MARKERS,
@@ -960,6 +1045,18 @@ mod tests {
                 LIVESTORM_WEB_MEETING_ORIGIN,
                 BIGBLUEBUTTON_MEETING_TITLE,
                 TELLA_WEB_RECORDER_ORIGIN,
+                SCREENPAL_WEB_RECORDER_ORIGIN,
+                VEED_WEB_RECORDER_ORIGIN,
+                CLIPCHAMP_WEB_RECORDER_ORIGIN,
+                VIDYARD_WEB_RECORDER_ORIGIN,
+                DESCRIPT_WEB_RECORDER_ORIGIN,
+                RESTREAM_WEB_STUDIO_ORIGIN,
+                VDO_NINJA_WEB_CALL_ORIGIN,
+                "screenpal.exe",
+                "screencast-o-matic",
+                "descript.exe",
+                "vidyard.exe",
+                "clipchamp.exe",
                 MACOS_SCREEN_CAPTURE_UI_PROCESS,
                 MACOS_SCREEN_CAPTURE_CLI_PROCESS,
                 MACOS_REPLAYD_PROCESS,
@@ -1391,6 +1488,31 @@ mod tests {
                 pid: Some(3008),
                 window_title: None,
             },
+            ScreenShareProcess {
+                name: "ScreenPal.exe".to_string(),
+                pid: Some(3009),
+                window_title: None,
+            },
+            ScreenShareProcess {
+                name: "Screencast-O-Matic".to_string(),
+                pid: Some(3010),
+                window_title: None,
+            },
+            ScreenShareProcess {
+                name: "/Applications/Descript.app/Contents/MacOS/Descript".to_string(),
+                pid: Some(3011),
+                window_title: None,
+            },
+            ScreenShareProcess {
+                name: "Vidyard.exe".to_string(),
+                pid: Some(3012),
+                window_title: None,
+            },
+            ScreenShareProcess {
+                name: "Clipchamp.exe".to_string(),
+                pid: Some(3013),
+                window_title: None,
+            },
         ];
 
         let status = screen_share_status_for_processes(processes);
@@ -1410,7 +1532,12 @@ mod tests {
                 Some(3005),
                 Some(3006),
                 Some(3007),
-                Some(3008)
+                Some(3008),
+                Some(3009),
+                Some(3010),
+                Some(3011),
+                Some(3012),
+                Some(3013)
             ]
         );
     }
