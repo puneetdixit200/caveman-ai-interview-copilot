@@ -328,7 +328,7 @@ test("overlay bounds updates preflight privacy before moving a visible window", 
 });
 
 test("native overlay show rechecks privacy after the OS visibility transition", async () => {
-  const overlayRs = await readFile("src-tauri/src/overlay/mod.rs", "utf8");
+  const overlayRs = normalizeLineEndings(await readFile("src-tauri/src/overlay/mod.rs", "utf8"));
   const commandStart = overlayRs.indexOf("pub fn set_overlay_window_visible(");
   const commandEnd = overlayRs.indexOf("pub fn native_show_privacy_gate_status", commandStart);
 
@@ -363,7 +363,7 @@ test("native overlay show rechecks privacy after the OS visibility transition", 
 });
 
 test("native companion show rechecks privacy after the OS visibility transition", async () => {
-  const overlayRs = await readFile("src-tauri/src/overlay/mod.rs", "utf8");
+  const overlayRs = normalizeLineEndings(await readFile("src-tauri/src/overlay/mod.rs", "utf8"));
   const commandStart = overlayRs.indexOf("pub fn set_companion_windows_visible(");
   const commandEnd = overlayRs.indexOf("pub fn companion_visibility_success_status", commandStart);
 
