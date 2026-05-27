@@ -254,6 +254,31 @@ const WATCHED_SCREEN_SHARE_PROCESSES: &[&str] = &[
     "ecamm live",
 ];
 
+const TITLE_ONLY_SCREEN_SHARE_PROCESSES: &[&str] = &[
+    "chrome.exe",
+    "chrome",
+    "google chrome",
+    "google chrome helper",
+    "google chrome helper (renderer)",
+    "msedge.exe",
+    "microsoft edge",
+    "firefox.exe",
+    "firefox",
+    "safari",
+    "safari web content",
+    "brave.exe",
+    "brave browser",
+    "arc",
+    "arc helper",
+    "opera.exe",
+    "opera",
+    "vivaldi.exe",
+    "vivaldi",
+    "whatsapp.exe",
+    "whatsapp",
+    MACOS_REPLAYD_PROCESS,
+];
+
 const WATCHED_SCREEN_SHARE_TITLES: &[&str] = &[
     "google meet",
     MEET_WEB_MEETING_ORIGIN,
@@ -437,7 +462,7 @@ fn screen_share_status_for_processes(processes: Vec<ScreenShareProcess>) -> Scre
     let matched_processes = processes
         .into_iter()
         .filter(|process| {
-            is_watched_screen_share_process(&process.name)
+            is_watched_screen_share_process(process)
                 || (is_screen_share_window_title_host_process(&process.name)
                     && is_watched_screen_share_window_title(process.window_title.as_deref()))
         })
@@ -454,8 +479,12 @@ fn screen_share_status_for_processes(processes: Vec<ScreenShareProcess>) -> Scre
     }
 }
 
-fn is_watched_screen_share_process(name: &str) -> bool {
-    let normalized = normalize_process_name(name);
+fn is_watched_screen_share_process(process: &ScreenShareProcess) -> bool {
+    let normalized = normalize_process_name(&process.name);
+    if is_title_only_screen_share_process(&normalized) {
+        return false;
+    }
+
     WATCHED_SCREEN_SHARE_PROCESSES
         .iter()
         .any(|candidate| process_name_matches_candidate(&normalized, candidate))
@@ -465,7 +494,14 @@ fn is_screen_share_window_title_host_process(name: &str) -> bool {
     let normalized = normalize_process_name(name);
     SCREEN_SHARE_TITLE_HOST_PROCESSES
         .iter()
+        .chain(TITLE_ONLY_SCREEN_SHARE_PROCESSES.iter())
         .any(|candidate| process_name_matches_candidate(&normalized, candidate))
+}
+
+fn is_title_only_screen_share_process(normalized: &str) -> bool {
+    TITLE_ONLY_SCREEN_SHARE_PROCESSES
+        .iter()
+        .any(|candidate| process_name_matches_candidate(normalized, candidate))
 }
 
 fn is_watched_screen_share_window_title(title: Option<&str>) -> bool {
@@ -913,10 +949,21 @@ mod tests {
             vec![
                 "/System/Library/CoreServices/screencaptureui",
                 "/usr/sbin/screencapture",
-                "/usr/libexec/replayd",
                 "/System/Library/PrivateFrameworks/ScreenCaptureKit.framework/ScreenCaptureKitAgent",
             ]
         );
+    }
+
+    #[test]
+    fn ignores_plain_browser_chat_and_idle_macos_capture_daemons() {
+        let processes = parse_unix_process_list(
+            " 19083 /Applications/WhatsApp.app/Contents/MacOS/WhatsApp\n 77591 /usr/libexec/replayd\n 79211 /System/Volumes/Preboot/Cryptexes/App/System/Applications/Safari.app/Contents/MacOS/Safari\n 79212 /Applications/Notes.app/Contents/MacOS/Notes",
+        );
+
+        let status = screen_share_status_for_processes(processes);
+
+        assert!(!status.active);
+        assert_eq!(status.matched_processes, Vec::<ScreenShareProcess>::new());
     }
 
     #[test]
@@ -953,7 +1000,35 @@ mod tests {
                 .iter()
                 .map(|process| process.pid)
                 .collect::<Vec<_>>(),
-            vec![Some(1001), Some(1002), Some(1003), Some(1004)]
+            vec![Some(1002), Some(1004)]
+        );
+    }
+
+    #[test]
+    fn detects_meeting_titles_from_plain_browser_hosts() {
+        let processes = vec![
+            ScreenShareProcess {
+                name: r"C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe".to_string(),
+                pid: Some(1001),
+                window_title: Some("Google Meet - Candidate Screen".to_string()),
+            },
+            ScreenShareProcess {
+                name: "/Applications/Safari.app/Contents/MacOS/Safari".to_string(),
+                pid: Some(1003),
+                window_title: Some("teams.microsoft.com - Interview".to_string()),
+            },
+        ];
+
+        let status = screen_share_status_for_processes(processes);
+
+        assert!(status.active);
+        assert_eq!(
+            status
+                .matched_processes
+                .iter()
+                .map(|process| process.pid)
+                .collect::<Vec<_>>(),
+            vec![Some(1001), Some(1003)]
         );
     }
 
@@ -991,7 +1066,7 @@ mod tests {
                 .iter()
                 .map(|process| process.pid)
                 .collect::<Vec<_>>(),
-            vec![Some(1101), Some(1102), Some(1103), Some(1104)]
+            vec![Some(1101), Some(1103), Some(1104)]
         );
     }
 
@@ -1171,7 +1246,7 @@ mod tests {
             ScreenShareProcess {
                 name: "WhatsApp.exe".to_string(),
                 pid: Some(3003),
-                window_title: None,
+                window_title: Some("web.whatsapp.com - Video call".to_string()),
             },
             ScreenShareProcess {
                 name: r"C:\\Windows\\System32\\QuickAssist.exe".to_string(),
