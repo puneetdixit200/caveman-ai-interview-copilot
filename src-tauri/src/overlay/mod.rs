@@ -37,6 +37,10 @@ pub const OVERLAY_POST_SHOW_UNSAFE_PROTECTION_MARKER: &str =
     "Overlay show was reverted because capture exclusion was not proven after visibility changed.";
 pub const COMPANION_POST_SHOW_UNSAFE_PROTECTION_MARKER: &str =
     "Companion app window show was reverted because capture exclusion was not proven after visibility changed.";
+pub const OVERLAY_POST_SHOW_SHARE_RISK_MARKER: &str =
+    "Overlay show was reverted because screen-share risk was detected after visibility changed.";
+pub const COMPANION_POST_SHOW_SHARE_RISK_MARKER: &str =
+    "Companion app window show was reverted because screen-share risk was detected after visibility changed.";
 
 pub fn protected_window_labels() -> [&'static str; 2] {
     PROTECTED_WINDOW_LABELS
@@ -466,10 +470,15 @@ pub fn set_companion_windows_visible(
             &post_show_protection_results,
             &missing_required_windows,
         );
+        let post_show_screen_share_decision = crate::screen_share::native_privacy_shield_decision(
+            crate::screen_share::detect_screen_share_status(),
+        );
 
         if let Some(message) = post_show_privacy_recheck_message(
             &post_show_status,
+            post_show_screen_share_decision,
             COMPANION_POST_SHOW_UNSAFE_PROTECTION_MARKER,
+            COMPANION_POST_SHOW_SHARE_RISK_MARKER,
         ) {
             let mut messages = vec![message];
             for (label, window) in &companion_windows {
@@ -576,9 +585,14 @@ pub fn set_overlay_window_visible(
 
     if visible && status.visible {
         let post_show_status = protect_overlay_window(app, capture_exclusion_enabled);
+        let post_show_screen_share_decision = crate::screen_share::native_privacy_shield_decision(
+            crate::screen_share::detect_screen_share_status(),
+        );
         if let Some(message) = post_show_privacy_recheck_message(
             &post_show_status,
+            post_show_screen_share_decision,
             OVERLAY_POST_SHOW_UNSAFE_PROTECTION_MARKER,
+            OVERLAY_POST_SHOW_SHARE_RISK_MARKER,
         ) {
             let _ = window.hide();
             let _ = set_companion_windows_visible(app, false, capture_exclusion_enabled);
@@ -633,13 +647,27 @@ pub fn native_show_privacy_gate_status(
 
 pub fn post_show_privacy_recheck_message(
     status: &OverlayProtectionStatus,
-    marker: &str,
+    screen_share_decision: crate::screen_share::NativePrivacyShieldDecision,
+    capture_exclusion_marker: &str,
+    screen_share_marker: &str,
 ) -> Option<String> {
-    match crate::screen_share::native_privacy_shield_decision_for_overlay_protection(status) {
-        crate::screen_share::NativePrivacyShieldDecision::Allow => None,
-        crate::screen_share::NativePrivacyShieldDecision::Hide { reason } => {
-            Some(format!("{marker} {reason}"))
-        }
+    let mut reasons = Vec::new();
+
+    if let crate::screen_share::NativePrivacyShieldDecision::Hide { reason } = screen_share_decision
+    {
+        reasons.push(format!("{screen_share_marker} {reason}"));
+    }
+
+    if let crate::screen_share::NativePrivacyShieldDecision::Hide { reason } =
+        crate::screen_share::native_privacy_shield_decision_for_overlay_protection(status)
+    {
+        reasons.push(format!("{capture_exclusion_marker} {reason}"));
+    }
+
+    if reasons.is_empty() {
+        None
+    } else {
+        Some(reasons.join(" "))
     }
 }
 

@@ -338,8 +338,12 @@ test("native overlay show rechecks privacy after the OS visibility transition", 
   const commandBody = overlayRs.slice(commandStart, commandEnd);
   const showCall = commandBody.indexOf("window.show()");
   const postShowRecheck = commandBody.indexOf("let post_show_status = protect_overlay_window(app, capture_exclusion_enabled)");
+  const postShowScreenShareRecheck = commandBody.indexOf(
+    "let post_show_screen_share_decision = crate::screen_share::native_privacy_shield_decision",
+    postShowRecheck
+  );
   const postShowGate = commandBody.indexOf(
-    "post_show_privacy_recheck_message(\n            &post_show_status,\n            OVERLAY_POST_SHOW_UNSAFE_PROTECTION_MARKER"
+    "post_show_privacy_recheck_message(\n            &post_show_status,\n            post_show_screen_share_decision,\n            OVERLAY_POST_SHOW_UNSAFE_PROTECTION_MARKER,\n            OVERLAY_POST_SHOW_SHARE_RISK_MARKER"
   );
   const revertOverlay = commandBody.indexOf("window.hide()", postShowGate);
   const hideCompanions = commandBody.indexOf(
@@ -349,16 +353,22 @@ test("native overlay show rechecks privacy after the OS visibility transition", 
 
   assert.notEqual(showCall, -1, "overlay visibility command must still call native show");
   assert.notEqual(postShowRecheck, -1, "overlay show must refresh native protection after show");
-  assert.notEqual(postShowGate, -1, "overlay show must inspect the post-show protection result");
+  assert.notEqual(postShowScreenShareRecheck, -1, "overlay show must recheck screen-share risk after show");
+  assert.notEqual(postShowGate, -1, "overlay show must inspect the post-show protection and screen-share result");
   assert.notEqual(revertOverlay, -1, "unsafe post-show state must hide the overlay again");
   assert.notEqual(hideCompanions, -1, "unsafe post-show state must hide companion windows too");
   assert.ok(showCall < postShowRecheck, "post-show protection refresh must happen after native show");
-  assert.ok(postShowRecheck < postShowGate, "post-show gate must use refreshed protection status");
+  assert.ok(postShowRecheck < postShowScreenShareRecheck, "post-show screen-share recheck must happen after native show");
+  assert.ok(postShowScreenShareRecheck < postShowGate, "post-show gate must use refreshed screen-share status");
   assert.ok(postShowGate < revertOverlay, "post-show denial must run before reverting overlay visibility");
   assert.ok(postShowGate < hideCompanions, "post-show denial must run before hiding companion windows");
   assert.match(
     overlayRs,
     /Overlay show was reverted because capture exclusion was not proven after visibility changed\./
+  );
+  assert.match(
+    overlayRs,
+    /Overlay show was reverted because screen-share risk was detected after visibility changed\./
   );
 });
 
@@ -373,21 +383,31 @@ test("native companion show rechecks privacy after the OS visibility transition"
   const commandBody = overlayRs.slice(commandStart, commandEnd);
   const showCall = commandBody.indexOf("window.show()");
   const postShowRecheck = commandBody.indexOf("let post_show_protection_results = companion_windows");
+  const postShowScreenShareRecheck = commandBody.indexOf(
+    "let post_show_screen_share_decision = crate::screen_share::native_privacy_shield_decision",
+    postShowRecheck
+  );
   const postShowGate = commandBody.indexOf(
-    "post_show_privacy_recheck_message(\n            &post_show_status,\n            COMPANION_POST_SHOW_UNSAFE_PROTECTION_MARKER"
+    "post_show_privacy_recheck_message(\n            &post_show_status,\n            post_show_screen_share_decision,\n            COMPANION_POST_SHOW_UNSAFE_PROTECTION_MARKER,\n            COMPANION_POST_SHOW_SHARE_RISK_MARKER"
   );
   const revertCompanions = commandBody.indexOf("window.hide()", postShowGate);
 
   assert.notEqual(showCall, -1, "companion visibility command must still call native show");
   assert.notEqual(postShowRecheck, -1, "companion show must refresh native protection after show");
-  assert.notEqual(postShowGate, -1, "companion show must inspect the post-show protection result");
+  assert.notEqual(postShowScreenShareRecheck, -1, "companion show must recheck screen-share risk after show");
+  assert.notEqual(postShowGate, -1, "companion show must inspect the post-show protection and screen-share result");
   assert.notEqual(revertCompanions, -1, "unsafe post-show state must hide companions again");
   assert.ok(showCall < postShowRecheck, "post-show protection refresh must happen after native show");
-  assert.ok(postShowRecheck < postShowGate, "post-show gate must use refreshed companion protection status");
+  assert.ok(postShowRecheck < postShowScreenShareRecheck, "post-show screen-share recheck must happen after native show");
+  assert.ok(postShowScreenShareRecheck < postShowGate, "post-show gate must use refreshed companion screen-share status");
   assert.ok(postShowGate < revertCompanions, "post-show denial must run before reverting companions");
   assert.match(
     overlayRs,
     /Companion app window show was reverted because capture exclusion was not proven after visibility changed\./
+  );
+  assert.match(
+    overlayRs,
+    /Companion app window show was reverted because screen-share risk was detected after visibility changed\./
   );
 });
 

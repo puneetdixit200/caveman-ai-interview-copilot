@@ -31,6 +31,8 @@ export const COMMON_PRIVACY_SHIELD_MARKERS = [
   "Overlay bounds update refused before capture exclusion was proven.",
   "Overlay show was reverted because capture exclusion was not proven after visibility changed.",
   "Companion app window show was reverted because capture exclusion was not proven after visibility changed.",
+  "Overlay show was reverted because screen-share risk was detected after visibility changed.",
+  "Companion app window show was reverted because screen-share risk was detected after visibility changed.",
   "Native privacy shield thread failed to start; refusing to run without fail-closed screen-share guard.",
   "Native privacy shield starts before startup companion window show.",
   "Native privacy shield denied screen OCR capture.",

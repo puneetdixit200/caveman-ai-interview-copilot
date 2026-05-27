@@ -7,8 +7,9 @@ use super::{
     protection_refresh_fail_closed_message, sanitize_overlay_bounds,
     startup_privacy_shield_hide_reason, windows_capture_exclusion_status, OverlayProtectionStatus,
     OverlayWindowBounds, BOUNDS_UPDATE_UNSAFE_PROTECTION_MARKER,
-    COMPANION_HIDE_UNSAFE_PROTECTION_MARKER, COMPANION_POST_SHOW_UNSAFE_PROTECTION_MARKER,
-    COMPANION_UNSAFE_PROTECTION_MARKER, OVERLAY_POST_SHOW_UNSAFE_PROTECTION_MARKER,
+    COMPANION_HIDE_UNSAFE_PROTECTION_MARKER, COMPANION_POST_SHOW_SHARE_RISK_MARKER,
+    COMPANION_POST_SHOW_UNSAFE_PROTECTION_MARKER, COMPANION_UNSAFE_PROTECTION_MARKER,
+    OVERLAY_POST_SHOW_SHARE_RISK_MARKER, OVERLAY_POST_SHOW_UNSAFE_PROTECTION_MARKER,
     PROTECTION_REFRESH_FAIL_CLOSED_MARKER, STARTUP_PRIVACY_SHIELD_DENIED_INITIAL_SHOW_MARKER,
 };
 use crate::screen_share::NativePrivacyShieldDecision;
@@ -269,7 +270,9 @@ fn bounds_update_gate_allows_when_share_clear_and_capture_exclusion_enabled() {
 fn post_show_privacy_recheck_blocks_when_capture_exclusion_is_not_proven() {
     let overlay_message = post_show_privacy_recheck_message(
         &capture_exclusion_unavailable_status(),
+        NativePrivacyShieldDecision::Allow,
         OVERLAY_POST_SHOW_UNSAFE_PROTECTION_MARKER,
+        OVERLAY_POST_SHOW_SHARE_RISK_MARKER,
     )
     .expect("overlay show must be reverted when post-show protection is unsafe");
 
@@ -279,7 +282,9 @@ fn post_show_privacy_recheck_blocks_when_capture_exclusion_is_not_proven() {
 
     let companion_message = post_show_privacy_recheck_message(
         &capture_exclusion_disabled_status(true),
+        NativePrivacyShieldDecision::Allow,
         COMPANION_POST_SHOW_UNSAFE_PROTECTION_MARKER,
+        COMPANION_POST_SHOW_SHARE_RISK_MARKER,
     )
     .expect("companion show must be reverted when post-show protection is unsafe");
 
@@ -289,11 +294,42 @@ fn post_show_privacy_recheck_blocks_when_capture_exclusion_is_not_proven() {
 }
 
 #[test]
+fn post_show_privacy_recheck_blocks_when_screen_share_risk_appears_after_show() {
+    let overlay_message = post_show_privacy_recheck_message(
+        &capture_exclusion_enabled_status(true),
+        NativePrivacyShieldDecision::Hide {
+            reason: "Known screen-sharing or recording process is running.".to_string(),
+        },
+        OVERLAY_POST_SHOW_UNSAFE_PROTECTION_MARKER,
+        OVERLAY_POST_SHOW_SHARE_RISK_MARKER,
+    )
+    .expect("overlay show must be reverted when screen-share risk appears after show");
+
+    assert!(overlay_message.contains(OVERLAY_POST_SHOW_SHARE_RISK_MARKER));
+    assert!(overlay_message.contains("Known screen-sharing or recording process"));
+
+    let companion_message = post_show_privacy_recheck_message(
+        &capture_exclusion_enabled_status(true),
+        NativePrivacyShieldDecision::Hide {
+            reason: "Screen-share guard failed closed: tasklist failed".to_string(),
+        },
+        COMPANION_POST_SHOW_UNSAFE_PROTECTION_MARKER,
+        COMPANION_POST_SHOW_SHARE_RISK_MARKER,
+    )
+    .expect("companion show must be reverted when screen-share guard fails after show");
+
+    assert!(companion_message.contains(COMPANION_POST_SHOW_SHARE_RISK_MARKER));
+    assert!(companion_message.contains("Screen-share guard failed closed"));
+}
+
+#[test]
 fn post_show_privacy_recheck_allows_when_capture_exclusion_is_enabled() {
     assert_eq!(
         post_show_privacy_recheck_message(
             &capture_exclusion_enabled_status(true),
+            NativePrivacyShieldDecision::Allow,
             OVERLAY_POST_SHOW_UNSAFE_PROTECTION_MARKER,
+            OVERLAY_POST_SHOW_SHARE_RISK_MARKER,
         ),
         None
     );
