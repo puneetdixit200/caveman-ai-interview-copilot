@@ -1,5 +1,10 @@
 use serde::Serialize;
-use std::{thread, time::Duration};
+use std::{
+    io::Read,
+    process::{Command, Output, Stdio},
+    thread,
+    time::{Duration, Instant},
+};
 
 #[derive(Debug, Clone, Serialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
@@ -19,6 +24,7 @@ pub struct ScreenShareStatus {
 }
 
 const NATIVE_PRIVACY_SHIELD_INTERVAL: Duration = Duration::from_millis(100);
+const SCREEN_SHARE_GUARD_COMMAND_TIMEOUT: Duration = Duration::from_millis(1_500);
 pub const NATIVE_PRIVACY_SHIELD_THREAD_START_FAILED_MARKER: &str =
     "Native privacy shield thread failed to start; refusing to run without fail-closed screen-share guard.";
 pub const NATIVE_PRIVACY_SHIELD_STARTS_BEFORE_INITIAL_SHOW_MARKER: &str =
@@ -27,6 +33,8 @@ pub const NATIVE_PRIVACY_SHIELD_FAST_POLL_MARKER: &str =
     "Native privacy shield polls every 100ms for new screen-share risk.";
 pub const NATIVE_PRIVACY_SHIELD_REFRESHES_CAPTURE_BEFORE_SHARE_HIDE_MARKER: &str =
     "Native privacy shield refreshes capture exclusion before hiding for screen-share risk.";
+pub const SCREEN_SHARE_GUARD_COMMAND_TIMEOUT_MARKER: &str =
+    "Screen-share guard command timeout failed closed before privacy polling could stall.";
 const EDGE_WEBVIEW_HOST_PROCESS: &str = "msedgewebview2.exe";
 const EDGE_PWA_HOST_PROCESS: &str = "msedge_proxy.exe";
 const CHROME_PWA_HOST_PROCESS: &str = "chrome_proxy.exe";
@@ -218,6 +226,7 @@ const PACKAGE_PRIVACY_SHIELD_WEBVIEW_MARKERS: &[&str] = &[
     BROWSER_RECORDING_SCREEN_TITLE,
     BROWSER_SCREEN_IS_BEING_RECORDED_TITLE,
     BROWSER_BEING_RECORDED_TITLE,
+    SCREEN_SHARE_GUARD_COMMAND_TIMEOUT_MARKER,
     WINDOW_TITLE_PUNCTUATION_NORMALIZATION_MARKER,
     MACOS_SCREEN_CAPTURE_UI_PROCESS,
     MACOS_SCREEN_CAPTURE_CLI_PROCESS,
@@ -546,9 +555,7 @@ pub fn detect_screen_share_status() -> anyhow::Result<ScreenShareStatus> {
 
     #[cfg(target_os = "windows")]
     {
-        let output = std::process::Command::new("tasklist")
-            .args(["/V", "/FO", "CSV", "/NH"])
-            .output()?;
+        let output = run_screen_share_guard_command("tasklist", &["/V", "/FO", "CSV", "/NH"])?;
 
         if !output.status.success() {
             return Err(anyhow::anyhow!(
@@ -563,9 +570,7 @@ pub fn detect_screen_share_status() -> anyhow::Result<ScreenShareStatus> {
 
     #[cfg(target_os = "macos")]
     {
-        let output = std::process::Command::new("ps")
-            .args(["-axo", "pid=,comm="])
-            .output()?;
+        let output = run_screen_share_guard_command("ps", &["-axo", "pid=,comm="])?;
 
         if !output.status.success() {
             return Err(anyhow::anyhow!(
@@ -600,10 +605,9 @@ fn retain_package_privacy_shield_webview_markers() {
 fn detect_macos_visible_window_title_processes() -> anyhow::Result<Vec<ScreenShareProcess>> {
     std::hint::black_box(MACOS_WINDOW_TITLE_GUARD_MARKER);
 
-    let output = std::process::Command::new("osascript")
-        .args(["-e", MACOS_VISIBLE_WINDOW_TITLE_SCRIPT])
-        .output()
-        .map_err(|error| anyhow::anyhow!("{MACOS_WINDOW_TITLE_GUARD_MARKER} {error}"))?;
+    let output =
+        run_screen_share_guard_command("osascript", &["-e", MACOS_VISIBLE_WINDOW_TITLE_SCRIPT])
+            .map_err(|error| anyhow::anyhow!("{MACOS_WINDOW_TITLE_GUARD_MARKER} {error}"))?;
 
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
@@ -622,6 +626,83 @@ fn detect_macos_visible_window_title_processes() -> anyhow::Result<Vec<ScreenSha
     Ok(parse_macos_window_title_rows(&String::from_utf8_lossy(
         &output.stdout,
     )))
+}
+
+fn run_screen_share_guard_command(program: &str, args: &[&str]) -> anyhow::Result<Output> {
+    run_screen_share_guard_command_with_timeout(program, args, SCREEN_SHARE_GUARD_COMMAND_TIMEOUT)
+}
+
+fn run_screen_share_guard_command_with_timeout(
+    program: &str,
+    args: &[&str],
+    timeout: Duration,
+) -> anyhow::Result<Output> {
+    std::hint::black_box(SCREEN_SHARE_GUARD_COMMAND_TIMEOUT_MARKER);
+
+    let mut child = Command::new(program)
+        .args(args)
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .map_err(|error| {
+            anyhow::anyhow!("Could not start screen-share guard command {program}: {error}")
+        })?;
+
+    let mut stdout = child
+        .stdout
+        .take()
+        .ok_or_else(|| anyhow::anyhow!("Could not capture {program} stdout"))?;
+    let mut stderr = child
+        .stderr
+        .take()
+        .ok_or_else(|| anyhow::anyhow!("Could not capture {program} stderr"))?;
+    let stdout_reader = thread::spawn(move || {
+        let mut buffer = Vec::new();
+        stdout.read_to_end(&mut buffer).map(|_| buffer)
+    });
+    let stderr_reader = thread::spawn(move || {
+        let mut buffer = Vec::new();
+        stderr.read_to_end(&mut buffer).map(|_| buffer)
+    });
+
+    let started_at = Instant::now();
+    loop {
+        if let Some(status) = child.try_wait().map_err(|error| {
+            anyhow::anyhow!("Could not poll screen-share guard command {program}: {error}")
+        })? {
+            let stdout = collect_screen_share_guard_output(program, "stdout", stdout_reader)?;
+            let stderr = collect_screen_share_guard_output(program, "stderr", stderr_reader)?;
+            return Ok(Output {
+                status,
+                stdout,
+                stderr,
+            });
+        }
+
+        if started_at.elapsed() >= timeout {
+            let _ = child.kill();
+            let _ = child.wait();
+            let _ = stdout_reader.join();
+            let _ = stderr_reader.join();
+            return Err(anyhow::anyhow!(
+                "{SCREEN_SHARE_GUARD_COMMAND_TIMEOUT_MARKER} {program} exceeded {}ms.",
+                timeout.as_millis()
+            ));
+        }
+
+        thread::sleep(Duration::from_millis(10));
+    }
+}
+
+fn collect_screen_share_guard_output(
+    program: &str,
+    stream: &str,
+    reader: thread::JoinHandle<std::io::Result<Vec<u8>>>,
+) -> anyhow::Result<Vec<u8>> {
+    reader
+        .join()
+        .map_err(|_| anyhow::anyhow!("Could not join {program} {stream} reader"))?
+        .map_err(|error| anyhow::anyhow!("Could not read {program} {stream}: {error}"))
 }
 
 pub fn native_privacy_shield_decision(
@@ -1455,6 +1536,7 @@ mod tests {
                 BROWSER_RECORDING_SCREEN_TITLE,
                 BROWSER_SCREEN_IS_BEING_RECORDED_TITLE,
                 BROWSER_BEING_RECORDED_TITLE,
+                SCREEN_SHARE_GUARD_COMMAND_TIMEOUT_MARKER,
                 WINDOW_TITLE_PUNCTUATION_NORMALIZATION_MARKER,
                 MACOS_SCREEN_CAPTURE_UI_PROCESS,
                 MACOS_SCREEN_CAPTURE_CLI_PROCESS,
@@ -2149,5 +2231,35 @@ mod tests {
         assert!(message.contains(NATIVE_PRIVACY_SHIELD_THREAD_START_FAILED_MARKER));
         assert!(message.contains("spawn denied"));
         assert!(message.contains("refusing to run"));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn screen_share_guard_command_timeout_fails_closed_on_unix() {
+        let error = run_screen_share_guard_command_with_timeout(
+            "sh",
+            &["-c", "sleep 1"],
+            Duration::from_millis(10),
+        )
+        .expect_err("stalled process detection should time out");
+
+        assert!(error
+            .to_string()
+            .contains(SCREEN_SHARE_GUARD_COMMAND_TIMEOUT_MARKER));
+    }
+
+    #[cfg(target_os = "windows")]
+    #[test]
+    fn screen_share_guard_command_timeout_fails_closed_on_windows() {
+        let error = run_screen_share_guard_command_with_timeout(
+            "powershell",
+            &["-NoProfile", "-Command", "Start-Sleep -Milliseconds 500"],
+            Duration::from_millis(10),
+        )
+        .expect_err("stalled process detection should time out");
+
+        assert!(error
+            .to_string()
+            .contains(SCREEN_SHARE_GUARD_COMMAND_TIMEOUT_MARKER));
     }
 }

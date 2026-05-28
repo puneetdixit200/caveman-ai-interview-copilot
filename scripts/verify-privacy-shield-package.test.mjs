@@ -179,6 +179,11 @@ test("requires packaged web meeting and recording title detector markers", () =>
   assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("screen is being recorded"));
   assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("being recorded"));
   assert.ok(
+    COMMON_PRIVACY_SHIELD_MARKERS.includes(
+      "Screen-share guard command timeout failed closed before privacy polling could stall."
+    )
+  );
+  assert.ok(
     COMMON_PRIVACY_SHIELD_MARKERS.includes("Screen-share window title guard normalizes UI punctuation before matching.")
   );
 });

@@ -126,6 +126,7 @@ export const COMMON_PRIVACY_SHIELD_MARKERS = [
   "recording screen",
   "screen is being recorded",
   "being recorded",
+  "Screen-share guard command timeout failed closed before privacy polling could stall.",
   "Screen-share window title guard normalizes UI punctuation before matching.",
   "screencaptureui",
   "screencapture",
