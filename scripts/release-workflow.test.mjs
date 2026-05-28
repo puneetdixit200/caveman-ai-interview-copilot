@@ -174,6 +174,27 @@ test("packaged dashboard stays hidden until the native privacy gate allows start
   );
 });
 
+test("dashboard waits for repeated clear checks before restoring after share risk", async () => {
+  const dashboardTsx = await readFile("src/pages/Dashboard.tsx", "utf8");
+  const overlaySafetyTs = await readFile("src/lib/overlaySafety.ts", "utf8");
+  const riskIndex = dashboardTsx.indexOf("privacyShieldHadRecentRisk.current = true");
+  const clearIncrementIndex = dashboardTsx.indexOf("privacyShieldClearChecks.current += 1");
+  const restoreGateIndex = dashboardTsx.indexOf("shouldRestoreAfterPrivacyShieldClear({", clearIncrementIndex);
+  const showCompanionIndex = dashboardTsx.indexOf("setCompanionWindowsVisible(true", restoreGateIndex);
+
+  assert.match(dashboardTsx, /shouldRestoreAfterPrivacyShieldClear/);
+  assert.match(dashboardTsx, /Overlay kept hidden until screen-share guard stays clear for repeated checks\./);
+  assert.match(overlaySafetyTs, /PRIVACY_SHIELD_RESTORE_CLEAR_CHECKS\s*=\s*2/);
+  assert.notEqual(riskIndex, -1, "screen-share risk path must remember recent privacy risk");
+  assert.notEqual(clearIncrementIndex, -1, "clear path must count consecutive clear checks");
+  assert.notEqual(restoreGateIndex, -1, "clear path must gate restoration after recent risk");
+  assert.notEqual(showCompanionIndex, -1, "companion show path must exist after restore gate");
+  assert.ok(
+    riskIndex < clearIncrementIndex && clearIncrementIndex < restoreGateIndex && restoreGateIndex < showCompanionIndex,
+    "companion windows must not be restored until repeated clear checks pass"
+  );
+});
+
 test("startup setup hides app windows when native privacy cannot be proven", async () => {
   const overlayRs = await readFile("src-tauri/src/overlay/mod.rs", "utf8");
   const configureStart = overlayRs.indexOf("pub fn configure_overlay_security(app: &mut tauri::App) -> bool");

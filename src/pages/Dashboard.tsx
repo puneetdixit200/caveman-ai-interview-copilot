@@ -14,7 +14,7 @@ import { LocalWhisperChunkTranscriber } from "../lib/localWhisperStreaming";
 import { canSendOcrContext } from "../lib/ocr";
 import { registerGlobalActionShortcuts } from "../lib/globalHotkeys";
 import { DEFAULT_OVERLAY_SHORTCUT, overlayShortcutLabel } from "../lib/hotkeys";
-import { shouldHideForPrivacyShield } from "../lib/overlaySafety";
+import { shouldHideForPrivacyShield, shouldRestoreAfterPrivacyShieldClear } from "../lib/overlaySafety";
 import {
   KNOWLEDGE_BASE_SETTING_KEY,
   createKnowledgeBase,
@@ -113,6 +113,8 @@ const INTERVIEW_TYPE_OPTIONS: Array<{ id: InterviewType; label: string }> = [
 ];
 
 const PRIVACY_SHIELD_INTERVAL_MS = 5000;
+const PRIVACY_SHIELD_WAIT_FOR_STABLE_CLEAR_MESSAGE =
+  "Overlay kept hidden until screen-share guard stays clear for repeated checks.";
 
 export function Dashboard() {
   const [running, setRunning] = useState(false);
@@ -151,6 +153,8 @@ export function Dashboard() {
   const captureShortcutAction = useRef<() => void>(() => undefined);
   const generateShortcutAction = useRef<() => void>(() => undefined);
   const typeLatestShortcutAction = useRef<() => void>(() => undefined);
+  const privacyShieldHadRecentRisk = useRef(false);
+  const privacyShieldClearChecks = useRef(0);
   const { visible, setVisible, opacity, setOpacity, fontSize, setFontSize, locked, setLocked } = useOverlayStore();
 
   const selectedProvider = useMemo(
@@ -191,6 +195,8 @@ export function Dashboard() {
             screenShareDetected: guardStatus.active
           })
         ) {
+          privacyShieldHadRecentRisk.current = true;
+          privacyShieldClearChecks.current = 0;
           const hiddenStatus = await setOverlayWindowVisible(false, config.security.captureExclusionEnabled);
           await setCompanionWindowsVisible(false, config.security.captureExclusionEnabled);
           setOverlayProtection(hiddenStatus);
@@ -198,6 +204,22 @@ export function Dashboard() {
           setVisible(false);
           return;
         }
+
+        if (
+          !shouldRestoreAfterPrivacyShieldClear({
+            hadRecentRisk: privacyShieldHadRecentRisk.current,
+            consecutiveClearChecks: privacyShieldClearChecks.current
+          })
+        ) {
+          const hiddenStatus = await setOverlayWindowVisible(false, config.security.captureExclusionEnabled);
+          await setCompanionWindowsVisible(false, config.security.captureExclusionEnabled);
+          setOverlayProtection(hiddenStatus);
+          setOverlayMessage(PRIVACY_SHIELD_WAIT_FOR_STABLE_CLEAR_MESSAGE);
+          setVisible(false);
+          return;
+        }
+
+        privacyShieldHadRecentRisk.current = false;
       }
       setVisible(nextVisible);
       const status = await setOverlayWindowVisible(nextVisible, config.security.captureExclusionEnabled);
@@ -360,6 +382,8 @@ export function Dashboard() {
           screenShareDetected: guardStatus?.active ?? false
         })
       ) {
+        privacyShieldHadRecentRisk.current = true;
+        privacyShieldClearChecks.current = 0;
         const hiddenStatus = await setOverlayWindowVisible(false, config.security.captureExclusionEnabled);
         await setCompanionWindowsVisible(false, config.security.captureExclusionEnabled);
         if (!cancelled) {
@@ -370,6 +394,24 @@ export function Dashboard() {
         return;
       }
 
+      privacyShieldClearChecks.current += 1;
+      if (
+        !shouldRestoreAfterPrivacyShieldClear({
+          hadRecentRisk: privacyShieldHadRecentRisk.current,
+          consecutiveClearChecks: privacyShieldClearChecks.current
+        })
+      ) {
+        const hiddenStatus = await setOverlayWindowVisible(false, config.security.captureExclusionEnabled);
+        await setCompanionWindowsVisible(false, config.security.captureExclusionEnabled);
+        if (!cancelled) {
+          setOverlayProtection(hiddenStatus);
+          setOverlayMessage(PRIVACY_SHIELD_WAIT_FOR_STABLE_CLEAR_MESSAGE);
+          setVisible(false);
+        }
+        return;
+      }
+
+      privacyShieldHadRecentRisk.current = false;
       await setCompanionWindowsVisible(true, config.security.captureExclusionEnabled);
       if (cancelled) {
         return;
