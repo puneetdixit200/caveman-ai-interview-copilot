@@ -122,6 +122,8 @@ const MACOS_REPLAYD_PROCESS: &str = "replayd";
 const MACOS_SCREEN_CAPTURE_KIT_AGENT_PROCESS: &str = "screencapturekitagent";
 const MACOS_WINDOW_TITLE_GUARD_MARKER: &str =
     "macOS window title screen-share guard failed closed:";
+const MACOS_WINDOW_TITLE_PERMISSION_FALLBACK_MARKER: &str =
+    "macOS window title screen-share guard permission denial falls back to OS capture protection.";
 #[cfg(target_os = "macos")]
 const MACOS_VISIBLE_WINDOW_TITLE_SCRIPT: &str = r#"
 set previousDelimiters to AppleScript's text item delimiters
@@ -233,6 +235,7 @@ const PACKAGE_PRIVACY_SHIELD_WEBVIEW_MARKERS: &[&str] = &[
     MACOS_REPLAYD_PROCESS,
     MACOS_SCREEN_CAPTURE_KIT_AGENT_PROCESS,
     MACOS_WINDOW_TITLE_GUARD_MARKER,
+    MACOS_WINDOW_TITLE_PERMISSION_FALLBACK_MARKER,
 ];
 
 #[derive(Debug, Clone, PartialEq)]
@@ -612,6 +615,11 @@ fn detect_macos_visible_window_title_processes() -> anyhow::Result<Vec<ScreenSha
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
         let detail = stderr.trim();
+        if macos_window_title_guard_permission_denied(detail) {
+            std::hint::black_box(MACOS_WINDOW_TITLE_PERMISSION_FALLBACK_MARKER);
+            return Ok(Vec::new());
+        }
+
         return Err(anyhow::anyhow!(
             "{} {}",
             MACOS_WINDOW_TITLE_GUARD_MARKER,
@@ -626,6 +634,23 @@ fn detect_macos_visible_window_title_processes() -> anyhow::Result<Vec<ScreenSha
     Ok(parse_macos_window_title_rows(&String::from_utf8_lossy(
         &output.stdout,
     )))
+}
+
+fn macos_window_title_guard_permission_denied(detail: &str) -> bool {
+    let normalized = detail.to_ascii_lowercase();
+    [
+        "not authorized",
+        "not authorised",
+        "not allowed",
+        "assistive access",
+        "accessibility",
+        "automation",
+        "operation not permitted",
+        "-1743",
+        "-25211",
+    ]
+    .iter()
+    .any(|candidate| normalized.contains(candidate))
 }
 
 fn run_screen_share_guard_command(program: &str, args: &[&str]) -> anyhow::Result<Output> {
@@ -1542,9 +1567,26 @@ mod tests {
                 MACOS_SCREEN_CAPTURE_CLI_PROCESS,
                 MACOS_REPLAYD_PROCESS,
                 MACOS_SCREEN_CAPTURE_KIT_AGENT_PROCESS,
-                MACOS_WINDOW_TITLE_GUARD_MARKER
+                MACOS_WINDOW_TITLE_GUARD_MARKER,
+                MACOS_WINDOW_TITLE_PERMISSION_FALLBACK_MARKER
             ]
         );
+    }
+
+    #[test]
+    fn macos_window_title_guard_permission_denial_is_classified_for_capture_fallback() {
+        assert!(macos_window_title_guard_permission_denied(
+            "execution error: Not authorized to send Apple events to System Events. (-1743)"
+        ));
+        assert!(macos_window_title_guard_permission_denied(
+            "System Events got an error: osascript is not allowed assistive access."
+        ));
+        assert!(macos_window_title_guard_permission_denied(
+            "Operation not permitted while reading accessibility window titles"
+        ));
+        assert!(!macos_window_title_guard_permission_denied(
+            "osascript exited because the script has a syntax error"
+        ));
     }
 
     #[test]
