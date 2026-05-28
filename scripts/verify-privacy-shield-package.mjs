@@ -133,7 +133,8 @@ export const COMMON_PRIVACY_SHIELD_MARKERS = [
   "replayd",
   "screencapturekitagent",
   "macOS window title screen-share guard failed closed:",
-  "macOS window title screen-share guard permission denial falls back to OS capture protection."
+  "macOS window title screen-share guard permission denial falls back to OS capture protection.",
+  "macOS window title screen-share guard skips transient System Events rows."
 ];
 
 export const FRONTEND_PRIVACY_SHIELD_MARKERS = [

@@ -124,18 +124,26 @@ const MACOS_WINDOW_TITLE_GUARD_MARKER: &str =
     "macOS window title screen-share guard failed closed:";
 const MACOS_WINDOW_TITLE_PERMISSION_FALLBACK_MARKER: &str =
     "macOS window title screen-share guard permission denial falls back to OS capture protection.";
+const MACOS_WINDOW_TITLE_TRANSIENT_ROW_MARKER: &str =
+    "macOS window title screen-share guard skips transient System Events rows.";
 #[cfg(target_os = "macos")]
 const MACOS_VISIBLE_WINDOW_TITLE_SCRIPT: &str = r#"
 set previousDelimiters to AppleScript's text item delimiters
 set windowTitleRows to {}
 tell application "System Events"
-  repeat with candidateProcess in (processes whose background only is false)
-    set processName to name of candidateProcess as text
-    set processId to unix id of candidateProcess as text
-    repeat with candidateWindow in windows of candidateProcess
-      set windowTitle to name of candidateWindow as text
-      if windowTitle is not "" then set end of windowTitleRows to processId & tab & processName & tab & windowTitle
-    end repeat
+  repeat with candidateProcess in processes
+    try
+      if background only of candidateProcess is false then
+        set processName to name of candidateProcess as text
+        set processId to unix id of candidateProcess as text
+        repeat with candidateWindow in windows of candidateProcess
+          try
+            set windowTitle to name of candidateWindow as text
+            if windowTitle is not "" then set end of windowTitleRows to processId & tab & processName & tab & windowTitle
+          end try
+        end repeat
+      end if
+    end try
   end repeat
 end tell
 set AppleScript's text item delimiters to linefeed
@@ -236,6 +244,7 @@ const PACKAGE_PRIVACY_SHIELD_WEBVIEW_MARKERS: &[&str] = &[
     MACOS_SCREEN_CAPTURE_KIT_AGENT_PROCESS,
     MACOS_WINDOW_TITLE_GUARD_MARKER,
     MACOS_WINDOW_TITLE_PERMISSION_FALLBACK_MARKER,
+    MACOS_WINDOW_TITLE_TRANSIENT_ROW_MARKER,
 ];
 
 #[derive(Debug, Clone, PartialEq)]
@@ -1568,7 +1577,8 @@ mod tests {
                 MACOS_REPLAYD_PROCESS,
                 MACOS_SCREEN_CAPTURE_KIT_AGENT_PROCESS,
                 MACOS_WINDOW_TITLE_GUARD_MARKER,
-                MACOS_WINDOW_TITLE_PERMISSION_FALLBACK_MARKER
+                MACOS_WINDOW_TITLE_PERMISSION_FALLBACK_MARKER,
+                MACOS_WINDOW_TITLE_TRANSIENT_ROW_MARKER
             ]
         );
     }
@@ -1853,6 +1863,20 @@ mod tests {
     fn macos_window_title_script_avoids_system_events_rows_name_collision() {
         assert!(MACOS_VISIBLE_WINDOW_TITLE_SCRIPT.contains("windowTitleRows"));
         assert!(!MACOS_VISIBLE_WINDOW_TITLE_SCRIPT.contains("set rows to {}"));
+    }
+
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn macos_window_title_script_skips_transient_system_events_rows() {
+        assert!(
+            MACOS_VISIBLE_WINDOW_TITLE_SCRIPT.contains("repeat with candidateProcess in processes")
+        );
+        assert!(MACOS_VISIBLE_WINDOW_TITLE_SCRIPT
+            .contains("background only of candidateProcess is false"));
+        assert!(MACOS_VISIBLE_WINDOW_TITLE_SCRIPT.contains("end try"));
+        assert!(
+            !MACOS_VISIBLE_WINDOW_TITLE_SCRIPT.contains("processes whose background only is false")
+        );
     }
 
     #[test]
