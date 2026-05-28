@@ -177,12 +177,15 @@ test("packaged dashboard stays hidden until the native privacy gate allows start
 test("dashboard waits for repeated clear checks before restoring after share risk", async () => {
   const dashboardTsx = await readFile("src/pages/Dashboard.tsx", "utf8");
   const overlaySafetyTs = await readFile("src/lib/overlaySafety.ts", "utf8");
+  const privacyShieldTimeoutTs = await readFile("src/lib/privacyShieldTimeout.ts", "utf8");
   const riskIndex = dashboardTsx.indexOf("privacyShieldHadRecentRisk.current = true");
   const clearIncrementIndex = dashboardTsx.indexOf("privacyShieldClearChecks.current += 1");
   const restoreGateIndex = dashboardTsx.indexOf("shouldRestoreAfterPrivacyShieldClear({", clearIncrementIndex);
-  const showCompanionIndex = dashboardTsx.indexOf("setCompanionWindowsVisible(true", restoreGateIndex);
+  const showCompanionIndex = dashboardTsx.indexOf("setCompanionWindowsVisibleFailClosed(true", restoreGateIndex);
 
   assert.match(dashboardTsx, /shouldRestoreAfterPrivacyShieldClear/);
+  assert.match(dashboardTsx, /withPrivacyShieldTimeout/);
+  assert.match(privacyShieldTimeoutTs, /Native privacy shield WebView command timeout failed closed before overlay visibility could drift\./);
   assert.match(dashboardTsx, /Overlay kept hidden until screen-share guard stays clear for repeated checks\./);
   assert.match(overlaySafetyTs, /PRIVACY_SHIELD_RESTORE_CLEAR_CHECKS\s*=\s*2/);
   assert.notEqual(riskIndex, -1, "screen-share risk path must remember recent privacy risk");

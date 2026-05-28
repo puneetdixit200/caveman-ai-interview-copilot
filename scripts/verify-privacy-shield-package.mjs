@@ -136,6 +136,7 @@ export const COMMON_PRIVACY_SHIELD_MARKERS = [
 ];
 
 export const FRONTEND_PRIVACY_SHIELD_MARKERS = [
+  "Native privacy shield WebView command timeout failed closed before overlay visibility could drift.",
   "Overlay kept hidden until screen-share guard stays clear for repeated checks."
 ];
 

@@ -65,6 +65,10 @@ import {
   typeTextIntoActiveWindow
 } from "../lib/tauri";
 import { ProviderRouter } from "../lib/providerRouter";
+import {
+  PRIVACY_SHIELD_NATIVE_CALL_TIMEOUT_MARKER,
+  withPrivacyShieldTimeout
+} from "../lib/privacyShieldTimeout";
 import { useOverlayStore } from "../stores/overlayStore";
 import type {
   AIResponseRecord,
@@ -178,14 +182,13 @@ export function Dashboard() {
         try {
           await setOverlayWindowBounds(config.overlay.bounds, config.security.captureExclusionEnabled);
         } catch (error) {
-          const hiddenStatus = await setOverlayWindowVisible(false, config.security.captureExclusionEnabled);
-          await setCompanionWindowsVisible(false, config.security.captureExclusionEnabled);
+          const hiddenStatus = await hideAppWindowsForPrivacyShield(config.security.captureExclusionEnabled);
           setOverlayProtection(hiddenStatus);
           setOverlayMessage(error instanceof Error ? error.message : String(error));
           setVisible(false);
           return;
         }
-        const status = await protectOverlayWindow(config.security.captureExclusionEnabled);
+        const status = await protectOverlayWindowFailClosed(config.security.captureExclusionEnabled);
         const guardStatus = await detectScreenShareStatusFailClosed();
         setScreenShareStatus(guardStatus);
 
@@ -197,8 +200,7 @@ export function Dashboard() {
         ) {
           privacyShieldHadRecentRisk.current = true;
           privacyShieldClearChecks.current = 0;
-          const hiddenStatus = await setOverlayWindowVisible(false, config.security.captureExclusionEnabled);
-          await setCompanionWindowsVisible(false, config.security.captureExclusionEnabled);
+          const hiddenStatus = await hideAppWindowsForPrivacyShield(config.security.captureExclusionEnabled);
           setOverlayProtection(hiddenStatus);
           setOverlayMessage(overlayAutoHideMessage(guardStatus));
           setVisible(false);
@@ -211,8 +213,7 @@ export function Dashboard() {
             consecutiveClearChecks: privacyShieldClearChecks.current
           })
         ) {
-          const hiddenStatus = await setOverlayWindowVisible(false, config.security.captureExclusionEnabled);
-          await setCompanionWindowsVisible(false, config.security.captureExclusionEnabled);
+          const hiddenStatus = await hideAppWindowsForPrivacyShield(config.security.captureExclusionEnabled);
           setOverlayProtection(hiddenStatus);
           setOverlayMessage(PRIVACY_SHIELD_WAIT_FOR_STABLE_CLEAR_MESSAGE);
           setVisible(false);
@@ -222,12 +223,12 @@ export function Dashboard() {
         privacyShieldHadRecentRisk.current = false;
       }
       setVisible(nextVisible);
-      const status = await setOverlayWindowVisible(nextVisible, config.security.captureExclusionEnabled);
+      const status = await setOverlayWindowVisibleFailClosed(nextVisible, config.security.captureExclusionEnabled);
 
       if (nextVisible && status.visible && status.captureExclusion === "enabled") {
-        await setCompanionWindowsVisible(true, config.security.captureExclusionEnabled);
+        await setCompanionWindowsVisibleFailClosed(true, config.security.captureExclusionEnabled);
       } else if (nextVisible) {
-        await setCompanionWindowsVisible(false, config.security.captureExclusionEnabled);
+        await setCompanionWindowsVisibleFailClosed(false, config.security.captureExclusionEnabled);
       }
       setOverlayProtection(status);
       setOverlayMessage(status.message ?? (nextVisible ? "Overlay shown" : "Overlay hidden"));
@@ -366,7 +367,7 @@ export function Dashboard() {
     let intervalId: number | undefined;
 
     async function applyOverlayProtection() {
-      const status = await protectOverlayWindow(config.security.captureExclusionEnabled);
+      const status = await protectOverlayWindowFailClosed(config.security.captureExclusionEnabled);
       if (cancelled) {
         return;
       }
@@ -384,8 +385,7 @@ export function Dashboard() {
       ) {
         privacyShieldHadRecentRisk.current = true;
         privacyShieldClearChecks.current = 0;
-        const hiddenStatus = await setOverlayWindowVisible(false, config.security.captureExclusionEnabled);
-        await setCompanionWindowsVisible(false, config.security.captureExclusionEnabled);
+        const hiddenStatus = await hideAppWindowsForPrivacyShield(config.security.captureExclusionEnabled);
         if (!cancelled) {
           setOverlayProtection(hiddenStatus);
           setOverlayMessage(overlayAutoHideMessage(guardStatus));
@@ -401,8 +401,7 @@ export function Dashboard() {
           consecutiveClearChecks: privacyShieldClearChecks.current
         })
       ) {
-        const hiddenStatus = await setOverlayWindowVisible(false, config.security.captureExclusionEnabled);
-        await setCompanionWindowsVisible(false, config.security.captureExclusionEnabled);
+        const hiddenStatus = await hideAppWindowsForPrivacyShield(config.security.captureExclusionEnabled);
         if (!cancelled) {
           setOverlayProtection(hiddenStatus);
           setOverlayMessage(PRIVACY_SHIELD_WAIT_FOR_STABLE_CLEAR_MESSAGE);
@@ -412,7 +411,7 @@ export function Dashboard() {
       }
 
       privacyShieldHadRecentRisk.current = false;
-      await setCompanionWindowsVisible(true, config.security.captureExclusionEnabled);
+      await setCompanionWindowsVisibleFailClosed(true, config.security.captureExclusionEnabled);
       if (cancelled) {
         return;
       }
@@ -1624,7 +1623,11 @@ function screenShareProcessNames(screenShareStatus: ScreenShareStatus): string {
 
 async function detectScreenShareStatusFailClosed(): Promise<ScreenShareStatus> {
   try {
-    return await detectScreenShareStatus();
+    return await withPrivacyShieldTimeout(
+      detectScreenShareStatus(),
+      "detect screen share",
+      privacyShieldScreenShareTimeoutStatus
+    );
   } catch {
     return {
       active: true,
@@ -1632,6 +1635,92 @@ async function detectScreenShareStatusFailClosed(): Promise<ScreenShareStatus> {
       message: "Screen-share guard check failed."
     };
   }
+}
+
+async function protectOverlayWindowFailClosed(captureExclusionEnabled: boolean): Promise<OverlayProtectionStatus> {
+  try {
+    return await withPrivacyShieldTimeout(
+      protectOverlayWindow(captureExclusionEnabled),
+      "protect overlay window",
+      privacyShieldOverlayTimeoutStatus
+    );
+  } catch (error) {
+    return privacyShieldOverlayTimeoutStatus(privacyShieldCommandErrorMessage("protect overlay window", error));
+  }
+}
+
+async function setOverlayWindowVisibleFailClosed(
+  visible: boolean,
+  captureExclusionEnabled: boolean
+): Promise<OverlayProtectionStatus> {
+  try {
+    return await withPrivacyShieldTimeout(
+      setOverlayWindowVisible(visible, captureExclusionEnabled),
+      visible ? "show overlay window" : "hide overlay window",
+      privacyShieldOverlayTimeoutStatus
+    );
+  } catch (error) {
+    return privacyShieldOverlayTimeoutStatus(
+      privacyShieldCommandErrorMessage(visible ? "show overlay window" : "hide overlay window", error)
+    );
+  }
+}
+
+async function setCompanionWindowsVisibleFailClosed(
+  visible: boolean,
+  captureExclusionEnabled: boolean
+): Promise<OverlayProtectionStatus> {
+  try {
+    return await withPrivacyShieldTimeout(
+      setCompanionWindowsVisible(visible, captureExclusionEnabled),
+      visible ? "show companion windows" : "hide companion windows",
+      privacyShieldCompanionTimeoutStatus
+    );
+  } catch (error) {
+    return privacyShieldCompanionTimeoutStatus(
+      privacyShieldCommandErrorMessage(visible ? "show companion windows" : "hide companion windows", error)
+    );
+  }
+}
+
+async function hideAppWindowsForPrivacyShield(captureExclusionEnabled: boolean): Promise<OverlayProtectionStatus> {
+  const hiddenStatus = await setOverlayWindowVisibleFailClosed(false, captureExclusionEnabled);
+  await setCompanionWindowsVisibleFailClosed(false, captureExclusionEnabled);
+  return hiddenStatus;
+}
+
+function privacyShieldScreenShareTimeoutStatus(message: string): ScreenShareStatus {
+  return {
+    active: true,
+    matchedProcesses: [],
+    message
+  };
+}
+
+function privacyShieldOverlayTimeoutStatus(message: string): OverlayProtectionStatus {
+  return {
+    alwaysOnTop: false,
+    skipTaskbar: false,
+    captureExclusion: "failed",
+    clickThrough: false,
+    visible: false,
+    message
+  };
+}
+
+function privacyShieldCompanionTimeoutStatus(message: string): OverlayProtectionStatus {
+  return {
+    ...privacyShieldOverlayTimeoutStatus(message),
+    alwaysOnTop: false,
+    skipTaskbar: false,
+    clickThrough: false
+  };
+}
+
+function privacyShieldCommandErrorMessage(operationLabel: string, error: unknown): string {
+  return `${PRIVACY_SHIELD_NATIVE_CALL_TIMEOUT_MARKER} ${operationLabel} failed before privacy could be proven. ${
+    error instanceof Error ? error.message : String(error)
+  }`;
 }
 
 function buildCollaborationSnapshot(

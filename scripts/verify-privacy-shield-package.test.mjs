@@ -42,6 +42,14 @@ test("validates packaged frontend privacy markers across built app assets", () =
   assert.deepEqual(result.missingMarkers, []);
 });
 
+test("requires packaged WebView privacy command timeout marker", () => {
+  assert.ok(
+    FRONTEND_PRIVACY_SHIELD_MARKERS.includes(
+      "Native privacy shield WebView command timeout failed closed before overlay visibility could drift."
+    )
+  );
+});
+
 test("requires packaged Teams and Google Meet WebView detector markers", () => {
   assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("msedgewebview2.exe"));
   assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("msedge_proxy.exe"));
