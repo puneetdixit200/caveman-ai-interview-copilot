@@ -256,6 +256,12 @@ test("requires packaged protection refresh fail-closed marker", () => {
   assert.ok(
     COMMON_PRIVACY_SHIELD_MARKERS.includes("Native privacy shield starts before startup companion window show.")
   );
+  assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("Native privacy shield polls every 100ms for new screen-share risk."));
+  assert.ok(
+    COMMON_PRIVACY_SHIELD_MARKERS.includes(
+      "Native privacy shield refreshes capture exclusion before hiding for screen-share risk."
+    )
+  );
 });
 
 test("reports missing packaged native privacy markers", () => {

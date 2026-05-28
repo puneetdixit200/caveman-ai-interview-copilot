@@ -222,6 +222,28 @@ test("startup refuses to run when the native privacy shield thread cannot start"
   assert.match(screenShareRs, /Native privacy shield starts before startup companion window show\./);
 });
 
+test("native privacy shield refreshes capture protection before share-risk hide", async () => {
+  const screenShareRs = await readFile("src-tauri/src/screen_share.rs", "utf8");
+  const shieldStart = screenShareRs.indexOf("pub fn start_native_privacy_shield(app: tauri::AppHandle)");
+  const shieldEnd = screenShareRs.indexOf("pub fn native_privacy_shield_thread_start_error_message", shieldStart);
+  const shieldBody = screenShareRs.slice(shieldStart, shieldEnd);
+  const shareRiskBranchStart = shieldBody.indexOf("NativePrivacyShieldDecision::Hide { .. } =>");
+  const refreshIndex = shieldBody.indexOf("crate::overlay::protect_overlay_window(&app, true)", shareRiskBranchStart);
+  const hideIndex = shieldBody.indexOf("hide_app_windows_for_native_privacy_shield(&app)", shareRiskBranchStart);
+
+  assert.notEqual(shieldStart, -1, "native privacy shield entrypoint must exist");
+  assert.notEqual(shareRiskBranchStart, -1, "screen-share risk branch must fail closed");
+  assert.notEqual(refreshIndex, -1, "share-risk branch must refresh capture exclusion before hiding");
+  assert.notEqual(hideIndex, -1, "share-risk branch must hide app windows");
+  assert.ok(refreshIndex < hideIndex, "capture exclusion must be refreshed before app windows are hidden");
+  assert.match(screenShareRs, /Duration::from_millis\(100\)/);
+  assert.match(screenShareRs, /Native privacy shield polls every 100ms for new screen-share risk\./);
+  assert.match(
+    screenShareRs,
+    /Native privacy shield refreshes capture exclusion before hiding for screen-share risk\./
+  );
+});
+
 test("native screen OCR capture hides app windows before creating screenshots", async () => {
   const commandsRs = await readFile("src-tauri/src/commands.rs", "utf8");
   const commandStart = commandsRs.indexOf("pub fn capture_screen_frame(app_handle: AppHandle)");

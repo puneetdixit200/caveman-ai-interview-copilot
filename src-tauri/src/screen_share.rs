@@ -18,11 +18,15 @@ pub struct ScreenShareStatus {
     pub message: Option<String>,
 }
 
-const NATIVE_PRIVACY_SHIELD_INTERVAL: Duration = Duration::from_millis(250);
+const NATIVE_PRIVACY_SHIELD_INTERVAL: Duration = Duration::from_millis(100);
 pub const NATIVE_PRIVACY_SHIELD_THREAD_START_FAILED_MARKER: &str =
     "Native privacy shield thread failed to start; refusing to run without fail-closed screen-share guard.";
 pub const NATIVE_PRIVACY_SHIELD_STARTS_BEFORE_INITIAL_SHOW_MARKER: &str =
     "Native privacy shield starts before startup companion window show.";
+pub const NATIVE_PRIVACY_SHIELD_FAST_POLL_MARKER: &str =
+    "Native privacy shield polls every 100ms for new screen-share risk.";
+pub const NATIVE_PRIVACY_SHIELD_REFRESHES_CAPTURE_BEFORE_SHARE_HIDE_MARKER: &str =
+    "Native privacy shield refreshes capture exclusion before hiding for screen-share risk.";
 const EDGE_WEBVIEW_HOST_PROCESS: &str = "msedgewebview2.exe";
 const EDGE_PWA_HOST_PROCESS: &str = "msedge_proxy.exe";
 const CHROME_PWA_HOST_PROCESS: &str = "chrome_proxy.exe";
@@ -670,6 +674,8 @@ pub fn native_privacy_shield_decision_for_overlay_protection(
 
 pub fn start_native_privacy_shield(app: tauri::AppHandle) -> anyhow::Result<()> {
     std::hint::black_box(NATIVE_PRIVACY_SHIELD_STARTS_BEFORE_INITIAL_SHOW_MARKER);
+    std::hint::black_box(NATIVE_PRIVACY_SHIELD_FAST_POLL_MARKER);
+    std::hint::black_box(NATIVE_PRIVACY_SHIELD_REFRESHES_CAPTURE_BEFORE_SHARE_HIDE_MARKER);
 
     thread::Builder::new()
         .name("screen-share-privacy-shield".to_string())
@@ -685,6 +691,10 @@ pub fn start_native_privacy_shield(app: tauri::AppHandle) -> anyhow::Result<()> 
                     }
                 }
                 NativePrivacyShieldDecision::Hide { .. } => {
+                    std::hint::black_box(
+                        NATIVE_PRIVACY_SHIELD_REFRESHES_CAPTURE_BEFORE_SHARE_HIDE_MARKER,
+                    );
+                    let _ = crate::overlay::protect_overlay_window(&app, true);
                     hide_app_windows_for_native_privacy_shield(&app);
                 }
             }
@@ -2120,7 +2130,16 @@ mod tests {
 
     #[test]
     fn native_privacy_shield_polls_quickly_enough_for_new_share_sessions() {
-        assert!(NATIVE_PRIVACY_SHIELD_INTERVAL <= Duration::from_millis(250));
+        assert_eq!(NATIVE_PRIVACY_SHIELD_INTERVAL, Duration::from_millis(100));
+        assert!(NATIVE_PRIVACY_SHIELD_FAST_POLL_MARKER.contains("100ms"));
+    }
+
+    #[test]
+    fn native_privacy_shield_marks_capture_refresh_before_share_hide() {
+        assert!(
+            NATIVE_PRIVACY_SHIELD_REFRESHES_CAPTURE_BEFORE_SHARE_HIDE_MARKER
+                .contains("refreshes capture exclusion")
+        );
     }
 
     #[test]

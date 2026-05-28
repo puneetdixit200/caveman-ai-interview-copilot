@@ -35,6 +35,8 @@ export const COMMON_PRIVACY_SHIELD_MARKERS = [
   "Companion app window show was reverted because screen-share risk was detected after visibility changed.",
   "Native privacy shield thread failed to start; refusing to run without fail-closed screen-share guard.",
   "Native privacy shield starts before startup companion window show.",
+  "Native privacy shield polls every 100ms for new screen-share risk.",
+  "Native privacy shield refreshes capture exclusion before hiding for screen-share risk.",
   "Native privacy shield denied screen OCR capture.",
   "Waiting for app windows to leave capture surfaces before screen OCR capture.",
   "Native privacy shield denied active-window typing during screen-share risk.",
