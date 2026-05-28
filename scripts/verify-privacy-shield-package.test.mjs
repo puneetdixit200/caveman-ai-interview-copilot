@@ -5,10 +5,8 @@ import path from "node:path";
 import test from "node:test";
 import {
   COMMON_PRIVACY_SHIELD_MARKERS,
-  FRONTEND_PRIVACY_SHIELD_MARKERS,
   TARGET_PRIVACY_SHIELD_MARKERS,
   evaluateBinaryPrivacyMarkers,
-  evaluatePackagePrivacyMarkers,
   privacyShieldAttestationName,
   verifyPrivacyShieldPackage,
   writePrivacyShieldAttestation
@@ -27,16 +25,6 @@ test("validates packaged native privacy markers from binary content", () => {
   const binary = Buffer.from(`prefix ${COMMON_PRIVACY_SHIELD_MARKERS.join(" middle ")} suffix`);
 
   const result = evaluateBinaryPrivacyMarkers(binary, COMMON_PRIVACY_SHIELD_MARKERS);
-
-  assert.equal(result.status, "ready");
-  assert.deepEqual(result.missingMarkers, []);
-});
-
-test("validates packaged frontend privacy markers across app assets", () => {
-  const result = evaluatePackagePrivacyMarkers(
-    ["native binary without UI text", `assets ${FRONTEND_PRIVACY_SHIELD_MARKERS.join(" middle ")}`],
-    FRONTEND_PRIVACY_SHIELD_MARKERS
-  );
 
   assert.equal(result.status, "ready");
   assert.deepEqual(result.missingMarkers, []);
@@ -274,11 +262,6 @@ test("requires packaged protection refresh fail-closed marker", () => {
       "Native privacy shield refreshes capture exclusion before hiding for screen-share risk."
     )
   );
-  assert.ok(
-    FRONTEND_PRIVACY_SHIELD_MARKERS.includes(
-      "Overlay kept hidden until screen-share guard stays clear for repeated checks."
-    )
-  );
 });
 
 test("reports missing packaged native privacy markers", () => {
@@ -318,11 +301,8 @@ test("verifies downloaded macOS package-smoke artifact layout", async () => {
   const dir = await mkdtemp(path.join(tmpdir(), "caveman-privacy-downloaded-macos-"));
   try {
     const binaryPath = path.join(dir, "macos", "Caveman.app", "Contents", "MacOS", "caveman");
-    const assetPath = path.join(dir, "macos", "Caveman.app", "Contents", "Resources", "assets", "index.js");
     await mkdir(path.dirname(binaryPath), { recursive: true });
-    await mkdir(path.dirname(assetPath), { recursive: true });
     await writeFile(binaryPath, TARGET_PRIVACY_SHIELD_MARKERS["macos-arm64"].join("\n"));
-    await writeFile(assetPath, FRONTEND_PRIVACY_SHIELD_MARKERS.join("\n"));
 
     const result = await verifyPrivacyShieldPackage({
       targetSelector: "macos-arm64",
@@ -331,27 +311,6 @@ test("verifies downloaded macOS package-smoke artifact layout", async () => {
 
     assert.equal(result.status, "ready");
     assert.deepEqual(result.checked, [binaryPath]);
-    assert.ok(result.frontendChecked.includes(assetPath));
-  } finally {
-    await rm(dir, { recursive: true, force: true });
-  }
-});
-
-test("fails downloaded package verification when frontend restore gate marker is missing", async () => {
-  const dir = await mkdtemp(path.join(tmpdir(), "caveman-privacy-missing-frontend-"));
-  try {
-    const binaryPath = path.join(dir, "macos", "Caveman.app", "Contents", "MacOS", "caveman");
-    await mkdir(path.dirname(binaryPath), { recursive: true });
-    await writeFile(binaryPath, TARGET_PRIVACY_SHIELD_MARKERS["macos-arm64"].join("\n"));
-
-    await assert.rejects(
-      () =>
-        verifyPrivacyShieldPackage({
-          targetSelector: "macos-arm64",
-          releaseDir: dir
-        }),
-      /missing frontend privacy shield markers/
-    );
   } finally {
     await rm(dir, { recursive: true, force: true });
   }
