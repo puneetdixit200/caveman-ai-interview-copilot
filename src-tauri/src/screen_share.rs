@@ -126,6 +126,8 @@ const MACOS_WINDOW_TITLE_PERMISSION_FALLBACK_MARKER: &str =
     "macOS window title screen-share guard permission denial falls back to OS capture protection.";
 const MACOS_WINDOW_TITLE_TRANSIENT_ROW_MARKER: &str =
     "macOS window title screen-share guard skips transient System Events rows.";
+const MACOS_WINDOW_TITLE_TIMEOUT_FALLBACK_MARKER: &str =
+    "macOS window title screen-share guard timeout falls back to OS capture protection.";
 #[cfg(target_os = "macos")]
 const MACOS_VISIBLE_WINDOW_TITLE_SCRIPT: &str = r#"
 set previousDelimiters to AppleScript's text item delimiters
@@ -245,6 +247,7 @@ const PACKAGE_PRIVACY_SHIELD_WEBVIEW_MARKERS: &[&str] = &[
     MACOS_WINDOW_TITLE_GUARD_MARKER,
     MACOS_WINDOW_TITLE_PERMISSION_FALLBACK_MARKER,
     MACOS_WINDOW_TITLE_TRANSIENT_ROW_MARKER,
+    MACOS_WINDOW_TITLE_TIMEOUT_FALLBACK_MARKER,
 ];
 
 #[derive(Debug, Clone, PartialEq)]
@@ -617,15 +620,27 @@ fn retain_package_privacy_shield_webview_markers() {
 fn detect_macos_visible_window_title_processes() -> anyhow::Result<Vec<ScreenShareProcess>> {
     std::hint::black_box(MACOS_WINDOW_TITLE_GUARD_MARKER);
 
-    let output =
-        run_screen_share_guard_command("osascript", &["-e", MACOS_VISIBLE_WINDOW_TITLE_SCRIPT])
-            .map_err(|error| anyhow::anyhow!("{MACOS_WINDOW_TITLE_GUARD_MARKER} {error}"))?;
+    let output = match run_screen_share_guard_command(
+        "osascript",
+        &["-e", MACOS_VISIBLE_WINDOW_TITLE_SCRIPT],
+    ) {
+        Ok(output) => output,
+        Err(error) => {
+            let detail = error.to_string();
+            if let Some(marker) = macos_window_title_guard_fallback_marker(&detail) {
+                std::hint::black_box(marker);
+                return Ok(Vec::new());
+            }
+
+            return Err(anyhow::anyhow!("{MACOS_WINDOW_TITLE_GUARD_MARKER} {error}"));
+        }
+    };
 
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
         let detail = stderr.trim();
-        if macos_window_title_guard_permission_denied(detail) {
-            std::hint::black_box(MACOS_WINDOW_TITLE_PERMISSION_FALLBACK_MARKER);
+        if let Some(marker) = macos_window_title_guard_fallback_marker(detail) {
+            std::hint::black_box(marker);
             return Ok(Vec::new());
         }
 
@@ -645,6 +660,22 @@ fn detect_macos_visible_window_title_processes() -> anyhow::Result<Vec<ScreenSha
     )))
 }
 
+fn macos_window_title_guard_fallback_marker(detail: &str) -> Option<&'static str> {
+    if macos_window_title_guard_permission_denied(detail) {
+        return Some(MACOS_WINDOW_TITLE_PERMISSION_FALLBACK_MARKER);
+    }
+
+    if macos_window_title_guard_timed_out(detail) {
+        return Some(MACOS_WINDOW_TITLE_TIMEOUT_FALLBACK_MARKER);
+    }
+
+    if macos_window_title_guard_transient_system_events_error(detail) {
+        return Some(MACOS_WINDOW_TITLE_TRANSIENT_ROW_MARKER);
+    }
+
+    None
+}
+
 fn macos_window_title_guard_permission_denied(detail: &str) -> bool {
     let normalized = detail.to_ascii_lowercase();
     [
@@ -660,6 +691,15 @@ fn macos_window_title_guard_permission_denied(detail: &str) -> bool {
     ]
     .iter()
     .any(|candidate| normalized.contains(candidate))
+}
+
+fn macos_window_title_guard_timed_out(detail: &str) -> bool {
+    detail.contains(SCREEN_SHARE_GUARD_COMMAND_TIMEOUT_MARKER)
+}
+
+fn macos_window_title_guard_transient_system_events_error(detail: &str) -> bool {
+    let normalized = detail.to_ascii_lowercase();
+    normalized.contains("invalid index") || normalized.contains("-1719")
 }
 
 fn run_screen_share_guard_command(program: &str, args: &[&str]) -> anyhow::Result<Output> {
@@ -1578,25 +1618,58 @@ mod tests {
                 MACOS_SCREEN_CAPTURE_KIT_AGENT_PROCESS,
                 MACOS_WINDOW_TITLE_GUARD_MARKER,
                 MACOS_WINDOW_TITLE_PERMISSION_FALLBACK_MARKER,
-                MACOS_WINDOW_TITLE_TRANSIENT_ROW_MARKER
+                MACOS_WINDOW_TITLE_TRANSIENT_ROW_MARKER,
+                MACOS_WINDOW_TITLE_TIMEOUT_FALLBACK_MARKER
             ]
         );
     }
 
     #[test]
     fn macos_window_title_guard_permission_denial_is_classified_for_capture_fallback() {
-        assert!(macos_window_title_guard_permission_denied(
-            "execution error: Not authorized to send Apple events to System Events. (-1743)"
-        ));
-        assert!(macos_window_title_guard_permission_denied(
-            "System Events got an error: osascript is not allowed assistive access."
-        ));
-        assert!(macos_window_title_guard_permission_denied(
-            "Operation not permitted while reading accessibility window titles"
-        ));
-        assert!(!macos_window_title_guard_permission_denied(
-            "osascript exited because the script has a syntax error"
-        ));
+        assert_eq!(
+            macos_window_title_guard_fallback_marker(
+                "execution error: Not authorized to send Apple events to System Events. (-1743)"
+            ),
+            Some(MACOS_WINDOW_TITLE_PERMISSION_FALLBACK_MARKER)
+        );
+        assert_eq!(
+            macos_window_title_guard_fallback_marker(
+                "System Events got an error: osascript is not allowed assistive access."
+            ),
+            Some(MACOS_WINDOW_TITLE_PERMISSION_FALLBACK_MARKER)
+        );
+        assert_eq!(
+            macos_window_title_guard_fallback_marker(
+                "Operation not permitted while reading accessibility window titles"
+            ),
+            Some(MACOS_WINDOW_TITLE_PERMISSION_FALLBACK_MARKER)
+        );
+        assert_eq!(
+            macos_window_title_guard_fallback_marker(
+                "osascript exited because the script has a syntax error"
+            ),
+            None
+        );
+    }
+
+    #[test]
+    fn macos_window_title_guard_timeout_is_classified_for_capture_fallback() {
+        assert_eq!(
+            macos_window_title_guard_fallback_marker(
+                "Screen-share guard command timeout failed closed before privacy polling could stall. osascript exceeded 1500ms."
+            ),
+            Some(MACOS_WINDOW_TITLE_TIMEOUT_FALLBACK_MARKER)
+        );
+    }
+
+    #[test]
+    fn macos_window_title_guard_transient_system_events_error_is_classified_for_capture_fallback() {
+        assert_eq!(
+            macos_window_title_guard_fallback_marker(
+                "System Events got an error: Can't get every process whose background only = false. Invalid index. (-1719)"
+            ),
+            Some(MACOS_WINDOW_TITLE_TRANSIENT_ROW_MARKER)
+        );
     }
 
     #[test]

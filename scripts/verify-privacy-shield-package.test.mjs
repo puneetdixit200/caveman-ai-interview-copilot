@@ -217,6 +217,11 @@ test("requires packaged macOS system capture detector markers", () => {
       "macOS window title screen-share guard skips transient System Events rows."
     )
   );
+  assert.ok(
+    COMMON_PRIVACY_SHIELD_MARKERS.includes(
+      "macOS window title screen-share guard timeout falls back to OS capture protection."
+    )
+  );
 });
 
 test("requires packaged Windows display-affinity readback marker", () => {
