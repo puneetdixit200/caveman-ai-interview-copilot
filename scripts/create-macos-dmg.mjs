@@ -4,6 +4,10 @@ import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
 const DEFAULT_PRODUCT_NAME = "Caveman";
+export const HDIUTIL_RESOURCE_BUSY_RETRY_MARKER =
+  "macOS DMG creation retries hdiutil failures before failing package smoke.";
+export const DEFAULT_HDIUTIL_CREATE_ATTEMPTS = 3;
+export const DEFAULT_HDIUTIL_CREATE_RETRY_DELAY_MS = 2000;
 
 export function macosArchSuffix(arch = process.arch) {
   if (arch === "arm64") return "aarch64";
@@ -45,11 +49,57 @@ export function buildHdiutilCreateArgs({ volumeName = DEFAULT_PRODUCT_NAME, sour
   return ["create", "-volname", volumeName, "-srcfolder", sourceFolder, "-ov", "-format", "UDZO", outputPath];
 }
 
+export async function runHdiutilCreateWithRetry({
+  productName = DEFAULT_PRODUCT_NAME,
+  paths,
+  spawn = spawnSync,
+  attempts = DEFAULT_HDIUTIL_CREATE_ATTEMPTS,
+  retryDelayMs = DEFAULT_HDIUTIL_CREATE_RETRY_DELAY_MS,
+  wait = delay
+}) {
+  if (!paths?.stagingDir || !paths?.dmgPath) {
+    throw new Error("paths.stagingDir and paths.dmgPath are required to create a macOS DMG");
+  }
+
+  let lastResult;
+  const totalAttempts = Math.max(1, attempts);
+  for (let attempt = 1; attempt <= totalAttempts; attempt += 1) {
+    await rm(paths.dmgPath, { force: true });
+    const result = spawn("hdiutil", buildHdiutilCreateArgs({
+      volumeName: productName,
+      sourceFolder: paths.stagingDir,
+      outputPath: paths.dmgPath
+    }), {
+      stdio: "pipe"
+    });
+    writeSpawnOutput(result);
+
+    if (result.status === 0 && !result.error) {
+      return;
+    }
+
+    lastResult = result;
+    if (attempt < totalAttempts) {
+      console.warn(
+        `${HDIUTIL_RESOURCE_BUSY_RETRY_MARKER} Attempt ${attempt}/${totalAttempts} failed: ${hdiutilFailureDetail(result)}`
+      );
+      await wait(retryDelayMs);
+    }
+  }
+
+  throw new Error(
+    `hdiutil failed while creating ${paths.dmgPath} after ${totalAttempts} attempt(s): ${hdiutilFailureDetail(lastResult)}`
+  );
+}
+
 export async function createMacosDmg({
   projectRoot = process.cwd(),
   productName = DEFAULT_PRODUCT_NAME,
   arch = process.arch,
-  spawn = spawnSync
+  spawn = spawnSync,
+  attempts = DEFAULT_HDIUTIL_CREATE_ATTEMPTS,
+  retryDelayMs = DEFAULT_HDIUTIL_CREATE_RETRY_DELAY_MS,
+  wait = delay
 } = {}) {
   if (process.platform !== "darwin") {
     throw new Error("macOS DMG packaging must run on macOS");
@@ -69,21 +119,47 @@ export async function createMacosDmg({
   await cp(paths.appPath, path.join(paths.stagingDir, `${productName}.app`), { recursive: true });
   await symlink("/Applications", path.join(paths.stagingDir, "Applications"));
 
-  const result = spawn("hdiutil", buildHdiutilCreateArgs({
-    volumeName: productName,
-    sourceFolder: paths.stagingDir,
-    outputPath: paths.dmgPath
-  }), {
-    stdio: "inherit"
-  });
-
-  await rm(paths.stagingDir, { recursive: true, force: true });
-
-  if (result.status !== 0) {
-    throw new Error(`hdiutil failed while creating ${paths.dmgPath}`);
+  try {
+    await runHdiutilCreateWithRetry({
+      productName,
+      paths,
+      spawn,
+      attempts,
+      retryDelayMs,
+      wait
+    });
+  } finally {
+    await rm(paths.stagingDir, { recursive: true, force: true });
   }
 
   return paths.dmgPath;
+}
+
+function writeSpawnOutput(result) {
+  if (result?.stdout?.length) {
+    process.stdout.write(result.stdout);
+  }
+  if (result?.stderr?.length) {
+    process.stderr.write(result.stderr);
+  }
+}
+
+function hdiutilFailureDetail(result) {
+  if (!result) {
+    return "hdiutil did not return a result";
+  }
+  if (result.error) {
+    return result.error.message;
+  }
+  const stderr = result.stderr?.toString?.().trim();
+  if (stderr) {
+    return stderr;
+  }
+  return `exit code ${result.status ?? "unknown"}`;
+}
+
+function delay(delayMs) {
+  return new Promise((resolve) => setTimeout(resolve, delayMs));
 }
 
 if (process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.argv[1])) {
