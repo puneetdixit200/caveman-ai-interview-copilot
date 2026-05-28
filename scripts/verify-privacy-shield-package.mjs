@@ -37,7 +37,6 @@ export const COMMON_PRIVACY_SHIELD_MARKERS = [
   "Native privacy shield starts before startup companion window show.",
   "Native privacy shield polls every 100ms for new screen-share risk.",
   "Native privacy shield refreshes capture exclusion before hiding for screen-share risk.",
-  "Overlay kept hidden until screen-share guard stays clear for repeated checks.",
   "Native privacy shield denied screen OCR capture.",
   "Waiting for app windows to leave capture surfaces before screen OCR capture.",
   "Native privacy shield denied active-window typing during screen-share risk.",
@@ -132,6 +131,10 @@ export const COMMON_PRIVACY_SHIELD_MARKERS = [
   "replayd",
   "screencapturekitagent",
   "macOS window title screen-share guard failed closed:"
+];
+
+export const FRONTEND_PRIVACY_SHIELD_MARKERS = [
+  "Overlay kept hidden until screen-share guard stays clear for repeated checks."
 ];
 
 export const DESKTOP_PROCESS_PRIVACY_SHIELD_MARKERS = [
@@ -237,6 +240,20 @@ export function evaluateBinaryPrivacyMarkers(binary, markers) {
   };
 }
 
+export function evaluatePackagePrivacyMarkers(artifacts, markers) {
+  const contents = artifacts.map((artifact) =>
+    Buffer.isBuffer(artifact) ? artifact : Buffer.from(String(artifact))
+  );
+  const missingMarkers = markers.filter((marker) => {
+    const markerBuffer = Buffer.from(marker);
+    return !contents.some((content) => content.includes(markerBuffer));
+  });
+  return {
+    status: missingMarkers.length === 0 ? "ready" : "blocked",
+    missingMarkers
+  };
+}
+
 export async function verifyPrivacyShieldPackage({
   targetSelector = "current",
   releaseDir = DEFAULT_RELEASE_DIR,
@@ -250,13 +267,14 @@ export async function verifyPrivacyShieldPackage({
   const cleanup = [];
 
   try {
-    const binaryPath = await resolvePackageBinary({
+    const packageScope = await resolvePackageInspectionScope({
       target,
       releaseDir,
       appName,
       commandRunner,
       cleanup
     });
+    const { binaryPath, packageRoot } = packageScope;
     checked.push(binaryPath);
     const binary = await readFile(binaryPath);
     const markerResult = evaluateBinaryPrivacyMarkers(binary, markers);
@@ -266,7 +284,27 @@ export async function verifyPrivacyShieldPackage({
       );
     }
 
-    const result = { target, status: "ready", checked, markers };
+    const frontendArtifacts = await readPackagePrivacyMarkerArtifacts(packageRoot, binaryPath);
+    const frontendMarkerResult = evaluatePackagePrivacyMarkers(
+      frontendArtifacts.map((artifact) => artifact.content),
+      FRONTEND_PRIVACY_SHIELD_MARKERS
+    );
+    if (frontendMarkerResult.status !== "ready") {
+      throw new Error(
+        `Packaged ${target} app is missing frontend privacy shield markers: ${frontendMarkerResult.missingMarkers.join(
+          ", "
+        )}`
+      );
+    }
+
+    const result = {
+      target,
+      status: "ready",
+      checked,
+      markers,
+      frontendChecked: frontendArtifacts.map((artifact) => artifact.path),
+      frontendMarkers: FRONTEND_PRIVACY_SHIELD_MARKERS
+    };
     if (writeAttestationPath) {
       await writePrivacyShieldAttestation({ outputPath: writeAttestationPath, ...result });
     }
@@ -276,17 +314,23 @@ export async function verifyPrivacyShieldPackage({
   }
 }
 
-async function resolvePackageBinary({ target, releaseDir, appName, commandRunner, cleanup }) {
+async function resolvePackageInspectionScope({ target, releaseDir, appName, commandRunner, cleanup }) {
   if (target.startsWith("macos-")) {
+    const appBundlePath = await firstExistingDirectory(
+      [
+        path.join(releaseDir, "bundle", "macos", `${appName}.app`),
+        path.join(releaseDir, "macos", `${appName}.app`)
+      ],
+      `${target} app bundle`
+    );
     const binaryPath = await firstExistingFile(
       [
-        path.join(releaseDir, "bundle", "macos", `${appName}.app`, "Contents", "MacOS", "caveman"),
-        path.join(releaseDir, "macos", `${appName}.app`, "Contents", "MacOS", "caveman")
+        path.join(appBundlePath, "Contents", "MacOS", "caveman")
       ],
       `${target} app binary`
     );
     await assertNonEmptyFile(binaryPath, `${target} app binary`);
-    return binaryPath;
+    return { binaryPath, packageRoot: appBundlePath };
   }
 
   if (target === "windows-x64") {
@@ -300,7 +344,8 @@ async function resolvePackageBinary({ target, releaseDir, appName, commandRunner
     await commandRunner("msiexec.exe", ["/a", msiFiles[0], "/qn", `TARGETDIR=${extractDir}`], {
       maxBuffer: COMMAND_MAX_BUFFER
     });
-    return findFirstFileNamed(extractDir, PACKAGE_TARGETS[target].binaryName);
+    const binaryPath = await findFirstFileNamed(extractDir, PACKAGE_TARGETS[target].binaryName);
+    return { binaryPath, packageRoot: extractDir };
   }
 
   if (target === "linux-x64") {
@@ -316,7 +361,9 @@ async function resolvePackageBinary({ target, releaseDir, appName, commandRunner
       cwd: extractDir,
       maxBuffer: COMMAND_MAX_BUFFER
     });
-    return findFirstFileNamed(path.join(extractDir, "squashfs-root"), PACKAGE_TARGETS[target].binaryName);
+    const packageRoot = path.join(extractDir, "squashfs-root");
+    const binaryPath = await findFirstFileNamed(packageRoot, PACKAGE_TARGETS[target].binaryName);
+    return { binaryPath, packageRoot };
   }
 
   throw new Error(`Unsupported package target: ${target}`);
@@ -331,7 +378,24 @@ async function firstExistingFile(candidates, label) {
   throw new Error(`Missing ${label}: ${candidates.join(" or ")}`);
 }
 
-export async function writePrivacyShieldAttestation({ outputPath, target, checked, markers }) {
+async function firstExistingDirectory(candidates, label) {
+  for (const candidate of candidates) {
+    const candidateStat = await stat(candidate).catch(() => null);
+    if (candidateStat?.isDirectory()) {
+      return candidate;
+    }
+  }
+  throw new Error(`Missing ${label}: ${candidates.join(" or ")}`);
+}
+
+export async function writePrivacyShieldAttestation({
+  outputPath,
+  target,
+  checked,
+  markers,
+  frontendChecked = [],
+  frontendMarkers = []
+}) {
   await mkdir(path.dirname(outputPath), { recursive: true });
   await writeFile(
     outputPath,
@@ -340,11 +404,34 @@ export async function writePrivacyShieldAttestation({ outputPath, target, checke
         status: "ready",
         target,
         checked,
-        markers
+        markers,
+        frontendChecked,
+        frontendMarkers
       },
       null,
       2
     )}\n`
+  );
+}
+
+async function readPackagePrivacyMarkerArtifacts(packageRoot, binaryPath) {
+  const candidatePaths = new Set([binaryPath]);
+  for (const candidate of await findFiles(packageRoot, isFrontendAssetCandidate)) {
+    candidatePaths.add(candidate);
+  }
+
+  const artifacts = [];
+  for (const candidate of [...candidatePaths].sort()) {
+    const content = await readFile(candidate);
+    artifacts.push({ path: candidate, content });
+  }
+  return artifacts;
+}
+
+function isFrontendAssetCandidate(fileName) {
+  const lowerName = fileName.toLowerCase();
+  return [".html", ".js", ".mjs", ".css", ".json", ".txt", ".map"].some((extension) =>
+    lowerName.endsWith(extension)
   );
 }
 
