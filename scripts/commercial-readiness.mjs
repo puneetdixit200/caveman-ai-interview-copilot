@@ -9,7 +9,10 @@ import { runLocalWhisperSmoke } from "./local-whisper-smoke.mjs";
 import { runObsStealthSmoke } from "./obs-stealth-smoke.mjs";
 import { runOllamaSmoke } from "./ollama-smoke.mjs";
 import { runOpenRouterSmoke } from "./openrouter-smoke.mjs";
-import { TARGET_PRIVACY_SHIELD_MARKERS } from "./verify-privacy-shield-package.mjs";
+import {
+  FRONTEND_PRIVACY_SHIELD_MARKERS,
+  TARGET_PRIVACY_SHIELD_MARKERS
+} from "./verify-privacy-shield-package.mjs";
 
 const execFileAsync = promisify(execFile);
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -278,9 +281,33 @@ export function validatePrivacyShieldAttestationPayload(target, payload) {
     };
   }
 
+  if (!Array.isArray(payload.frontendMarkers)) {
+    return {
+      status: "blocked",
+      detail: `Privacy shield attestation for ${target} does not list built frontend markers.`
+    };
+  }
+
+  const missingFrontendMarkers = FRONTEND_PRIVACY_SHIELD_MARKERS.filter(
+    (marker) => !payload.frontendMarkers.includes(marker)
+  );
+  if (missingFrontendMarkers.length > 0) {
+    return {
+      status: "blocked",
+      detail: `Privacy shield attestation for ${target} is missing built frontend markers: ${missingFrontendMarkers.join(", ")}`
+    };
+  }
+
+  if (!Array.isArray(payload.frontendChecked) || payload.frontendChecked.length === 0) {
+    return {
+      status: "blocked",
+      detail: `Privacy shield attestation for ${target} does not list checked built frontend files.`
+    };
+  }
+
   return {
     status: "ready",
-    detail: `Privacy shield attestation for ${target} includes required packaged markers.`
+    detail: `Privacy shield attestation for ${target} includes required packaged native and frontend markers.`
   };
 }
 

@@ -111,7 +111,7 @@ Packaging commands call `npm run sidecars:prepare` before Tauri builds. The side
 
 The generated sidecar files live under `src-tauri/binaries/whisper-runtime/` and follow Tauri's target-triple naming. Generated binaries and Windows DLLs are ignored by git; rebuild them with `npm run sidecars:prepare` on each target platform.
 
-After packaging, run `npm run package:verify-sidecar` on the same platform to inspect the redistributable output. The verifier checks the macOS app bundle, extracts the Windows MSI payload, and inspects Linux DEB/AppImage packages for the bundled `caveman-whisper` runtime before artifacts are uploaded in CI.
+After packaging, run `npm run package:verify-sidecar` and `npm run package:verify-privacy-shield` on the same platform to inspect the redistributable output. The verifiers check the macOS app bundle, extract the Windows MSI payload, inspect Linux DEB/AppImage packages for the bundled `caveman-whisper` runtime, and require packaged native plus built-frontend privacy shield markers before artifacts are uploaded in CI or published by the signed release workflow.
 
 ## Architecture
 

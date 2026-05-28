@@ -88,6 +88,9 @@ jobs:
       - name: Verify bundled Whisper sidecar
         run: npm run package:verify-sidecar
 
+      - name: Verify packaged privacy shield
+        run: node scripts/verify-privacy-shield-package.mjs --target windows-x64 --write-attestation src-tauri/target/release/bundle/privacy-shield-windows-x64.json
+
       - name: Upload Windows build artifact
         uses: actions/upload-artifact@v7.0.1
         with:
@@ -99,6 +102,7 @@ jobs:
             src-tauri/target/release/bundle/nsis/*.sig
             src-tauri/target/release/bundle/msi/*.msi
             src-tauri/target/release/bundle/msi/*.sig
+            src-tauri/target/release/bundle/privacy-shield-windows-x64.json
 
   build-macos-intel:
     runs-on: macos-15-intel
@@ -206,6 +210,9 @@ jobs:
       - name: Verify bundled Whisper sidecar
         run: npm run package:verify-sidecar
 
+      - name: Verify packaged privacy shield
+        run: node scripts/verify-privacy-shield-package.mjs --target macos-x64 --write-attestation src-tauri/target/release/bundle/privacy-shield-macos-x64.json
+
       - name: Upload macOS Intel build artifact
         uses: actions/upload-artifact@v7.0.1
         with:
@@ -215,6 +222,7 @@ jobs:
             src-tauri/target/release/bundle/dmg/*.dmg
             src-tauri/target/release/bundle/macos/*.app.tar.gz
             src-tauri/target/release/bundle/macos/*.app.tar.gz.sig
+            src-tauri/target/release/bundle/privacy-shield-macos-x64.json
 
   build-macos-arm64:
     runs-on: macos-15
@@ -322,6 +330,9 @@ jobs:
       - name: Verify bundled Whisper sidecar
         run: npm run package:verify-sidecar
 
+      - name: Verify packaged privacy shield
+        run: node scripts/verify-privacy-shield-package.mjs --target macos-arm64 --write-attestation src-tauri/target/release/bundle/privacy-shield-macos-arm64.json
+
       - name: Upload macOS Apple Silicon build artifact
         uses: actions/upload-artifact@v7.0.1
         with:
@@ -331,6 +342,7 @@ jobs:
             src-tauri/target/release/bundle/dmg/*.dmg
             src-tauri/target/release/bundle/macos/*.app.tar.gz
             src-tauri/target/release/bundle/macos/*.app.tar.gz.sig
+            src-tauri/target/release/bundle/privacy-shield-macos-arm64.json
 
   build-linux:
     runs-on: ubuntu-24.04
@@ -374,6 +386,9 @@ jobs:
       - name: Verify bundled Whisper sidecar
         run: npm run package:verify-sidecar
 
+      - name: Verify packaged privacy shield
+        run: node scripts/verify-privacy-shield-package.mjs --target linux-x64 --write-attestation src-tauri/target/release/bundle/privacy-shield-linux-x64.json
+
       - name: Upload Linux build artifact
         uses: actions/upload-artifact@v7.0.1
         with:
@@ -384,6 +399,7 @@ jobs:
             src-tauri/target/release/bundle/appimage/*.AppImage.sig
             src-tauri/target/release/bundle/deb/*.deb
             src-tauri/target/release/bundle/deb/*.deb.sig
+            src-tauri/target/release/bundle/privacy-shield-linux-x64.json
 
   publish-release:
     needs: [build-windows, build-macos-intel, build-macos-arm64, build-linux]
@@ -427,3 +443,4 @@ jobs:
             release-assets/**/*.AppImage
             release-assets/**/*.deb
             release-assets/**/*.sig
+            release-assets/**/privacy-shield-*.json

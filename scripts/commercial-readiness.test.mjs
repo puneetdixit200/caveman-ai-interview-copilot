@@ -9,7 +9,10 @@ import {
   parseGhSecretList,
   skippedLiveChecks
 } from "./commercial-readiness.mjs";
-import { TARGET_PRIVACY_SHIELD_MARKERS } from "./verify-privacy-shield-package.mjs";
+import {
+  FRONTEND_PRIVACY_SHIELD_MARKERS,
+  TARGET_PRIVACY_SHIELD_MARKERS
+} from "./verify-privacy-shield-package.mjs";
 
 const completeSecrets = [
   "TAURI_SIGNING_PRIVATE_KEY",
@@ -90,7 +93,9 @@ test("blocks privacy shield attestations that lack required packaged detector ma
         {
           status: "ready",
           target,
-          markers: TARGET_PRIVACY_SHIELD_MARKERS[target]
+          markers: TARGET_PRIVACY_SHIELD_MARKERS[target],
+          frontendMarkers: FRONTEND_PRIVACY_SHIELD_MARKERS,
+          frontendChecked: ["/tmp/run/dist/assets/index.js"]
         }
       ];
     })
@@ -98,7 +103,9 @@ test("blocks privacy shield attestations that lack required packaged detector ma
   privacyShieldAttestations.set("/tmp/run/caveman-windows-package-smoke/privacy-shield-windows-x64.json", {
     status: "ready",
     target: "windows-x64",
-    markers: ["Screen-share guard failed closed:"]
+    markers: ["Screen-share guard failed closed:"],
+    frontendMarkers: FRONTEND_PRIVACY_SHIELD_MARKERS,
+    frontendChecked: ["/tmp/run/dist/assets/index.js"]
   });
 
   const result = evaluateArtifactReadiness(files, { privacyShieldAttestations });
@@ -115,6 +122,45 @@ test("blocks privacy shield attestations that lack required packaged detector ma
     liveChecks: []
   });
   assert.match(report, /msedgewebview2\.exe/);
+});
+
+test("blocks privacy shield attestations that lack built frontend restore-gate markers", () => {
+  const files = REQUIRED_ARTIFACTS.map((artifact) => `/tmp/run/${artifact.examplePath}`);
+  const privacyShieldAttestations = new Map(
+    [
+      ["privacy-shield-windows-x64", "windows-x64"],
+      ["privacy-shield-macos-arm64", "macos-arm64"],
+      ["privacy-shield-macos-x64", "macos-x64"],
+      ["privacy-shield-linux-x64", "linux-x64"]
+    ].map(([artifactId, target]) => {
+      const artifact = REQUIRED_ARTIFACTS.find((candidate) => candidate.id === artifactId);
+      return [
+        `/tmp/run/${artifact.examplePath}`,
+        {
+          status: "ready",
+          target,
+          markers: TARGET_PRIVACY_SHIELD_MARKERS[target],
+          frontendMarkers: FRONTEND_PRIVACY_SHIELD_MARKERS,
+          frontendChecked: ["/tmp/run/dist/assets/index.js"]
+        }
+      ];
+    })
+  );
+  privacyShieldAttestations.set("/tmp/run/caveman-macos-arm64-package-smoke/privacy-shield-macos-arm64.json", {
+    status: "ready",
+    target: "macos-arm64",
+    markers: TARGET_PRIVACY_SHIELD_MARKERS["macos-arm64"],
+    frontendMarkers: [],
+    frontendChecked: []
+  });
+
+  const result = evaluateArtifactReadiness(files, { privacyShieldAttestations });
+
+  assert.equal(result.status, "blocked");
+  assert.match(
+    result.checks.find((check) => check.id === "privacy-shield-macos-arm64").detail,
+    /Overlay kept hidden until screen-share guard stays clear/
+  );
 });
 
 test("reports missing redistributable artifacts by platform", () => {

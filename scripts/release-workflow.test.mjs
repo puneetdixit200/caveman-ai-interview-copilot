@@ -527,6 +527,33 @@ test("release workflow builds macOS and Linux packages before publishing one rel
   assert.match(workflow, /release-assets\/\*\*\/\*\.sig/);
 });
 
+test("signed release workflow uploads privacy shield attestations from every target", async () => {
+  const workflow = await readFile(workflowPath, "utf8");
+
+  for (const target of ["windows-x64", "macos-x64", "macos-arm64", "linux-x64"]) {
+    assert.match(
+      workflow,
+      new RegExp(`verify-privacy-shield-package\\.mjs --target ${target} --write-attestation`),
+      `${target} signed release must verify packaged privacy shield markers`
+    );
+    assert.match(
+      workflow,
+      new RegExp(`privacy-shield-${target}\\.json`),
+      `${target} signed release must upload privacy shield attestation`
+    );
+  }
+
+  assert.match(workflow, /release-assets\/\*\*\/privacy-shield-\*\.json/);
+  assert.ok(
+    workflow.indexOf("Verify bundled Whisper sidecar") < workflow.indexOf("Verify packaged privacy shield"),
+    "privacy shield verification should run after the sidecar verification"
+  );
+  assert.ok(
+    workflow.indexOf("Verify packaged privacy shield") < workflow.indexOf("Upload Windows build artifact"),
+    "privacy shield attestation must exist before release artifacts are uploaded"
+  );
+});
+
 test("release workflow can run from pushed version tags without manual inputs", async () => {
   const workflow = await readFile(workflowPath, "utf8");
 
@@ -595,6 +622,7 @@ test("release workflow contract is part of the release test suite", async () => 
   assert.equal(packageJson.scripts["sidecars:prepare"], "node scripts/prepare-whisper-sidecars.mjs --target current --output-config src-tauri/target/tauri.sidecars.generated.conf.json");
   assert.equal(packageJson.scripts["sidecars:check"], "node scripts/prepare-whisper-sidecars.mjs --target current --check");
   assert.equal(packageJson.scripts["package:verify-sidecar"], "node scripts/verify-bundled-sidecar.mjs --target current");
+  assert.equal(packageJson.scripts["package:verify-privacy-shield"], "node scripts/verify-privacy-shield-package.mjs --target current");
   assert.equal(packageJson.scripts["ai:smoke"], "node scripts/ollama-smoke.mjs");
   assert.equal(packageJson.scripts["ai:smoke:openrouter"], "node scripts/openrouter-smoke.mjs");
   assert.equal(packageJson.scripts["obs:smoke"], "node scripts/obs-stealth-smoke.mjs");
@@ -611,15 +639,15 @@ test("package scripts expose repeatable macOS and Windows installer builds", asy
 
   assert.equal(
     packageJson.scripts["tauri:build:mac"],
-    "npm run sidecars:prepare && tauri build --ci --bundles app --config src-tauri/target/tauri.sidecars.generated.conf.json && node scripts/create-macos-dmg.mjs && npm run package:verify-sidecar"
+    "npm run sidecars:prepare && tauri build --ci --bundles app --config src-tauri/target/tauri.sidecars.generated.conf.json && node scripts/create-macos-dmg.mjs && npm run package:verify-sidecar && npm run package:verify-privacy-shield"
   );
   assert.equal(
     packageJson.scripts["tauri:build:windows"],
-    "npm run sidecars:prepare && tauri build --ci --bundles nsis,msi --config src-tauri/target/tauri.sidecars.generated.conf.json && npm run package:verify-sidecar"
+    "npm run sidecars:prepare && tauri build --ci --bundles nsis,msi --config src-tauri/target/tauri.sidecars.generated.conf.json && npm run package:verify-sidecar && npm run package:verify-privacy-shield"
   );
   assert.equal(
     packageJson.scripts["tauri:build:linux"],
-    "npm run sidecars:prepare && tauri build --ci --bundles appimage,deb --config src-tauri/target/tauri.sidecars.generated.conf.json && npm run package:verify-sidecar"
+    "npm run sidecars:prepare && tauri build --ci --bundles appimage,deb --config src-tauri/target/tauri.sidecars.generated.conf.json && npm run package:verify-sidecar && npm run package:verify-privacy-shield"
   );
   assert.match(readme, /npm run tauri:build:mac/);
   assert.match(readme, /npm run tauri:build:windows/);

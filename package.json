@@ -24,9 +24,9 @@
     "commercial:secrets": "node scripts/configure-commercial-secrets.mjs",
     "release:dispatch": "node scripts/dispatch-signed-release.mjs",
     "tauri": "tauri",
-    "tauri:build:mac": "npm run sidecars:prepare && tauri build --ci --bundles app --config src-tauri/target/tauri.sidecars.generated.conf.json && node scripts/create-macos-dmg.mjs && npm run package:verify-sidecar",
-    "tauri:build:windows": "npm run sidecars:prepare && tauri build --ci --bundles nsis,msi --config src-tauri/target/tauri.sidecars.generated.conf.json && npm run package:verify-sidecar",
-    "tauri:build:linux": "npm run sidecars:prepare && tauri build --ci --bundles appimage,deb --config src-tauri/target/tauri.sidecars.generated.conf.json && npm run package:verify-sidecar",
+    "tauri:build:mac": "npm run sidecars:prepare && tauri build --ci --bundles app --config src-tauri/target/tauri.sidecars.generated.conf.json && node scripts/create-macos-dmg.mjs && npm run package:verify-sidecar && npm run package:verify-privacy-shield",
+    "tauri:build:windows": "npm run sidecars:prepare && tauri build --ci --bundles nsis,msi --config src-tauri/target/tauri.sidecars.generated.conf.json && npm run package:verify-sidecar && npm run package:verify-privacy-shield",
+    "tauri:build:linux": "npm run sidecars:prepare && tauri build --ci --bundles appimage,deb --config src-tauri/target/tauri.sidecars.generated.conf.json && npm run package:verify-sidecar && npm run package:verify-privacy-shield",
     "tauri:build:signed": "powershell -ExecutionPolicy Bypass -File scripts/build-signed-update.ps1",
     "verify": "npm run test:release && npm run test && npm run typecheck && npm run build"
   },
