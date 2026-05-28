@@ -55,7 +55,10 @@ export async function runHdiutilCreateWithRetry({
   spawn = spawnSync,
   attempts = DEFAULT_HDIUTIL_CREATE_ATTEMPTS,
   retryDelayMs = DEFAULT_HDIUTIL_CREATE_RETRY_DELAY_MS,
-  wait = delay
+  wait = delay,
+  remove = rm,
+  writeOutput = writeSpawnOutput,
+  logger = console
 }) {
   if (!paths?.stagingDir || !paths?.dmgPath) {
     throw new Error("paths.stagingDir and paths.dmgPath are required to create a macOS DMG");
@@ -64,7 +67,7 @@ export async function runHdiutilCreateWithRetry({
   let lastResult;
   const totalAttempts = Math.max(1, attempts);
   for (let attempt = 1; attempt <= totalAttempts; attempt += 1) {
-    await rm(paths.dmgPath, { force: true });
+    await remove(paths.dmgPath, { force: true });
     const result = spawn("hdiutil", buildHdiutilCreateArgs({
       volumeName: productName,
       sourceFolder: paths.stagingDir,
@@ -72,7 +75,7 @@ export async function runHdiutilCreateWithRetry({
     }), {
       stdio: "pipe"
     });
-    writeSpawnOutput(result);
+    writeOutput(result);
 
     if (result.status === 0 && !result.error) {
       return;
@@ -80,7 +83,7 @@ export async function runHdiutilCreateWithRetry({
 
     lastResult = result;
     if (attempt < totalAttempts) {
-      console.warn(
+      logger.warn(
         `${HDIUTIL_RESOURCE_BUSY_RETRY_MARKER} Attempt ${attempt}/${totalAttempts} failed: ${hdiutilFailureDetail(result)}`
       );
       await wait(retryDelayMs);

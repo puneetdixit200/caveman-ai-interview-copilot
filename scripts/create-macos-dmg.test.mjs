@@ -55,6 +55,7 @@ test("builds a direct hdiutil create command without Finder AppleScript decorati
 
 test("retries transient hdiutil DMG creation failures before failing package smoke", async () => {
   const calls = [];
+  const removals = [];
   const waits = [];
   const spawn = (program, args, options) => {
     calls.push({ program, args, options });
@@ -71,12 +72,21 @@ test("retries transient hdiutil DMG creation failures before failing package smo
       dmgPath: "/tmp/Caveman_0.1.0_x64.dmg"
     },
     spawn,
+    remove: async (target, options) => {
+      removals.push({ target, options });
+    },
     wait: async (delayMs) => {
       waits.push(delayMs);
-    }
+    },
+    writeOutput: () => undefined,
+    logger: { warn: () => undefined }
   });
 
   assert.equal(calls.length, 2);
+  assert.deepEqual(removals, [
+    { target: "/tmp/Caveman_0.1.0_x64.dmg", options: { force: true } },
+    { target: "/tmp/Caveman_0.1.0_x64.dmg", options: { force: true } }
+  ]);
   assert.deepEqual(waits, [DEFAULT_HDIUTIL_CREATE_RETRY_DELAY_MS]);
   assert.equal(calls[0].program, "hdiutil");
   assert.deepEqual(calls[0].options, { stdio: "pipe" });
@@ -84,28 +94,26 @@ test("retries transient hdiutil DMG creation failures before failing package smo
 
 test("reports the hdiutil retry marker when every DMG creation attempt fails", async () => {
   const warnings = [];
-  const originalWarn = console.warn;
-  console.warn = (message) => warnings.push(message);
-  try {
-    await assert.rejects(
-      runHdiutilCreateWithRetry({
-        productName: "Caveman",
-        paths: {
-          stagingDir: "/tmp/Caveman.dmg-staging",
-          dmgPath: "/tmp/Caveman_0.1.0_x64.dmg"
-        },
-        spawn: () => ({
-          status: 1,
-          stdout: Buffer.from(""),
-          stderr: Buffer.from("hdiutil: create failed - Resource busy\n")
-        }),
-        wait: async () => undefined
+
+  await assert.rejects(
+    runHdiutilCreateWithRetry({
+      productName: "Caveman",
+      paths: {
+        stagingDir: "/tmp/Caveman.dmg-staging",
+        dmgPath: "/tmp/Caveman_0.1.0_x64.dmg"
+      },
+      spawn: () => ({
+        status: 1,
+        stdout: Buffer.from(""),
+        stderr: Buffer.from("hdiutil: create failed - Resource busy\n")
       }),
-      /hdiutil failed while creating .* after 3 attempt/
-    );
-  } finally {
-    console.warn = originalWarn;
-  }
+      remove: async () => undefined,
+      wait: async () => undefined,
+      writeOutput: () => undefined,
+      logger: { warn: (message) => warnings.push(message) }
+    }),
+    /hdiutil failed while creating .* after 3 attempt/
+  );
 
   assert.equal(warnings.length, DEFAULT_HDIUTIL_CREATE_ATTEMPTS - 1);
   assert.ok(warnings.every((message) => message.includes(HDIUTIL_RESOURCE_BUSY_RETRY_MARKER)));
