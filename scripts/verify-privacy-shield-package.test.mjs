@@ -262,6 +262,11 @@ test("requires packaged protection refresh fail-closed marker", () => {
       "Native privacy shield refreshes capture exclusion before hiding for screen-share risk."
     )
   );
+  assert.ok(
+    COMMON_PRIVACY_SHIELD_MARKERS.includes(
+      "Overlay kept hidden until screen-share guard stays clear for repeated checks."
+    )
+  );
 });
 
 test("reports missing packaged native privacy markers", () => {
