@@ -29,6 +29,20 @@ const CHROME_PWA_HOST_PROCESS: &str = "chrome_proxy.exe";
 const BRAVE_PWA_HOST_PROCESS: &str = "brave_proxy.exe";
 const OPERA_PWA_HOST_PROCESS: &str = "opera_proxy.exe";
 const VIVALDI_PWA_HOST_PROCESS: &str = "vivaldi_proxy.exe";
+const ZEN_BROWSER_PROCESS: &str = "zen";
+const ZEN_BROWSER_EXE_PROCESS: &str = "zen.exe";
+const CHROMIUM_BROWSER_PROCESS: &str = "chromium";
+const CHROMIUM_BROWSER_EXE_PROCESS: &str = "chromium.exe";
+const LIBREWOLF_BROWSER_PROCESS: &str = "librewolf";
+const LIBREWOLF_BROWSER_EXE_PROCESS: &str = "librewolf.exe";
+const WATERFOX_BROWSER_PROCESS: &str = "waterfox";
+const WATERFOX_BROWSER_EXE_PROCESS: &str = "waterfox.exe";
+const FLOORP_BROWSER_PROCESS: &str = "floorp";
+const FLOORP_BROWSER_EXE_PROCESS: &str = "floorp.exe";
+const DUCKDUCKGO_BROWSER_PROCESS: &str = "duckduckgo";
+const DUCKDUCKGO_BROWSER_EXE_PROCESS: &str = "duckduckgo.exe";
+const MULLVAD_BROWSER_PROCESS: &str = "mullvad browser";
+const MULLVAD_BROWSER_DASH_PROCESS: &str = "mullvad-browser";
 const WEBEX_HOST_PROCESS: &str = "webexhost.exe";
 const SCREENCONNECT_WINDOWS_CLIENT_PROCESS: &str = "screenconnect.windowsclient.exe";
 const SCREENCONNECT_CLIENT_PROCESS: &str = "screenconnect.client.exe";
@@ -114,6 +128,20 @@ const PACKAGE_PRIVACY_SHIELD_WEBVIEW_MARKERS: &[&str] = &[
     BRAVE_PWA_HOST_PROCESS,
     OPERA_PWA_HOST_PROCESS,
     VIVALDI_PWA_HOST_PROCESS,
+    ZEN_BROWSER_PROCESS,
+    ZEN_BROWSER_EXE_PROCESS,
+    CHROMIUM_BROWSER_PROCESS,
+    CHROMIUM_BROWSER_EXE_PROCESS,
+    LIBREWOLF_BROWSER_PROCESS,
+    LIBREWOLF_BROWSER_EXE_PROCESS,
+    WATERFOX_BROWSER_PROCESS,
+    WATERFOX_BROWSER_EXE_PROCESS,
+    FLOORP_BROWSER_PROCESS,
+    FLOORP_BROWSER_EXE_PROCESS,
+    DUCKDUCKGO_BROWSER_PROCESS,
+    DUCKDUCKGO_BROWSER_EXE_PROCESS,
+    MULLVAD_BROWSER_PROCESS,
+    MULLVAD_BROWSER_DASH_PROCESS,
     WEBEX_HOST_PROCESS,
     SCREENCONNECT_WINDOWS_CLIENT_PROCESS,
     SCREENCONNECT_CLIENT_PROCESS,
@@ -256,6 +284,20 @@ const WATCHED_SCREEN_SHARE_PROCESSES: &[&str] = &[
     "opera",
     "vivaldi.exe",
     "vivaldi",
+    ZEN_BROWSER_PROCESS,
+    ZEN_BROWSER_EXE_PROCESS,
+    CHROMIUM_BROWSER_PROCESS,
+    CHROMIUM_BROWSER_EXE_PROCESS,
+    LIBREWOLF_BROWSER_PROCESS,
+    LIBREWOLF_BROWSER_EXE_PROCESS,
+    WATERFOX_BROWSER_PROCESS,
+    WATERFOX_BROWSER_EXE_PROCESS,
+    FLOORP_BROWSER_PROCESS,
+    FLOORP_BROWSER_EXE_PROCESS,
+    DUCKDUCKGO_BROWSER_PROCESS,
+    DUCKDUCKGO_BROWSER_EXE_PROCESS,
+    MULLVAD_BROWSER_PROCESS,
+    MULLVAD_BROWSER_DASH_PROCESS,
     // Recording and broadcast tools that can expose overlays outside meeting apps.
     "obs64.exe",
     "obs32.exe",
@@ -374,6 +416,20 @@ const TITLE_ONLY_SCREEN_SHARE_PROCESSES: &[&str] = &[
     "opera",
     "vivaldi.exe",
     "vivaldi",
+    ZEN_BROWSER_PROCESS,
+    ZEN_BROWSER_EXE_PROCESS,
+    CHROMIUM_BROWSER_PROCESS,
+    CHROMIUM_BROWSER_EXE_PROCESS,
+    LIBREWOLF_BROWSER_PROCESS,
+    LIBREWOLF_BROWSER_EXE_PROCESS,
+    WATERFOX_BROWSER_PROCESS,
+    WATERFOX_BROWSER_EXE_PROCESS,
+    FLOORP_BROWSER_PROCESS,
+    FLOORP_BROWSER_EXE_PROCESS,
+    DUCKDUCKGO_BROWSER_PROCESS,
+    DUCKDUCKGO_BROWSER_EXE_PROCESS,
+    MULLVAD_BROWSER_PROCESS,
+    MULLVAD_BROWSER_DASH_PROCESS,
     "whatsapp.exe",
     "whatsapp",
     MACOS_REPLAYD_PROCESS,
@@ -1251,6 +1307,20 @@ mod tests {
                 BRAVE_PWA_HOST_PROCESS,
                 OPERA_PWA_HOST_PROCESS,
                 VIVALDI_PWA_HOST_PROCESS,
+                ZEN_BROWSER_PROCESS,
+                ZEN_BROWSER_EXE_PROCESS,
+                CHROMIUM_BROWSER_PROCESS,
+                CHROMIUM_BROWSER_EXE_PROCESS,
+                LIBREWOLF_BROWSER_PROCESS,
+                LIBREWOLF_BROWSER_EXE_PROCESS,
+                WATERFOX_BROWSER_PROCESS,
+                WATERFOX_BROWSER_EXE_PROCESS,
+                FLOORP_BROWSER_PROCESS,
+                FLOORP_BROWSER_EXE_PROCESS,
+                DUCKDUCKGO_BROWSER_PROCESS,
+                DUCKDUCKGO_BROWSER_EXE_PROCESS,
+                MULLVAD_BROWSER_PROCESS,
+                MULLVAD_BROWSER_DASH_PROCESS,
                 WEBEX_HOST_PROCESS,
                 SCREENCONNECT_WINDOWS_CLIENT_PROCESS,
                 SCREENCONNECT_CLIENT_PROCESS,
@@ -1454,6 +1524,91 @@ mod tests {
                 .collect::<Vec<_>>(),
             vec![Some(1001), Some(1003)]
         );
+    }
+
+    #[test]
+    fn detects_meeting_and_share_titles_from_browser_forks() {
+        let processes = vec![
+            ScreenShareProcess {
+                name: "/Applications/Zen.app/Contents/MacOS/zen".to_string(),
+                pid: Some(1011),
+                window_title: Some("Google Meet - Candidate Screen".to_string()),
+            },
+            ScreenShareProcess {
+                name: r"C:\\Program Files\\Chromium\\Application\\chromium.exe".to_string(),
+                pid: Some(1012),
+                window_title: Some("teams.microsoft.com - Interview".to_string()),
+            },
+            ScreenShareProcess {
+                name: "LibreWolf.exe".to_string(),
+                pid: Some(1013),
+                window_title: Some("This screen is being shared".to_string()),
+            },
+            ScreenShareProcess {
+                name: "Waterfox".to_string(),
+                pid: Some(1014),
+                window_title: Some("Screen recording - Loom".to_string()),
+            },
+            ScreenShareProcess {
+                name: "Floorp".to_string(),
+                pid: Some(1015),
+                window_title: Some("Presenting this tab - Google Meet".to_string()),
+            },
+            ScreenShareProcess {
+                name: "DuckDuckGo.exe".to_string(),
+                pid: Some(1016),
+                window_title: Some("This window is being shared".to_string()),
+            },
+            ScreenShareProcess {
+                name: "Mullvad Browser".to_string(),
+                pid: Some(1017),
+                window_title: Some("meet.google.com/abc-defg-hij".to_string()),
+            },
+        ];
+
+        let status = screen_share_status_for_processes(processes);
+
+        assert!(status.active);
+        assert_eq!(
+            status
+                .matched_processes
+                .iter()
+                .map(|process| process.pid)
+                .collect::<Vec<_>>(),
+            vec![
+                Some(1011),
+                Some(1012),
+                Some(1013),
+                Some(1014),
+                Some(1015),
+                Some(1016),
+                Some(1017)
+            ]
+        );
+    }
+
+    #[test]
+    fn ignores_idle_browser_forks_without_share_titles() {
+        let status = screen_share_status_for_processes(vec![
+            ScreenShareProcess {
+                name: "/Applications/Zen.app/Contents/MacOS/zen".to_string(),
+                pid: Some(1021),
+                window_title: Some("Release notes".to_string()),
+            },
+            ScreenShareProcess {
+                name: "Chromium".to_string(),
+                pid: Some(1022),
+                window_title: None,
+            },
+            ScreenShareProcess {
+                name: "LibreWolf.exe".to_string(),
+                pid: Some(1023),
+                window_title: Some("N/A".to_string()),
+            },
+        ]);
+
+        assert!(!status.active);
+        assert_eq!(status.matched_processes, Vec::<ScreenShareProcess>::new());
     }
 
     #[test]
