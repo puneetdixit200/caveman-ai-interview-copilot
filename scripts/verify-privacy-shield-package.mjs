@@ -10,6 +10,7 @@ const execFileAsync = promisify(execFile);
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(__dirname, "..");
 const DEFAULT_RELEASE_DIR = path.join(REPO_ROOT, "src-tauri", "target", "release");
+const DEFAULT_FRONTEND_DIST = path.join(REPO_ROOT, "dist");
 const DEFAULT_APP_NAME = "Caveman";
 const COMMAND_MAX_BUFFER = 1024 * 1024 * 100;
 
@@ -240,9 +241,24 @@ export function evaluateBinaryPrivacyMarkers(binary, markers) {
   };
 }
 
+export function evaluatePackagePrivacyMarkers(artifacts, markers) {
+  const contents = artifacts.map((artifact) =>
+    Buffer.isBuffer(artifact) ? artifact : Buffer.from(String(artifact))
+  );
+  const missingMarkers = markers.filter((marker) => {
+    const markerBuffer = Buffer.from(marker);
+    return !contents.some((content) => content.includes(markerBuffer));
+  });
+  return {
+    status: missingMarkers.length === 0 ? "ready" : "blocked",
+    missingMarkers
+  };
+}
+
 export async function verifyPrivacyShieldPackage({
   targetSelector = "current",
   releaseDir = DEFAULT_RELEASE_DIR,
+  frontendDist = DEFAULT_FRONTEND_DIST,
   appName = DEFAULT_APP_NAME,
   commandRunner = runCommand,
   writeAttestationPath
@@ -260,7 +276,7 @@ export async function verifyPrivacyShieldPackage({
       commandRunner,
       cleanup
     });
-    const { binaryPath } = packageScope;
+    const { binaryPath, packageRoot } = packageScope;
     checked.push(binaryPath);
     const binary = await readFile(binaryPath);
     const markerResult = evaluateBinaryPrivacyMarkers(binary, markers);
@@ -270,11 +286,31 @@ export async function verifyPrivacyShieldPackage({
       );
     }
 
+    const frontendRoot = (await exists(frontendDist)) ? frontendDist : packageRoot;
+    const frontendArtifacts = await readPrivacyMarkerArtifacts(
+      frontendRoot,
+      frontendRoot === packageRoot ? [binaryPath] : []
+    );
+    const frontendMarkerResult = evaluatePackagePrivacyMarkers(
+      frontendArtifacts.map((artifact) => artifact.content),
+      FRONTEND_PRIVACY_SHIELD_MARKERS
+    );
+    if (frontendMarkerResult.status !== "ready") {
+      throw new Error(
+        `Packaged ${target} build is missing frontend privacy shield markers: ${frontendMarkerResult.missingMarkers.join(
+          ", "
+        )}`
+      );
+    }
+
     const result = {
       target,
       status: "ready",
       checked,
-      markers
+      markers,
+      frontendRoot,
+      frontendChecked: frontendArtifacts.map((artifact) => artifact.path),
+      frontendMarkers: FRONTEND_PRIVACY_SHIELD_MARKERS
     };
     if (writeAttestationPath) {
       await writePrivacyShieldAttestation({ outputPath: writeAttestationPath, ...result });
@@ -363,7 +399,10 @@ export async function writePrivacyShieldAttestation({
   outputPath,
   target,
   checked,
-  markers
+  markers,
+  frontendRoot = null,
+  frontendChecked = [],
+  frontendMarkers = []
 }) {
   await mkdir(path.dirname(outputPath), { recursive: true });
   await writeFile(
@@ -373,11 +412,35 @@ export async function writePrivacyShieldAttestation({
         status: "ready",
         target,
         checked,
-        markers
+        markers,
+        frontendRoot,
+        frontendChecked,
+        frontendMarkers
       },
       null,
       2
     )}\n`
+  );
+}
+
+async function readPrivacyMarkerArtifacts(root, extraPaths = []) {
+  const candidatePaths = new Set(extraPaths);
+  for (const candidate of await findFiles(root, isFrontendAssetCandidate)) {
+    candidatePaths.add(candidate);
+  }
+
+  const artifacts = [];
+  for (const candidate of [...candidatePaths].sort()) {
+    const content = await readFile(candidate);
+    artifacts.push({ path: candidate, content });
+  }
+  return artifacts;
+}
+
+function isFrontendAssetCandidate(fileName) {
+  const lowerName = fileName.toLowerCase();
+  return [".html", ".js", ".mjs", ".css", ".json", ".txt", ".map"].some((extension) =>
+    lowerName.endsWith(extension)
   );
 }
 
