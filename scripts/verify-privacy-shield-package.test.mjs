@@ -141,10 +141,16 @@ test("requires packaged web meeting and recording title detector markers", () =>
   assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("you are sharing"));
   assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("you're sharing"));
   assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("sharing your screen"));
+  assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("sharing your entire screen"));
+  assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("sharing entire screen"));
   assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("sharing this tab"));
+  assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("sharing a browser tab"));
+  assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("sharing a chrome tab"));
   assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("sharing a window"));
+  assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("sharing an application window"));
   assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("this tab is being shared"));
   assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("this window is being shared"));
+  assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("application window is being shared"));
   assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("this screen is being shared"));
   assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("screen is being shared"));
   assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("stop sharing"));
@@ -153,6 +159,8 @@ test("requires packaged web meeting and recording title detector markers", () =>
   assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("presenting your screen"));
   assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("presenting this tab"));
   assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("presenting a window"));
+  assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("presenting to everyone"));
+  assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("stop presenting"));
   assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("screen recording"));
   assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("recording your screen"));
   assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("recording screen"));
