@@ -41,6 +41,14 @@ pub const OVERLAY_POST_SHOW_SHARE_RISK_MARKER: &str =
     "Overlay show was reverted because screen-share risk was detected after visibility changed.";
 pub const COMPANION_POST_SHOW_SHARE_RISK_MARKER: &str =
     "Companion app window show was reverted because screen-share risk was detected after visibility changed.";
+pub const COMPANION_WINDOW_BOUNDS_REPAIR_MARKER: &str =
+    "Companion app window bounds are repaired before privacy-approved startup show.";
+const COMPANION_WINDOW_MIN_WIDTH: u32 = 1024;
+const COMPANION_WINDOW_MIN_HEIGHT: u32 = 720;
+const COMPANION_WINDOW_DEFAULT_WIDTH: u32 = 1280;
+const COMPANION_WINDOW_DEFAULT_HEIGHT: u32 = 820;
+const COMPANION_WINDOW_MIN_VISIBLE_WIDTH: u32 = 320;
+const COMPANION_WINDOW_MIN_VISIBLE_HEIGHT: u32 = 240;
 
 pub fn protected_window_labels() -> [&'static str; 2] {
     PROTECTED_WINDOW_LABELS
@@ -438,6 +446,10 @@ pub fn set_companion_windows_visible(
 
     let mut visibility_failures = Vec::new();
     for (label, window) in &companion_windows {
+        if visible {
+            repair_companion_window_bounds(app, window);
+        }
+
         let visibility_result = if visible {
             window.show()
         } else {
@@ -678,6 +690,50 @@ fn companion_window_status(mut status: OverlayProtectionStatus) -> OverlayProtec
     status
 }
 
+fn repair_companion_window_bounds(app: &tauri::AppHandle, window: &tauri::WebviewWindow) {
+    std::hint::black_box(COMPANION_WINDOW_BOUNDS_REPAIR_MARKER);
+
+    let Ok(position) = window.outer_position() else {
+        return;
+    };
+    let Ok(size) = window.outer_size() else {
+        return;
+    };
+    let monitor = window
+        .current_monitor()
+        .ok()
+        .flatten()
+        .or_else(|| app.primary_monitor().ok().flatten());
+    let Some(monitor) = monitor else {
+        return;
+    };
+
+    let current_bounds = OverlayWindowBounds {
+        x: position.x,
+        y: position.y,
+        width: size.width,
+        height: size.height,
+        monitor_name: None,
+    };
+    let monitor_bounds = OverlayWindowBounds {
+        x: monitor.position().x,
+        y: monitor.position().y,
+        width: monitor.size().width,
+        height: monitor.size().height,
+        monitor_name: monitor.name().cloned(),
+    };
+    let repaired_bounds = sanitize_companion_window_bounds(current_bounds.clone(), monitor_bounds);
+    if repaired_bounds == current_bounds {
+        return;
+    }
+
+    let _ = window.set_size(PhysicalSize::new(
+        repaired_bounds.width,
+        repaired_bounds.height,
+    ));
+    let _ = window.set_position(PhysicalPosition::new(repaired_bounds.x, repaired_bounds.y));
+}
+
 fn native_show_was_denied(status: &OverlayProtectionStatus) -> bool {
     status
         .message
@@ -690,6 +746,52 @@ fn required_companion_window_labels() -> Vec<&'static str> {
         .into_iter()
         .filter(|label| is_companion_window_label(label))
         .collect::<Vec<_>>()
+}
+
+pub fn sanitize_companion_window_bounds(
+    bounds: OverlayWindowBounds,
+    monitor: OverlayWindowBounds,
+) -> OverlayWindowBounds {
+    let min_width = COMPANION_WINDOW_MIN_WIDTH.min(monitor.width.max(1));
+    let min_height = COMPANION_WINDOW_MIN_HEIGHT.min(monitor.height.max(1));
+    let visible_width = intersect_extent(bounds.x, bounds.width, monitor.x, monitor.width);
+    let visible_height = intersect_extent(bounds.y, bounds.height, monitor.y, monitor.height);
+    let has_usable_size = bounds.width >= min_width && bounds.height >= min_height;
+    let has_usable_visible_area = visible_width
+        >= COMPANION_WINDOW_MIN_VISIBLE_WIDTH.min(min_width)
+        && visible_height >= COMPANION_WINDOW_MIN_VISIBLE_HEIGHT.min(min_height);
+
+    if has_usable_size && has_usable_visible_area {
+        return bounds;
+    }
+
+    let width = COMPANION_WINDOW_DEFAULT_WIDTH.min(monitor.width.max(1));
+    let height = COMPANION_WINDOW_DEFAULT_HEIGHT.min(monitor.height.max(1));
+    let x = center_axis(monitor.x, monitor.width, width);
+    let y = center_axis(monitor.y, monitor.height, height);
+
+    OverlayWindowBounds {
+        x,
+        y,
+        width,
+        height,
+        monitor_name: monitor.monitor_name,
+    }
+}
+
+fn intersect_extent(a_origin: i32, a_size: u32, b_origin: i32, b_size: u32) -> u32 {
+    let a_start = i64::from(a_origin);
+    let a_end = a_start + i64::from(a_size);
+    let b_start = i64::from(b_origin);
+    let b_end = b_start + i64::from(b_size);
+    let start = a_start.max(b_start);
+    let end = a_end.min(b_end);
+    end.saturating_sub(start).try_into().unwrap_or(u32::MAX)
+}
+
+fn center_axis(monitor_origin: i32, monitor_size: u32, window_size: u32) -> i32 {
+    let offset = monitor_size.saturating_sub(window_size) / 2;
+    monitor_origin.saturating_add(i32::try_from(offset).unwrap_or(i32::MAX))
 }
 
 #[cfg(target_os = "windows")]

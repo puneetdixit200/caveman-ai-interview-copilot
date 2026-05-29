@@ -4,13 +4,14 @@ use super::{
     companion_capture_exclusion_status, companion_visibility_success_status,
     enforce_capture_exclusion_setting, is_companion_window_label, is_overlay_window_label,
     native_show_privacy_gate_status, post_show_privacy_recheck_message, protected_window_labels,
-    protection_refresh_fail_closed_message, sanitize_overlay_bounds,
-    startup_privacy_shield_hide_reason, windows_capture_exclusion_status, OverlayProtectionStatus,
-    OverlayWindowBounds, BOUNDS_UPDATE_UNSAFE_PROTECTION_MARKER,
+    protection_refresh_fail_closed_message, sanitize_companion_window_bounds,
+    sanitize_overlay_bounds, startup_privacy_shield_hide_reason, windows_capture_exclusion_status,
+    OverlayProtectionStatus, OverlayWindowBounds, BOUNDS_UPDATE_UNSAFE_PROTECTION_MARKER,
     COMPANION_HIDE_UNSAFE_PROTECTION_MARKER, COMPANION_POST_SHOW_SHARE_RISK_MARKER,
     COMPANION_POST_SHOW_UNSAFE_PROTECTION_MARKER, COMPANION_UNSAFE_PROTECTION_MARKER,
-    OVERLAY_POST_SHOW_SHARE_RISK_MARKER, OVERLAY_POST_SHOW_UNSAFE_PROTECTION_MARKER,
-    PROTECTION_REFRESH_FAIL_CLOSED_MARKER, STARTUP_PRIVACY_SHIELD_DENIED_INITIAL_SHOW_MARKER,
+    COMPANION_WINDOW_BOUNDS_REPAIR_MARKER, OVERLAY_POST_SHOW_SHARE_RISK_MARKER,
+    OVERLAY_POST_SHOW_UNSAFE_PROTECTION_MARKER, PROTECTION_REFRESH_FAIL_CLOSED_MARKER,
+    STARTUP_PRIVACY_SHIELD_DENIED_INITIAL_SHOW_MARKER,
 };
 use crate::screen_share::NativePrivacyShieldDecision;
 
@@ -79,6 +80,63 @@ fn sanitizes_overlay_bounds_without_breaking_multi_monitor_coordinates() {
             monitor_name: Some("Left Display".to_string()),
         }
     );
+}
+
+#[test]
+fn repairs_tiny_offscreen_companion_window_to_centered_monitor_bounds() {
+    assert!(COMPANION_WINDOW_BOUNDS_REPAIR_MARKER.contains("bounds are repaired"));
+
+    let repaired = sanitize_companion_window_bounds(
+        OverlayWindowBounds {
+            x: -233,
+            y: 423,
+            width: 168,
+            height: 142,
+            monitor_name: None,
+        },
+        OverlayWindowBounds {
+            x: 0,
+            y: 0,
+            width: 1440,
+            height: 900,
+            monitor_name: Some("Built-in Display".to_string()),
+        },
+    );
+
+    assert_eq!(
+        repaired,
+        OverlayWindowBounds {
+            x: 80,
+            y: 40,
+            width: 1280,
+            height: 820,
+            monitor_name: Some("Built-in Display".to_string()),
+        }
+    );
+}
+
+#[test]
+fn preserves_usable_companion_window_on_secondary_monitor() {
+    let bounds = OverlayWindowBounds {
+        x: -1800,
+        y: 80,
+        width: 1100,
+        height: 760,
+        monitor_name: None,
+    };
+
+    let repaired = sanitize_companion_window_bounds(
+        bounds.clone(),
+        OverlayWindowBounds {
+            x: -1920,
+            y: 0,
+            width: 1920,
+            height: 1080,
+            monitor_name: Some("Left Display".to_string()),
+        },
+    );
+
+    assert_eq!(repaired, bounds);
 }
 
 #[test]
