@@ -41,7 +41,6 @@ export const COMMON_PRIVACY_SHIELD_MARKERS = [
   "Companion app windows are focused only when unusable bounds need repair after privacy clears.",
   "macOS companion window repair reactivates the app only after unusable bounds are detected.",
   "Companion app windows reactivate after screen-share risk clears to recover usable bounds.",
-  "Companion app windows use a privacy-gated reopen restore when the bundle is reopened.",
   "Native privacy shield thread failed to start; refusing to run without fail-closed screen-share guard.",
   "Native privacy shield starts before startup companion window show.",
   "Native privacy shield polls every 50ms for new screen-share risk.",
@@ -208,7 +207,8 @@ export const MACOS_COMPANION_WINDOW_REPAIR_MARKERS = [
 
 export const MACOS_NATIVE_PRIVACY_SHIELD_MARKERS = [
   "macOS process screen-share guard skips window-title scan after direct capture-process match.",
-  "macOS window-title guard uses a short timeout so native privacy polling cannot stall."
+  "macOS window-title guard uses a short timeout so native privacy polling cannot stall.",
+  "Companion app windows use a privacy-gated reopen restore when the bundle is reopened."
 ];
 
 export const TARGET_PRIVACY_SHIELD_MARKERS = {

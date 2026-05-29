@@ -386,7 +386,7 @@ test("requires packaged protection refresh fail-closed marker", () => {
     )
   );
   assert.ok(
-    COMMON_PRIVACY_SHIELD_MARKERS.includes(
+    MACOS_NATIVE_PRIVACY_SHIELD_MARKERS.includes(
       "Companion app windows use a privacy-gated reopen restore when the bundle is reopened."
     )
   );
