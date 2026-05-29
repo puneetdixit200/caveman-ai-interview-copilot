@@ -38,7 +38,6 @@ export const COMMON_PRIVACY_SHIELD_MARKERS = [
   "Companion app windows are restored and repaired while privacy shield stays clear.",
   "Companion app windows are focused only when unusable bounds need repair after privacy clears.",
   "macOS companion window repair reactivates the app only after unusable bounds are detected.",
-  "macOS companion window repair uses AppleScript activation when LaunchServices show leaves windows offscreen.",
   "Companion app windows reactivate after screen-share risk clears to recover usable bounds.",
   "Native privacy shield thread failed to start; refusing to run without fail-closed screen-share guard.",
   "Native privacy shield starts before startup companion window show.",
@@ -197,6 +196,10 @@ export const DESKTOP_PROCESS_PRIVACY_SHIELD_MARKERS = [
   "screenconnect.clientservice.exe"
 ];
 
+export const MACOS_COMPANION_WINDOW_REPAIR_MARKERS = [
+  "macOS companion window repair uses AppleScript activation when LaunchServices show leaves windows offscreen."
+];
+
 export const TARGET_PRIVACY_SHIELD_MARKERS = {
   "windows-x64": [
     ...COMMON_PRIVACY_SHIELD_MARKERS,
@@ -207,12 +210,14 @@ export const TARGET_PRIVACY_SHIELD_MARKERS = {
   "macos-x64": [
     ...COMMON_PRIVACY_SHIELD_MARKERS,
     ...DESKTOP_PROCESS_PRIVACY_SHIELD_MARKERS,
+    ...MACOS_COMPANION_WINDOW_REPAIR_MARKERS,
     "set_content_protected",
     "macOS rejected NSWindow content protection"
   ],
   "macos-arm64": [
     ...COMMON_PRIVACY_SHIELD_MARKERS,
     ...DESKTOP_PROCESS_PRIVACY_SHIELD_MARKERS,
+    ...MACOS_COMPANION_WINDOW_REPAIR_MARKERS,
     "set_content_protected",
     "macOS rejected NSWindow content protection"
   ],

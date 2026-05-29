@@ -6,6 +6,7 @@ import test from "node:test";
 import {
   COMMON_PRIVACY_SHIELD_MARKERS,
   FRONTEND_PRIVACY_SHIELD_MARKERS,
+  MACOS_COMPANION_WINDOW_REPAIR_MARKERS,
   TARGET_PRIVACY_SHIELD_MARKERS,
   evaluateBinaryPrivacyMarkers,
   evaluatePackagePrivacyMarkers,
@@ -309,7 +310,27 @@ test("requires packaged protection refresh fail-closed marker", () => {
     )
   );
   assert.ok(
-    COMMON_PRIVACY_SHIELD_MARKERS.includes(
+    MACOS_COMPANION_WINDOW_REPAIR_MARKERS.includes(
+      "macOS companion window repair uses AppleScript activation when LaunchServices show leaves windows offscreen."
+    )
+  );
+  assert.ok(
+    TARGET_PRIVACY_SHIELD_MARKERS["macos-arm64"].includes(
+      "macOS companion window repair uses AppleScript activation when LaunchServices show leaves windows offscreen."
+    )
+  );
+  assert.ok(
+    TARGET_PRIVACY_SHIELD_MARKERS["macos-x64"].includes(
+      "macOS companion window repair uses AppleScript activation when LaunchServices show leaves windows offscreen."
+    )
+  );
+  assert.ok(
+    !TARGET_PRIVACY_SHIELD_MARKERS["windows-x64"].includes(
+      "macOS companion window repair uses AppleScript activation when LaunchServices show leaves windows offscreen."
+    )
+  );
+  assert.ok(
+    !TARGET_PRIVACY_SHIELD_MARKERS["linux-x64"].includes(
       "macOS companion window repair uses AppleScript activation when LaunchServices show leaves windows offscreen."
     )
   );
