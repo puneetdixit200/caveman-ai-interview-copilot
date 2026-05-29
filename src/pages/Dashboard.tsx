@@ -116,7 +116,7 @@ const INTERVIEW_TYPE_OPTIONS: Array<{ id: InterviewType; label: string }> = [
   { id: "mixed", label: "Mixed" }
 ];
 
-const PRIVACY_SHIELD_INTERVAL_MS = 5000;
+const PRIVACY_SHIELD_INTERVAL_MS = 500;
 const PRIVACY_SHIELD_WAIT_FOR_STABLE_CLEAR_MESSAGE =
   "Overlay kept hidden until screen-share guard stays clear for repeated checks.";
 

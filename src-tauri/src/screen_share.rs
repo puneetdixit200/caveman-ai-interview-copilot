@@ -2,6 +2,7 @@ use serde::Serialize;
 use std::{
     io::Read,
     process::{Command, Output, Stdio},
+    sync::atomic::{AtomicBool, Ordering},
     thread,
     time::{Duration, Instant},
 };
@@ -25,6 +26,7 @@ pub struct ScreenShareStatus {
 
 const NATIVE_PRIVACY_SHIELD_INTERVAL: Duration = Duration::from_millis(100);
 const SCREEN_SHARE_GUARD_COMMAND_TIMEOUT: Duration = Duration::from_millis(1_500);
+static NATIVE_PRIVACY_SHIELD_SHARE_RISK_ACTIVE: AtomicBool = AtomicBool::new(false);
 pub const NATIVE_PRIVACY_SHIELD_THREAD_START_FAILED_MARKER: &str =
     "Native privacy shield thread failed to start; refusing to run without fail-closed screen-share guard.";
 pub const NATIVE_PRIVACY_SHIELD_STARTS_BEFORE_INITIAL_SHOW_MARKER: &str =
@@ -35,6 +37,8 @@ pub const NATIVE_PRIVACY_SHIELD_REFRESHES_CAPTURE_BEFORE_SHARE_HIDE_MARKER: &str
     "Native privacy shield refreshes capture exclusion before hiding for screen-share risk.";
 pub const NATIVE_PRIVACY_SHIELD_MAIN_THREAD_WINDOW_UPDATE_MARKER: &str =
     "Native privacy shield applies app-window updates on the Tauri main thread.";
+pub const NATIVE_PRIVACY_SHIELD_SHARE_RISK_LATCH_MARKER: &str =
+    "Native privacy shield exposes a nonblocking share-risk latch for bounds repair.";
 pub const SCREEN_SHARE_GUARD_COMMAND_TIMEOUT_MARKER: &str =
     "Screen-share guard command timeout failed closed before privacy polling could stall.";
 const EDGE_WEBVIEW_HOST_PROCESS: &str = "msedgewebview2.exe";
@@ -130,6 +134,8 @@ const MACOS_WINDOW_TITLE_TRANSIENT_ROW_MARKER: &str =
     "macOS window title screen-share guard skips transient System Events rows.";
 const MACOS_WINDOW_TITLE_TIMEOUT_FALLBACK_MARKER: &str =
     "macOS window title screen-share guard timeout falls back to OS capture protection.";
+const MACOS_PROCESS_GUARD_SHORT_CIRCUIT_MARKER: &str =
+    "macOS process screen-share guard skips window-title scan after direct capture-process match.";
 #[cfg(target_os = "macos")]
 const MACOS_VISIBLE_WINDOW_TITLE_SCRIPT: &str = r#"
 set previousDelimiters to AppleScript's text item delimiters
@@ -596,6 +602,12 @@ pub fn detect_screen_share_status() -> anyhow::Result<ScreenShareStatus> {
         }
 
         let mut processes = parse_unix_process_list(&String::from_utf8_lossy(&output.stdout));
+        let direct_process_status = screen_share_status_for_processes(processes.clone());
+        if direct_process_status.active {
+            std::hint::black_box(MACOS_PROCESS_GUARD_SHORT_CIRCUIT_MARKER);
+            return Ok(direct_process_status);
+        }
+
         processes.extend(detect_macos_visible_window_title_processes()?);
 
         return Ok(screen_share_status_for_processes(processes));
@@ -757,9 +769,13 @@ fn run_screen_share_guard_command_with_timeout(
 
         if started_at.elapsed() >= timeout {
             let _ = child.kill();
-            let _ = child.wait();
-            let _ = stdout_reader.join();
-            let _ = stderr_reader.join();
+            let _ = thread::Builder::new()
+                .name(format!("screen-share-guard-reap-{program}"))
+                .spawn(move || {
+                    let _ = child.wait();
+                });
+            drop(stdout_reader);
+            drop(stderr_reader);
             return Err(anyhow::anyhow!(
                 "{SCREEN_SHARE_GUARD_COMMAND_TIMEOUT_MARKER} {program} exceeded {}ms.",
                 timeout.as_millis()
@@ -834,6 +850,7 @@ pub fn start_native_privacy_shield(app: tauri::AppHandle) -> anyhow::Result<()> 
     std::hint::black_box(NATIVE_PRIVACY_SHIELD_FAST_POLL_MARKER);
     std::hint::black_box(NATIVE_PRIVACY_SHIELD_REFRESHES_CAPTURE_BEFORE_SHARE_HIDE_MARKER);
     std::hint::black_box(NATIVE_PRIVACY_SHIELD_MAIN_THREAD_WINDOW_UPDATE_MARKER);
+    std::hint::black_box(NATIVE_PRIVACY_SHIELD_SHARE_RISK_LATCH_MARKER);
 
     thread::Builder::new()
         .name("screen-share-privacy-shield".to_string())
@@ -841,10 +858,13 @@ pub fn start_native_privacy_shield(app: tauri::AppHandle) -> anyhow::Result<()> 
             let mut share_risk_was_active = false;
             loop {
                 let decision = native_privacy_shield_decision(detect_screen_share_status());
+                let share_risk_is_active =
+                    matches!(decision, NativePrivacyShieldDecision::Hide { .. });
+                NATIVE_PRIVACY_SHIELD_SHARE_RISK_ACTIVE
+                    .store(share_risk_is_active, Ordering::Relaxed);
                 let restore_after_share_risk =
                     matches!(decision, NativePrivacyShieldDecision::Allow) && share_risk_was_active;
-                share_risk_was_active =
-                    matches!(decision, NativePrivacyShieldDecision::Hide { .. });
+                share_risk_was_active = share_risk_is_active;
                 let main_thread_app = app.clone();
                 let _ = app.run_on_main_thread(move || match decision {
                     NativePrivacyShieldDecision::Allow => {
@@ -887,6 +907,10 @@ pub fn start_native_privacy_shield(app: tauri::AppHandle) -> anyhow::Result<()> 
 
 pub fn native_privacy_shield_thread_start_error_message(error: impl std::fmt::Display) -> String {
     format!("{NATIVE_PRIVACY_SHIELD_THREAD_START_FAILED_MARKER} {error}")
+}
+
+pub fn native_privacy_shield_share_risk_is_active() -> bool {
+    NATIVE_PRIVACY_SHIELD_SHARE_RISK_ACTIVE.load(Ordering::Relaxed)
 }
 
 fn hide_app_windows_for_native_privacy_shield(app: &tauri::AppHandle) {
@@ -2412,6 +2436,7 @@ mod tests {
                 .contains("refreshes capture exclusion")
         );
         assert!(NATIVE_PRIVACY_SHIELD_MAIN_THREAD_WINDOW_UPDATE_MARKER.contains("main thread"));
+        assert!(NATIVE_PRIVACY_SHIELD_SHARE_RISK_LATCH_MARKER.contains("nonblocking"));
     }
 
     #[test]

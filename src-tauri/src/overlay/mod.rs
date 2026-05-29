@@ -43,14 +43,16 @@ pub const COMPANION_POST_SHOW_SHARE_RISK_MARKER: &str =
     "Companion app window show was reverted because screen-share risk was detected after visibility changed.";
 pub const COMPANION_WINDOW_BOUNDS_REPAIR_MARKER: &str =
     "Companion app window bounds are repaired before and after privacy-approved startup show.";
+pub const COMPANION_WINDOW_NATIVE_BOUNDS_REPAIR_MARKER: &str =
+    "macOS companion window repair forces native bounds when CoreGraphics reports collapsed windows.";
 pub const COMPANION_WINDOW_BACKGROUND_REPAIR_MARKER: &str =
     "Companion app windows are restored and repaired while privacy shield stays clear.";
+pub const COMPANION_WINDOW_WATCHDOG_PRIVACY_PAUSE_MARKER: &str =
+    "Companion window bounds watchdog pauses repairs while screen-share risk is active.";
 pub const COMPANION_WINDOW_FOREGROUND_REPAIR_MARKER: &str =
     "Companion app windows are focused only when unusable bounds need repair after privacy clears.";
 pub const COMPANION_WINDOW_APP_ACTIVATION_REPAIR_MARKER: &str =
     "macOS companion window repair reactivates the app only after unusable bounds are detected.";
-pub const COMPANION_WINDOW_APPLESCRIPT_ACTIVATION_REPAIR_MARKER: &str =
-    "macOS companion window repair uses AppleScript activation when LaunchServices show leaves windows offscreen.";
 pub const COMPANION_WINDOW_SHARE_RISK_CLEAR_REPAIR_MARKER: &str =
     "Companion app windows reactivate after screen-share risk clears to recover usable bounds.";
 const COMPANION_WINDOW_MIN_WIDTH: u32 = 1024;
@@ -468,9 +470,24 @@ pub fn set_companion_windows_visible(
         if visible {
             let _ = window.unminimize();
             let repaired_before_show = repair_companion_window_bounds(app, window);
+            let native_repaired_before_show = repair_native_companion_window_bounds_if_needed(
+                app,
+                window,
+                companion_window_needs_native_activation(app),
+            );
             let visibility_result = window.show();
             let repaired_after_show = repair_companion_window_bounds(app, window);
-            if visibility_result.is_ok() && (repaired_before_show || repaired_after_show) {
+            let native_repaired_after_show = repair_native_companion_window_bounds_if_needed(
+                app,
+                window,
+                companion_window_needs_native_activation(app),
+            );
+            if visibility_result.is_ok()
+                && (repaired_before_show
+                    || native_repaired_before_show
+                    || repaired_after_show
+                    || native_repaired_after_show)
+            {
                 focus_repaired_companion_window(app, window);
             }
 
@@ -584,8 +601,16 @@ pub fn focus_companion_windows(app: &tauri::AppHandle) {
             continue;
         }
 
+        let native_repaired = repair_native_companion_window_bounds_if_needed(
+            app,
+            &window,
+            companion_window_needs_native_activation(app),
+        );
         let _ = window.unminimize();
-        let _ = repair_companion_window_bounds(app, &window);
+        let repaired = repair_companion_window_bounds(app, &window);
+        if native_repaired || repaired {
+            activate_app_for_companion_window_repair(app);
+        }
         let _ = window.set_focus();
         let _ = repair_companion_window_bounds(app, &window);
     }
@@ -604,10 +629,21 @@ pub fn restore_companion_windows_after_clear_privacy_check(app: &tauri::AppHandl
         let needs_native_activation = companion_window_needs_native_activation(app);
         let _ = window.unminimize();
         let repaired_before_show = repair_companion_window_bounds(app, &window);
+        let native_repaired_before_show =
+            repair_native_companion_window_bounds_if_needed(app, &window, needs_native_activation);
         let visibility_result = window.show();
         let repaired_after_show = repair_companion_window_bounds(app, &window);
+        let native_repaired_after_show = repair_native_companion_window_bounds_if_needed(
+            app,
+            &window,
+            companion_window_needs_native_activation(app),
+        );
         if visibility_result.is_ok()
-            && (needs_native_activation || repaired_before_show || repaired_after_show)
+            && (needs_native_activation
+                || repaired_before_show
+                || native_repaired_before_show
+                || repaired_after_show
+                || native_repaired_after_show)
         {
             focus_repaired_companion_window(app, &window);
         }
@@ -626,7 +662,9 @@ pub fn restore_companion_windows_after_share_risk_cleared(app: &tauri::AppHandle
 
         let _ = window.unminimize();
         let _ = repair_companion_window_bounds(app, &window);
+        let _ = force_repair_companion_window_bounds(app, &window);
         let _ = window.show();
+        let _ = force_repair_companion_window_bounds(app, &window);
         activate_app_for_companion_window_repair(app);
         let _ = window.set_focus();
         let _ = repair_companion_window_bounds(app, &window);
@@ -637,12 +675,22 @@ pub fn repair_companion_window_bounds_without_show(app: &tauri::AppHandle) {
     use tauri::Manager;
 
     std::hint::black_box(COMPANION_WINDOW_BACKGROUND_REPAIR_MARKER);
+    std::hint::black_box(COMPANION_WINDOW_WATCHDOG_PRIVACY_PAUSE_MARKER);
+
+    if crate::screen_share::native_privacy_shield_share_risk_is_active() {
+        return;
+    }
 
     for (label, window) in app.webview_windows() {
         if !is_companion_window_label(&label) {
             continue;
         }
 
+        let _ = repair_native_companion_window_bounds_if_needed(
+            app,
+            &window,
+            companion_window_needs_native_activation(app),
+        );
         let _ = repair_companion_window_bounds(app, &window);
     }
 }
@@ -849,33 +897,11 @@ fn activate_app_for_companion_window_repair(app: &tauri::AppHandle) {
         .stdout(std::process::Stdio::null())
         .stderr(std::process::Stdio::null())
         .spawn();
-    activate_macos_app_with_applescript(bundle_identifier);
 }
 
 #[cfg(not(target_os = "macos"))]
 fn activate_app_for_companion_window_repair(_app: &tauri::AppHandle) {
     std::hint::black_box(COMPANION_WINDOW_APP_ACTIVATION_REPAIR_MARKER);
-}
-
-#[cfg(target_os = "macos")]
-fn activate_macos_app_with_applescript(bundle_identifier: &str) {
-    std::hint::black_box(COMPANION_WINDOW_APPLESCRIPT_ACTIVATION_REPAIR_MARKER);
-
-    let script = format!(
-        "tell application id {} to activate",
-        applescript_string_literal(bundle_identifier)
-    );
-    let _ = std::process::Command::new("osascript")
-        .args(["-e", script.as_str()])
-        .stdin(std::process::Stdio::null())
-        .stdout(std::process::Stdio::null())
-        .stderr(std::process::Stdio::null())
-        .spawn();
-}
-
-#[cfg(target_os = "macos")]
-fn applescript_string_literal(value: &str) -> String {
-    format!("\"{}\"", value.replace('\\', "\\\\").replace('"', "\\\""))
 }
 
 #[cfg(target_os = "macos")]
@@ -1069,6 +1095,67 @@ fn repair_companion_window_bounds(app: &tauri::AppHandle, window: &tauri::Webvie
     ));
     let position_result =
         window.set_position(LogicalPosition::new(repaired_bounds.x, repaired_bounds.y));
+    size_result.is_ok() || position_result.is_ok()
+}
+
+fn repair_native_companion_window_bounds_if_needed(
+    app: &tauri::AppHandle,
+    window: &tauri::WebviewWindow,
+    needed: bool,
+) -> bool {
+    if !needed {
+        return false;
+    }
+
+    force_repair_companion_window_bounds(app, window)
+}
+
+fn force_repair_companion_window_bounds(
+    app: &tauri::AppHandle,
+    window: &tauri::WebviewWindow,
+) -> bool {
+    std::hint::black_box(COMPANION_WINDOW_NATIVE_BOUNDS_REPAIR_MARKER);
+
+    let monitor = window
+        .current_monitor()
+        .ok()
+        .flatten()
+        .or_else(|| app.primary_monitor().ok().flatten());
+    let Some(monitor) = monitor else {
+        return false;
+    };
+    let scale_factor = window
+        .scale_factor()
+        .ok()
+        .filter(|scale| *scale > 0.0)
+        .unwrap_or_else(|| monitor.scale_factor());
+    let logical_monitor_position = monitor.position().to_logical::<i32>(scale_factor);
+    let logical_monitor_size = monitor.size().to_logical::<u32>(scale_factor);
+    let monitor_bounds = OverlayWindowBounds {
+        x: logical_monitor_position.x,
+        y: logical_monitor_position.y,
+        width: logical_monitor_size.width,
+        height: logical_monitor_size.height,
+        monitor_name: monitor.name().cloned(),
+    };
+    let forced_bounds = sanitize_companion_window_bounds(
+        OverlayWindowBounds {
+            x: monitor_bounds.x,
+            y: monitor_bounds.y,
+            width: 0,
+            height: 0,
+            monitor_name: None,
+        },
+        monitor_bounds,
+    );
+
+    let _ = window.set_min_size(Some(LogicalSize::new(
+        COMPANION_WINDOW_MIN_WIDTH.min(forced_bounds.width.max(1)),
+        COMPANION_WINDOW_MIN_HEIGHT.min(forced_bounds.height.max(1)),
+    )));
+    let size_result = window.set_size(LogicalSize::new(forced_bounds.width, forced_bounds.height));
+    let position_result =
+        window.set_position(LogicalPosition::new(forced_bounds.x, forced_bounds.y));
     size_result.is_ok() || position_result.is_ok()
 }
 

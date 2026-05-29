@@ -185,6 +185,7 @@ test("dashboard waits for repeated clear checks before restoring after share ris
 
   assert.match(dashboardTsx, /shouldRestoreAfterPrivacyShieldClear/);
   assert.match(dashboardTsx, /withPrivacyShieldTimeout/);
+  assert.match(dashboardTsx, /const PRIVACY_SHIELD_INTERVAL_MS = 500;/);
   assert.match(privacyShieldTimeoutTs, /Native privacy shield WebView command timeout failed closed before overlay visibility could drift\./);
   assert.match(dashboardTsx, /Overlay kept hidden until screen-share guard stays clear for repeated checks\./);
   assert.match(overlaySafetyTs, /PRIVACY_SHIELD_RESTORE_CLEAR_CHECKS\s*=\s*2/);
@@ -276,6 +277,65 @@ test("native privacy shield refreshes capture protection before share-risk hide"
     /Native privacy shield refreshes capture exclusion before hiding for screen-share risk\./
   );
   assert.match(screenShareRs, /Native privacy shield applies app-window updates on the Tauri main thread\./);
+});
+
+test("companion bounds watchdog pauses repairs during active share-risk", async () => {
+  const overlayRs = normalizeLineEndings(await readFile("src-tauri/src/overlay/mod.rs", "utf8"));
+  const watchdogRepairStart = overlayRs.indexOf("pub fn repair_companion_window_bounds_without_show(");
+  const watchdogRepairEnd = overlayRs.indexOf("pub fn start_companion_window_bounds_watchdog", watchdogRepairStart);
+
+  assert.notEqual(watchdogRepairStart, -1, "companion watchdog repair helper must exist");
+  assert.notEqual(watchdogRepairEnd, -1, "companion watchdog repair helper body must be bounded");
+
+  const watchdogRepairBody = overlayRs.slice(watchdogRepairStart, watchdogRepairEnd);
+  const shareRiskLatch = watchdogRepairBody.indexOf("crate::screen_share::native_privacy_shield_share_risk_is_active()");
+  const fullDetector = watchdogRepairBody.indexOf("crate::screen_share::detect_screen_share_status()");
+  const earlyReturn = watchdogRepairBody.indexOf("return;");
+  const windowLoop = watchdogRepairBody.indexOf("for (label, window) in app.webview_windows()");
+  const nativeRepair = watchdogRepairBody.indexOf("repair_native_companion_window_bounds_if_needed");
+  const standardRepair = watchdogRepairBody.indexOf("repair_companion_window_bounds(app, &window)");
+
+  assert.notEqual(shareRiskLatch, -1, "watchdog must check the nonblocking share-risk latch");
+  assert.equal(fullDetector, -1, "watchdog must not run the full screen-share detector on the UI thread");
+  assert.notEqual(earlyReturn, -1, "watchdog must return before repairs during share-risk");
+  assert.notEqual(windowLoop, -1, "watchdog must still repair windows after the privacy check clears");
+  assert.notEqual(nativeRepair, -1, "watchdog must still run native bounds repair when clear");
+  assert.notEqual(standardRepair, -1, "watchdog must still run standard bounds repair when clear");
+  assert.ok(shareRiskLatch < earlyReturn, "privacy latch must control the watchdog early return");
+  assert.ok(earlyReturn < windowLoop, "watchdog must skip all repairs while share-risk is active");
+  assert.ok(windowLoop < nativeRepair, "native repair must only run after the privacy pause check");
+  assert.ok(windowLoop < standardRepair, "standard repair must only run after the privacy pause check");
+  assert.match(
+    overlayRs,
+    /Companion window bounds watchdog pauses repairs while screen-share risk is active\./
+  );
+});
+
+test("macOS process guard short-circuits before window-title scan", async () => {
+  const screenShareRs = normalizeLineEndings(await readFile("src-tauri/src/screen_share.rs", "utf8"));
+  const macosBranchStart = screenShareRs.indexOf("#[cfg(target_os = \"macos\")]\n    {");
+  const macosBranchEnd = screenShareRs.indexOf("#[cfg(not(any(target_os = \"macos\", target_os = \"windows\")))]", macosBranchStart);
+
+  assert.notEqual(macosBranchStart, -1, "macOS screen-share detector branch must exist");
+  assert.notEqual(macosBranchEnd, -1, "macOS screen-share detector branch must be bounded");
+
+  const macosBranch = screenShareRs.slice(macosBranchStart, macosBranchEnd);
+  const processParse = macosBranch.indexOf("parse_unix_process_list");
+  const directStatus = macosBranch.indexOf("let direct_process_status = screen_share_status_for_processes(processes.clone())");
+  const directReturn = macosBranch.indexOf("return Ok(direct_process_status)");
+  const titleScan = macosBranch.indexOf("detect_macos_visible_window_title_processes()");
+
+  assert.notEqual(processParse, -1, "macOS detector must parse process list first");
+  assert.notEqual(directStatus, -1, "macOS detector must evaluate direct process matches");
+  assert.notEqual(directReturn, -1, "macOS detector must return direct process matches immediately");
+  assert.notEqual(titleScan, -1, "macOS detector must still scan window titles when no direct process risk exists");
+  assert.ok(processParse < directStatus, "direct status must use parsed process rows");
+  assert.ok(directStatus < directReturn, "direct process status must control short-circuit return");
+  assert.ok(directReturn < titleScan, "direct process risks must skip the slower window-title scan");
+  assert.match(
+    screenShareRs,
+    /macOS process screen-share guard skips window-title scan after direct capture-process match\./
+  );
 });
 
 test("native screen OCR capture hides app windows before creating screenshots", async () => {

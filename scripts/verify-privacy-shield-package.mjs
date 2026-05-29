@@ -36,6 +36,7 @@ export const COMMON_PRIVACY_SHIELD_MARKERS = [
   "Companion app window show was reverted because screen-share risk was detected after visibility changed.",
   "Companion app window bounds are repaired before and after privacy-approved startup show.",
   "Companion app windows are restored and repaired while privacy shield stays clear.",
+  "Companion window bounds watchdog pauses repairs while screen-share risk is active.",
   "Companion app windows are focused only when unusable bounds need repair after privacy clears.",
   "macOS companion window repair reactivates the app only after unusable bounds are detected.",
   "Companion app windows reactivate after screen-share risk clears to recover usable bounds.",
@@ -44,6 +45,7 @@ export const COMMON_PRIVACY_SHIELD_MARKERS = [
   "Native privacy shield polls every 100ms for new screen-share risk.",
   "Native privacy shield refreshes capture exclusion before hiding for screen-share risk.",
   "Native privacy shield applies app-window updates on the Tauri main thread.",
+  "Native privacy shield exposes a nonblocking share-risk latch for bounds repair.",
   "Native privacy shield denied screen OCR capture.",
   "Waiting for app windows to leave capture surfaces before screen OCR capture.",
   "Native privacy shield denied active-window typing during screen-share risk.",
@@ -197,7 +199,11 @@ export const DESKTOP_PROCESS_PRIVACY_SHIELD_MARKERS = [
 ];
 
 export const MACOS_COMPANION_WINDOW_REPAIR_MARKERS = [
-  "macOS companion window repair uses AppleScript activation when LaunchServices show leaves windows offscreen."
+  "macOS companion window repair forces native bounds when CoreGraphics reports collapsed windows."
+];
+
+export const MACOS_NATIVE_PRIVACY_SHIELD_MARKERS = [
+  "macOS process screen-share guard skips window-title scan after direct capture-process match."
 ];
 
 export const TARGET_PRIVACY_SHIELD_MARKERS = {
@@ -211,6 +217,7 @@ export const TARGET_PRIVACY_SHIELD_MARKERS = {
     ...COMMON_PRIVACY_SHIELD_MARKERS,
     ...DESKTOP_PROCESS_PRIVACY_SHIELD_MARKERS,
     ...MACOS_COMPANION_WINDOW_REPAIR_MARKERS,
+    ...MACOS_NATIVE_PRIVACY_SHIELD_MARKERS,
     "set_content_protected",
     "macOS rejected NSWindow content protection"
   ],
@@ -218,6 +225,7 @@ export const TARGET_PRIVACY_SHIELD_MARKERS = {
     ...COMMON_PRIVACY_SHIELD_MARKERS,
     ...DESKTOP_PROCESS_PRIVACY_SHIELD_MARKERS,
     ...MACOS_COMPANION_WINDOW_REPAIR_MARKERS,
+    ...MACOS_NATIVE_PRIVACY_SHIELD_MARKERS,
     "set_content_protected",
     "macOS rejected NSWindow content protection"
   ],

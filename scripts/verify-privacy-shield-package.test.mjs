@@ -7,6 +7,7 @@ import {
   COMMON_PRIVACY_SHIELD_MARKERS,
   FRONTEND_PRIVACY_SHIELD_MARKERS,
   MACOS_COMPANION_WINDOW_REPAIR_MARKERS,
+  MACOS_NATIVE_PRIVACY_SHIELD_MARKERS,
   TARGET_PRIVACY_SHIELD_MARKERS,
   evaluateBinaryPrivacyMarkers,
   evaluatePackagePrivacyMarkers,
@@ -301,7 +302,17 @@ test("requires packaged protection refresh fail-closed marker", () => {
   );
   assert.ok(
     COMMON_PRIVACY_SHIELD_MARKERS.includes(
+      "Companion window bounds watchdog pauses repairs while screen-share risk is active."
+    )
+  );
+  assert.ok(
+    COMMON_PRIVACY_SHIELD_MARKERS.includes(
       "Companion app windows are focused only when unusable bounds need repair after privacy clears."
+    )
+  );
+  assert.ok(
+    COMMON_PRIVACY_SHIELD_MARKERS.includes(
+      "Native privacy shield exposes a nonblocking share-risk latch for bounds repair."
     )
   );
   assert.ok(
@@ -311,27 +322,52 @@ test("requires packaged protection refresh fail-closed marker", () => {
   );
   assert.ok(
     MACOS_COMPANION_WINDOW_REPAIR_MARKERS.includes(
-      "macOS companion window repair uses AppleScript activation when LaunchServices show leaves windows offscreen."
+      "macOS companion window repair forces native bounds when CoreGraphics reports collapsed windows."
     )
   );
   assert.ok(
     TARGET_PRIVACY_SHIELD_MARKERS["macos-arm64"].includes(
-      "macOS companion window repair uses AppleScript activation when LaunchServices show leaves windows offscreen."
+      "macOS companion window repair forces native bounds when CoreGraphics reports collapsed windows."
     )
   );
   assert.ok(
     TARGET_PRIVACY_SHIELD_MARKERS["macos-x64"].includes(
-      "macOS companion window repair uses AppleScript activation when LaunchServices show leaves windows offscreen."
+      "macOS companion window repair forces native bounds when CoreGraphics reports collapsed windows."
     )
   );
   assert.ok(
     !TARGET_PRIVACY_SHIELD_MARKERS["windows-x64"].includes(
-      "macOS companion window repair uses AppleScript activation when LaunchServices show leaves windows offscreen."
+      "macOS companion window repair forces native bounds when CoreGraphics reports collapsed windows."
     )
   );
   assert.ok(
     !TARGET_PRIVACY_SHIELD_MARKERS["linux-x64"].includes(
-      "macOS companion window repair uses AppleScript activation when LaunchServices show leaves windows offscreen."
+      "macOS companion window repair forces native bounds when CoreGraphics reports collapsed windows."
+    )
+  );
+  assert.ok(
+    MACOS_NATIVE_PRIVACY_SHIELD_MARKERS.includes(
+      "macOS process screen-share guard skips window-title scan after direct capture-process match."
+    )
+  );
+  assert.ok(
+    TARGET_PRIVACY_SHIELD_MARKERS["macos-arm64"].includes(
+      "macOS process screen-share guard skips window-title scan after direct capture-process match."
+    )
+  );
+  assert.ok(
+    TARGET_PRIVACY_SHIELD_MARKERS["macos-x64"].includes(
+      "macOS process screen-share guard skips window-title scan after direct capture-process match."
+    )
+  );
+  assert.ok(
+    !TARGET_PRIVACY_SHIELD_MARKERS["windows-x64"].includes(
+      "macOS process screen-share guard skips window-title scan after direct capture-process match."
+    )
+  );
+  assert.ok(
+    !TARGET_PRIVACY_SHIELD_MARKERS["linux-x64"].includes(
+      "macOS process screen-share guard skips window-title scan after direct capture-process match."
     )
   );
   assert.ok(
