@@ -286,11 +286,16 @@ test("native privacy shield refreshes capture protection before share-risk hide"
   );
   assert.match(
     screenShareRs,
+    /Native privacy shield scans macOS window titles on a bounded background worker for browser Meet and Teams risk\./
+  );
+  assert.match(
+    screenShareRs,
     /macOS window-title guard uses a short timeout so native privacy polling cannot stall\./
   );
   assert.match(screenShareRs, /detect_screen_share_status_for_native_privacy_shield/);
   assert.match(screenShareRs, /detect_macos_direct_capture_process_status\(\)\?/);
-  assert.doesNotMatch(screenShareRs, /start_macos_window_title_privacy_scan_thread/);
+  assert.match(screenShareRs, /start_macos_window_title_privacy_scan_thread\(\)\?/);
+  assert.match(screenShareRs, /MACOS_WINDOW_TITLE_PRIVACY_RISK_ACTIVE\.load/);
   assert.doesNotMatch(screenShareRs, /native_privacy_shield_decision_with_cached_title_scan/);
   assert.doesNotMatch(screenShareRs, /NativePrivacyShieldPollState::default/);
   assert.match(

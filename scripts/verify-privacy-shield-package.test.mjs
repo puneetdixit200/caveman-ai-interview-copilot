@@ -356,6 +356,11 @@ test("requires packaged protection refresh fail-closed marker", () => {
     )
   );
   assert.ok(
+    MACOS_NATIVE_PRIVACY_SHIELD_MARKERS.includes(
+      "Native privacy shield scans macOS window titles on a bounded background worker for browser Meet and Teams risk."
+    )
+  );
+  assert.ok(
     TARGET_PRIVACY_SHIELD_MARKERS["macos-arm64"].includes(
       "macOS process screen-share guard skips window-title scan after direct capture-process match."
     )

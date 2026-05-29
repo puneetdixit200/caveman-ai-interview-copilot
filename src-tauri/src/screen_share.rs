@@ -28,7 +28,11 @@ const NATIVE_PRIVACY_SHIELD_INTERVAL: Duration = Duration::from_millis(50);
 const SCREEN_SHARE_GUARD_COMMAND_TIMEOUT: Duration = Duration::from_millis(1_500);
 #[cfg(target_os = "macos")]
 const MACOS_WINDOW_TITLE_GUARD_COMMAND_TIMEOUT: Duration = Duration::from_millis(750);
+#[cfg(target_os = "macos")]
+const MACOS_WINDOW_TITLE_PRIVACY_SCAN_INTERVAL: Duration = Duration::from_millis(5_000);
 static NATIVE_PRIVACY_SHIELD_SHARE_RISK_ACTIVE: AtomicBool = AtomicBool::new(false);
+#[cfg(target_os = "macos")]
+static MACOS_WINDOW_TITLE_PRIVACY_RISK_ACTIVE: AtomicBool = AtomicBool::new(false);
 pub const NATIVE_PRIVACY_SHIELD_THREAD_START_FAILED_MARKER: &str =
     "Native privacy shield thread failed to start; refusing to run without fail-closed screen-share guard.";
 pub const NATIVE_PRIVACY_SHIELD_STARTS_BEFORE_INITIAL_SHOW_MARKER: &str =
@@ -39,6 +43,9 @@ pub const NATIVE_PRIVACY_SHIELD_SKIPS_WINDOW_TITLE_SCAN_MARKER: &str =
     "Native privacy shield keeps macOS window-title scans out of the fast poll so direct capture polling cannot stall.";
 pub const NATIVE_PRIVACY_SHIELD_MACOS_PGREP_CAPTURE_MARKER: &str =
     "Native privacy shield checks macOS capture processes with pgrep before slower process parsing.";
+#[cfg(target_os = "macos")]
+pub const NATIVE_PRIVACY_SHIELD_MACOS_WINDOW_TITLE_BACKGROUND_SCAN_MARKER: &str =
+    "Native privacy shield scans macOS window titles on a bounded background worker for browser Meet and Teams risk.";
 pub const NATIVE_PRIVACY_SHIELD_REFRESHES_CAPTURE_BEFORE_SHARE_HIDE_MARKER: &str =
     "Native privacy shield refreshes capture exclusion before hiding for screen-share risk.";
 pub const NATIVE_PRIVACY_SHIELD_MAIN_THREAD_WINDOW_UPDATE_MARKER: &str =
@@ -867,6 +874,9 @@ pub fn start_native_privacy_shield(app: tauri::AppHandle) -> anyhow::Result<()> 
     std::hint::black_box(NATIVE_PRIVACY_SHIELD_MAIN_THREAD_WINDOW_UPDATE_MARKER);
     std::hint::black_box(NATIVE_PRIVACY_SHIELD_SHARE_RISK_LATCH_MARKER);
 
+    #[cfg(target_os = "macos")]
+    start_macos_window_title_privacy_scan_thread()?;
+
     thread::Builder::new()
         .name("screen-share-privacy-shield".to_string())
         .spawn(move || {
@@ -946,6 +956,10 @@ pub fn detect_screen_share_status_for_native_privacy_shield() -> anyhow::Result<
             return Ok(direct_process_status);
         }
 
+        if let Some(status) = macos_window_title_privacy_risk_status() {
+            return Ok(status);
+        }
+
         std::hint::black_box(NATIVE_PRIVACY_SHIELD_SKIPS_WINDOW_TITLE_SCAN_MARKER);
         Ok(direct_process_status)
     }
@@ -954,6 +968,54 @@ pub fn detect_screen_share_status_for_native_privacy_shield() -> anyhow::Result<
     {
         detect_screen_share_status()
     }
+}
+
+#[cfg(target_os = "macos")]
+fn start_macos_window_title_privacy_scan_thread() -> anyhow::Result<()> {
+    std::hint::black_box(NATIVE_PRIVACY_SHIELD_MACOS_WINDOW_TITLE_BACKGROUND_SCAN_MARKER);
+
+    thread::Builder::new()
+        .name("macos-window-title-privacy-shield".to_string())
+        .spawn(move || loop {
+            thread::sleep(MACOS_WINDOW_TITLE_PRIVACY_SCAN_INTERVAL);
+            if detect_macos_direct_capture_process_status()
+                .ok()
+                .flatten()
+                .is_some()
+            {
+                MACOS_WINDOW_TITLE_PRIVACY_RISK_ACTIVE.store(false, Ordering::Relaxed);
+                continue;
+            }
+
+            let active = detect_macos_window_title_privacy_risk().unwrap_or(false);
+            MACOS_WINDOW_TITLE_PRIVACY_RISK_ACTIVE.store(active, Ordering::Relaxed);
+        })
+        .map(|_| ())
+        .map_err(|error| anyhow::anyhow!("{error}"))
+}
+
+#[cfg(target_os = "macos")]
+fn detect_macos_window_title_privacy_risk() -> anyhow::Result<bool> {
+    let processes = detect_macos_visible_window_title_processes()?;
+    Ok(screen_share_status_for_processes(processes).active)
+}
+
+#[cfg(target_os = "macos")]
+fn macos_window_title_privacy_risk_status() -> Option<ScreenShareStatus> {
+    if !MACOS_WINDOW_TITLE_PRIVACY_RISK_ACTIVE.load(Ordering::Relaxed) {
+        return None;
+    }
+
+    std::hint::black_box(NATIVE_PRIVACY_SHIELD_MACOS_WINDOW_TITLE_BACKGROUND_SCAN_MARKER);
+    Some(ScreenShareStatus {
+        active: true,
+        matched_processes: vec![ScreenShareProcess {
+            name: "macOS window-title privacy scan".to_string(),
+            pid: None,
+            window_title: Some("Browser meeting or sharing title detected".to_string()),
+        }],
+        message: Some("Browser meeting or sharing title is visible.".to_string()),
+    })
 }
 
 #[cfg(target_os = "macos")]
@@ -2555,8 +2617,39 @@ mod tests {
                 MACOS_WINDOW_TITLE_GUARD_COMMAND_TIMEOUT,
                 Duration::from_millis(750)
             );
+            assert_eq!(
+                MACOS_WINDOW_TITLE_PRIVACY_SCAN_INTERVAL,
+                Duration::from_millis(5_000)
+            );
             assert!(MACOS_WINDOW_TITLE_SHORT_TIMEOUT_MARKER.contains("short timeout"));
+            assert!(
+                NATIVE_PRIVACY_SHIELD_MACOS_WINDOW_TITLE_BACKGROUND_SCAN_MARKER
+                    .contains("background worker")
+            );
         }
+    }
+
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn native_privacy_shield_uses_background_window_title_risk_without_fast_scan() {
+        MACOS_WINDOW_TITLE_PRIVACY_RISK_ACTIVE.store(false, Ordering::Relaxed);
+        assert_eq!(macos_window_title_privacy_risk_status(), None);
+
+        MACOS_WINDOW_TITLE_PRIVACY_RISK_ACTIVE.store(true, Ordering::Relaxed);
+        let status = macos_window_title_privacy_risk_status()
+            .expect("active title risk should synthesize a fast shield status");
+
+        assert!(status.active);
+        assert_eq!(
+            status.matched_processes,
+            vec![ScreenShareProcess {
+                name: "macOS window-title privacy scan".to_string(),
+                pid: None,
+                window_title: Some("Browser meeting or sharing title detected".to_string()),
+            }]
+        );
+
+        MACOS_WINDOW_TITLE_PRIVACY_RISK_ACTIVE.store(false, Ordering::Relaxed);
     }
 
     #[test]
