@@ -252,13 +252,22 @@ test("native privacy shield refreshes capture protection before share-risk hide"
   const shieldEnd = screenShareRs.indexOf("pub fn native_privacy_shield_thread_start_error_message", shieldStart);
   const shieldBody = screenShareRs.slice(shieldStart, shieldEnd);
   const shareRiskBranchStart = shieldBody.indexOf("NativePrivacyShieldDecision::Hide { .. } =>");
-  const refreshIndex = shieldBody.indexOf("crate::overlay::protect_overlay_window(&app, true)", shareRiskBranchStart);
-  const hideIndex = shieldBody.indexOf("hide_app_windows_for_native_privacy_shield(&app)", shareRiskBranchStart);
+  const mainThreadDispatch = shieldBody.indexOf("app.run_on_main_thread");
+  const shareRiskLatch = shieldBody.indexOf("share_risk_was_active");
+  const clearRestore = shieldBody.indexOf("restore_companion_windows_after_share_risk_cleared");
+  const refreshIndex = shieldBody.indexOf("crate::overlay::protect_overlay_window(&main_thread_app, true)", shareRiskBranchStart);
+  const hideIndex = shieldBody.indexOf("hide_app_windows_for_native_privacy_shield(&main_thread_app)", shareRiskBranchStart);
 
   assert.notEqual(shieldStart, -1, "native privacy shield entrypoint must exist");
   assert.notEqual(shareRiskBranchStart, -1, "screen-share risk branch must fail closed");
+  assert.notEqual(mainThreadDispatch, -1, "privacy shield window updates must be scheduled on the Tauri main thread");
+  assert.notEqual(shareRiskLatch, -1, "privacy shield must remember whether the previous poll hid for share risk");
+  assert.notEqual(clearRestore, -1, "privacy shield must run a stronger restore when share risk clears");
   assert.notEqual(refreshIndex, -1, "share-risk branch must refresh capture exclusion before hiding");
   assert.notEqual(hideIndex, -1, "share-risk branch must hide app windows");
+  assert.ok(shareRiskLatch < mainThreadDispatch, "share-risk transition state must be computed before UI restore dispatch");
+  assert.ok(mainThreadDispatch < clearRestore, "share-risk clear restore must run on the Tauri main thread");
+  assert.ok(mainThreadDispatch < shareRiskBranchStart, "privacy decisions must dispatch window updates to the main thread");
   assert.ok(refreshIndex < hideIndex, "capture exclusion must be refreshed before app windows are hidden");
   assert.match(screenShareRs, /Duration::from_millis\(100\)/);
   assert.match(screenShareRs, /Native privacy shield polls every 100ms for new screen-share risk\./);
@@ -266,6 +275,7 @@ test("native privacy shield refreshes capture protection before share-risk hide"
     screenShareRs,
     /Native privacy shield refreshes capture exclusion before hiding for screen-share risk\./
   );
+  assert.match(screenShareRs, /Native privacy shield applies app-window updates on the Tauri main thread\./);
 });
 
 test("native screen OCR capture hides app windows before creating screenshots", async () => {

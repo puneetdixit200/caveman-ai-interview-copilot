@@ -559,6 +559,8 @@ dependencies = [
  "chrono",
  "cpal",
  "keyring-core",
+ "objc2-core-foundation",
+ "objc2-core-graphics",
  "reqwest",
  "rusqlite",
  "serde",

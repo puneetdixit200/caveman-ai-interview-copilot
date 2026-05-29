@@ -33,6 +33,8 @@ pub const NATIVE_PRIVACY_SHIELD_FAST_POLL_MARKER: &str =
     "Native privacy shield polls every 100ms for new screen-share risk.";
 pub const NATIVE_PRIVACY_SHIELD_REFRESHES_CAPTURE_BEFORE_SHARE_HIDE_MARKER: &str =
     "Native privacy shield refreshes capture exclusion before hiding for screen-share risk.";
+pub const NATIVE_PRIVACY_SHIELD_MAIN_THREAD_WINDOW_UPDATE_MARKER: &str =
+    "Native privacy shield applies app-window updates on the Tauri main thread.";
 pub const SCREEN_SHARE_GUARD_COMMAND_TIMEOUT_MARKER: &str =
     "Screen-share guard command timeout failed closed before privacy polling could stall.";
 const EDGE_WEBVIEW_HOST_PROCESS: &str = "msedgewebview2.exe";
@@ -831,32 +833,48 @@ pub fn start_native_privacy_shield(app: tauri::AppHandle) -> anyhow::Result<()> 
     std::hint::black_box(NATIVE_PRIVACY_SHIELD_STARTS_BEFORE_INITIAL_SHOW_MARKER);
     std::hint::black_box(NATIVE_PRIVACY_SHIELD_FAST_POLL_MARKER);
     std::hint::black_box(NATIVE_PRIVACY_SHIELD_REFRESHES_CAPTURE_BEFORE_SHARE_HIDE_MARKER);
+    std::hint::black_box(NATIVE_PRIVACY_SHIELD_MAIN_THREAD_WINDOW_UPDATE_MARKER);
 
     thread::Builder::new()
         .name("screen-share-privacy-shield".to_string())
-        .spawn(move || loop {
-            match native_privacy_shield_decision(detect_screen_share_status()) {
-                NativePrivacyShieldDecision::Allow => {
-                    let status = crate::overlay::protect_overlay_window(&app, true);
-                    if matches!(
-                        native_privacy_shield_decision_for_overlay_protection(&status),
-                        NativePrivacyShieldDecision::Hide { .. }
-                    ) {
-                        hide_app_windows_for_native_privacy_shield(&app);
-                    } else {
-                        crate::overlay::restore_companion_windows_after_clear_privacy_check(&app);
+        .spawn(move || {
+            let mut share_risk_was_active = false;
+            loop {
+                let decision = native_privacy_shield_decision(detect_screen_share_status());
+                let restore_after_share_risk =
+                    matches!(decision, NativePrivacyShieldDecision::Allow) && share_risk_was_active;
+                share_risk_was_active =
+                    matches!(decision, NativePrivacyShieldDecision::Hide { .. });
+                let main_thread_app = app.clone();
+                let _ = app.run_on_main_thread(move || match decision {
+                    NativePrivacyShieldDecision::Allow => {
+                        let status = crate::overlay::protect_overlay_window(&main_thread_app, true);
+                        if matches!(
+                            native_privacy_shield_decision_for_overlay_protection(&status),
+                            NativePrivacyShieldDecision::Hide { .. }
+                        ) {
+                            hide_app_windows_for_native_privacy_shield(&main_thread_app);
+                        } else if restore_after_share_risk {
+                            crate::overlay::restore_companion_windows_after_share_risk_cleared(
+                                &main_thread_app,
+                            );
+                        } else {
+                            crate::overlay::restore_companion_windows_after_clear_privacy_check(
+                                &main_thread_app,
+                            );
+                        }
                     }
-                }
-                NativePrivacyShieldDecision::Hide { .. } => {
-                    std::hint::black_box(
-                        NATIVE_PRIVACY_SHIELD_REFRESHES_CAPTURE_BEFORE_SHARE_HIDE_MARKER,
-                    );
-                    let _ = crate::overlay::protect_overlay_window(&app, true);
-                    hide_app_windows_for_native_privacy_shield(&app);
-                }
-            }
+                    NativePrivacyShieldDecision::Hide { .. } => {
+                        std::hint::black_box(
+                            NATIVE_PRIVACY_SHIELD_REFRESHES_CAPTURE_BEFORE_SHARE_HIDE_MARKER,
+                        );
+                        let _ = crate::overlay::protect_overlay_window(&main_thread_app, true);
+                        hide_app_windows_for_native_privacy_shield(&main_thread_app);
+                    }
+                });
 
-            thread::sleep(NATIVE_PRIVACY_SHIELD_INTERVAL);
+                thread::sleep(NATIVE_PRIVACY_SHIELD_INTERVAL);
+            }
         })
         .map(|_| ())
         .map_err(|error| {
@@ -2393,6 +2411,7 @@ mod tests {
             NATIVE_PRIVACY_SHIELD_REFRESHES_CAPTURE_BEFORE_SHARE_HIDE_MARKER
                 .contains("refreshes capture exclusion")
         );
+        assert!(NATIVE_PRIVACY_SHIELD_MAIN_THREAD_WINDOW_UPDATE_MARKER.contains("main thread"));
     }
 
     #[test]

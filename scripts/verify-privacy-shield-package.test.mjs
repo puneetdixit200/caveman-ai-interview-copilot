@@ -300,6 +300,21 @@ test("requires packaged protection refresh fail-closed marker", () => {
   );
   assert.ok(
     COMMON_PRIVACY_SHIELD_MARKERS.includes(
+      "Companion app windows are focused only when unusable bounds need repair after privacy clears."
+    )
+  );
+  assert.ok(
+    COMMON_PRIVACY_SHIELD_MARKERS.includes(
+      "macOS companion window repair reactivates the app only after unusable bounds are detected."
+    )
+  );
+  assert.ok(
+    COMMON_PRIVACY_SHIELD_MARKERS.includes(
+      "Companion app windows reactivate after screen-share risk clears to recover usable bounds."
+    )
+  );
+  assert.ok(
+    COMMON_PRIVACY_SHIELD_MARKERS.includes(
       "Native privacy shield thread failed to start; refusing to run without fail-closed screen-share guard."
     )
   );
@@ -310,6 +325,11 @@ test("requires packaged protection refresh fail-closed marker", () => {
   assert.ok(
     COMMON_PRIVACY_SHIELD_MARKERS.includes(
       "Native privacy shield refreshes capture exclusion before hiding for screen-share risk."
+    )
+  );
+  assert.ok(
+    COMMON_PRIVACY_SHIELD_MARKERS.includes(
+      "Native privacy shield applies app-window updates on the Tauri main thread."
     )
   );
   assert.ok(
