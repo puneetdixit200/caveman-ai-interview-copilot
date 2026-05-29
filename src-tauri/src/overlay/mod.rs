@@ -44,7 +44,7 @@ pub const COMPANION_POST_SHOW_SHARE_RISK_MARKER: &str =
 pub const COMPANION_WINDOW_BOUNDS_REPAIR_MARKER: &str =
     "Companion app window bounds are repaired before and after privacy-approved startup show.";
 pub const COMPANION_WINDOW_BACKGROUND_REPAIR_MARKER: &str =
-    "Companion app window bounds are repaired while privacy shield stays clear.";
+    "Companion app windows are restored and repaired while privacy shield stays clear.";
 const COMPANION_WINDOW_MIN_WIDTH: u32 = 1024;
 const COMPANION_WINDOW_MIN_HEIGHT: u32 = 720;
 const COMPANION_WINDOW_DEFAULT_WIDTH: u32 = 1280;
@@ -52,6 +52,7 @@ const COMPANION_WINDOW_DEFAULT_HEIGHT: u32 = 820;
 const COMPANION_WINDOW_MIN_VISIBLE_WIDTH: u32 = 320;
 const COMPANION_WINDOW_MIN_VISIBLE_HEIGHT: u32 = 240;
 pub const STARTUP_COMPANION_WINDOW_REPAIR_DELAYS_MS: [u64; 3] = [150, 600, 1_500];
+pub const COMPANION_WINDOW_BOUNDS_WATCHDOG_INTERVAL_MS: u64 = 500;
 
 pub fn protected_window_labels() -> [&'static str; 2] {
     PROTECTED_WINDOW_LABELS
@@ -571,18 +572,50 @@ pub fn focus_companion_windows(app: &tauri::AppHandle) {
     }
 }
 
-pub fn repair_visible_companion_window_bounds(app: &tauri::AppHandle) {
+pub fn restore_companion_windows_after_clear_privacy_check(app: &tauri::AppHandle) {
     use tauri::Manager;
 
     std::hint::black_box(COMPANION_WINDOW_BACKGROUND_REPAIR_MARKER);
 
     for (label, window) in app.webview_windows() {
-        if !is_companion_window_label(&label) || !window.is_visible().unwrap_or(false) {
+        if !is_companion_window_label(&label) {
+            continue;
+        }
+
+        repair_companion_window_bounds(app, &window);
+        let _ = window.show();
+        repair_companion_window_bounds(app, &window);
+    }
+}
+
+pub fn repair_companion_window_bounds_without_show(app: &tauri::AppHandle) {
+    use tauri::Manager;
+
+    std::hint::black_box(COMPANION_WINDOW_BACKGROUND_REPAIR_MARKER);
+
+    for (label, window) in app.webview_windows() {
+        if !is_companion_window_label(&label) {
             continue;
         }
 
         repair_companion_window_bounds(app, &window);
     }
+}
+
+pub fn start_companion_window_bounds_watchdog(app: tauri::AppHandle) -> anyhow::Result<()> {
+    std::thread::Builder::new()
+        .name("companion-window-bounds-watchdog".to_string())
+        .spawn(move || loop {
+            std::thread::sleep(std::time::Duration::from_millis(
+                COMPANION_WINDOW_BOUNDS_WATCHDOG_INTERVAL_MS,
+            ));
+            let main_thread_app = app.clone();
+            let _ = app.run_on_main_thread(move || {
+                repair_companion_window_bounds_without_show(&main_thread_app);
+            });
+        })
+        .map(|_| ())
+        .map_err(|error| anyhow::anyhow!("{error}"))
 }
 
 pub fn schedule_startup_companion_window_repair(app: tauri::AppHandle) {

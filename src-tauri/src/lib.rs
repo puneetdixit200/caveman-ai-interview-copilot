@@ -37,6 +37,7 @@ pub fn run() {
             app.manage(runtime::RuntimeBudget::default());
             let startup_allows_initial_show = overlay::configure_overlay_security(app);
             screen_share::start_native_privacy_shield(app.handle().clone())?;
+            overlay::start_companion_window_bounds_watchdog(app.handle().clone())?;
             if startup_allows_initial_show {
                 let _ = overlay::set_companion_windows_visible(app.handle(), true, true);
                 overlay::focus_companion_windows(app.handle());

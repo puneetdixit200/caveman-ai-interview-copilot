@@ -844,7 +844,7 @@ pub fn start_native_privacy_shield(app: tauri::AppHandle) -> anyhow::Result<()> 
                     ) {
                         hide_app_windows_for_native_privacy_shield(&app);
                     } else {
-                        crate::overlay::repair_visible_companion_window_bounds(&app);
+                        crate::overlay::restore_companion_windows_after_clear_privacy_check(&app);
                     }
                 }
                 NativePrivacyShieldDecision::Hide { .. } => {

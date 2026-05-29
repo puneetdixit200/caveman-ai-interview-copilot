@@ -295,7 +295,7 @@ test("requires packaged protection refresh fail-closed marker", () => {
   );
   assert.ok(
     COMMON_PRIVACY_SHIELD_MARKERS.includes(
-      "Companion app window bounds are repaired while privacy shield stays clear."
+      "Companion app windows are restored and repaired while privacy shield stays clear."
     )
   );
   assert.ok(
