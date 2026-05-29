@@ -416,6 +416,11 @@ test("requires packaged protection refresh fail-closed marker", () => {
   );
   assert.ok(
     COMMON_PRIVACY_SHIELD_MARKERS.includes(
+      "Native privacy shield treats unexpected macOS pgrep errors as fail-closed before slower process parsing."
+    )
+  );
+  assert.ok(
+    COMMON_PRIVACY_SHIELD_MARKERS.includes(
       "Native privacy shield refreshes capture exclusion before hiding for screen-share risk."
     )
   );

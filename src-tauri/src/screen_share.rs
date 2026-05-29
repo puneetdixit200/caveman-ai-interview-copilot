@@ -44,6 +44,9 @@ pub const NATIVE_PRIVACY_SHIELD_SKIPS_WINDOW_TITLE_SCAN_MARKER: &str =
 pub const NATIVE_PRIVACY_SHIELD_MACOS_PGREP_CAPTURE_MARKER: &str =
     "Native privacy shield checks macOS capture processes with pgrep before slower process parsing.";
 #[cfg(target_os = "macos")]
+pub const NATIVE_PRIVACY_SHIELD_MACOS_PGREP_FAIL_CLOSED_MARKER: &str =
+    "Native privacy shield treats unexpected macOS pgrep errors as fail-closed before slower process parsing.";
+#[cfg(target_os = "macos")]
 pub const NATIVE_PRIVACY_SHIELD_MACOS_WINDOW_TITLE_BACKGROUND_SCAN_MARKER: &str =
     "Native privacy shield scans macOS window titles on a bounded background worker for browser Meet and Teams risk.";
 pub const NATIVE_PRIVACY_SHIELD_REFRESHES_CAPTURE_BEFORE_SHARE_HIDE_MARKER: &str =
@@ -150,6 +153,8 @@ const MACOS_WINDOW_TITLE_TIMEOUT_FALLBACK_MARKER: &str =
 #[cfg(target_os = "macos")]
 const MACOS_WINDOW_TITLE_SHORT_TIMEOUT_MARKER: &str =
     "macOS window-title guard uses a short timeout so native privacy polling cannot stall.";
+#[cfg(target_os = "macos")]
+const MACOS_DIRECT_CAPTURE_PGREP_NO_MATCH_EXIT_CODE: i32 = 1;
 const MACOS_PROCESS_GUARD_SHORT_CIRCUIT_MARKER: &str =
     "macOS process screen-share guard skips window-title scan after direct capture-process match.";
 #[cfg(target_os = "macos")]
@@ -893,31 +898,12 @@ pub fn start_native_privacy_shield(app: tauri::AppHandle) -> anyhow::Result<()> 
                     matches!(decision, NativePrivacyShieldDecision::Allow) && share_risk_was_active;
                 share_risk_was_active = share_risk_is_active;
                 let main_thread_app = app.clone();
-                let _ = app.run_on_main_thread(move || match decision {
-                    NativePrivacyShieldDecision::Allow => {
-                        let status = crate::overlay::protect_overlay_window(&main_thread_app, true);
-                        if matches!(
-                            native_privacy_shield_decision_for_overlay_protection(&status),
-                            NativePrivacyShieldDecision::Hide { .. }
-                        ) {
-                            hide_app_windows_for_native_privacy_shield(&main_thread_app);
-                        } else if restore_after_share_risk {
-                            crate::overlay::restore_companion_windows_after_share_risk_cleared(
-                                &main_thread_app,
-                            );
-                        } else {
-                            crate::overlay::restore_companion_windows_after_clear_privacy_check(
-                                &main_thread_app,
-                            );
-                        }
-                    }
-                    NativePrivacyShieldDecision::Hide { .. } => {
-                        std::hint::black_box(
-                            NATIVE_PRIVACY_SHIELD_REFRESHES_CAPTURE_BEFORE_SHARE_HIDE_MARKER,
-                        );
-                        let _ = crate::overlay::protect_overlay_window(&main_thread_app, true);
-                        hide_app_windows_for_native_privacy_shield(&main_thread_app);
-                    }
+                let _ = app.run_on_main_thread(move || {
+                    apply_native_privacy_shield_window_update(
+                        &main_thread_app,
+                        decision,
+                        restore_after_share_risk,
+                    );
                 });
 
                 thread::sleep(NATIVE_PRIVACY_SHIELD_INTERVAL);
@@ -1021,6 +1007,7 @@ fn macos_window_title_privacy_risk_status() -> Option<ScreenShareStatus> {
 #[cfg(target_os = "macos")]
 fn detect_macos_direct_capture_process_status() -> anyhow::Result<Option<ScreenShareStatus>> {
     std::hint::black_box(NATIVE_PRIVACY_SHIELD_MACOS_PGREP_CAPTURE_MARKER);
+    std::hint::black_box(NATIVE_PRIVACY_SHIELD_MACOS_PGREP_FAIL_CLOSED_MARKER);
 
     let mut matched_processes = Vec::new();
     for name in [
@@ -1034,6 +1021,11 @@ fn detect_macos_direct_capture_process_status() -> anyhow::Result<Option<ScreenS
                 name,
                 &String::from_utf8_lossy(&output.stdout),
             ));
+            continue;
+        }
+
+        if output.status.code() != Some(MACOS_DIRECT_CAPTURE_PGREP_NO_MATCH_EXIT_CODE) {
+            return Err(macos_pgrep_query_error(name, &output));
         }
     }
 
@@ -1046,6 +1038,20 @@ fn detect_macos_direct_capture_process_status() -> anyhow::Result<Option<ScreenS
             message: Some("Known screen-sharing or recording process is running.".to_string()),
         }))
     }
+}
+
+#[cfg(target_os = "macos")]
+fn macos_pgrep_query_error(name: &str, output: &Output) -> anyhow::Error {
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    let detail = stderr.trim();
+    anyhow::anyhow!(
+        "Could not query macOS direct capture agent {name} for screen-share guard{}",
+        if detail.is_empty() {
+            ".".to_string()
+        } else {
+            format!(": {detail}")
+        }
+    )
 }
 
 #[cfg(target_os = "macos")]
@@ -1069,6 +1075,33 @@ pub fn native_privacy_shield_thread_start_error_message(error: impl std::fmt::Di
 
 pub fn native_privacy_shield_share_risk_is_active() -> bool {
     NATIVE_PRIVACY_SHIELD_SHARE_RISK_ACTIVE.load(Ordering::Relaxed)
+}
+
+fn apply_native_privacy_shield_window_update(
+    app: &tauri::AppHandle,
+    decision: NativePrivacyShieldDecision,
+    restore_after_share_risk: bool,
+) {
+    match decision {
+        NativePrivacyShieldDecision::Allow => {
+            let status = crate::overlay::protect_overlay_window(app, true);
+            if matches!(
+                native_privacy_shield_decision_for_overlay_protection(&status),
+                NativePrivacyShieldDecision::Hide { .. }
+            ) {
+                hide_app_windows_for_native_privacy_shield(app);
+            } else if restore_after_share_risk {
+                crate::overlay::restore_companion_windows_after_share_risk_cleared(app);
+            } else {
+                crate::overlay::restore_companion_windows_after_clear_privacy_check(app);
+            }
+        }
+        NativePrivacyShieldDecision::Hide { .. } => {
+            std::hint::black_box(NATIVE_PRIVACY_SHIELD_REFRESHES_CAPTURE_BEFORE_SHARE_HIDE_MARKER);
+            let _ = crate::overlay::protect_overlay_window(app, true);
+            hide_app_windows_for_native_privacy_shield(app);
+        }
+    }
 }
 
 fn hide_app_windows_for_native_privacy_shield(app: &tauri::AppHandle) {
@@ -1951,6 +1984,7 @@ mod tests {
     #[test]
     fn parses_macos_direct_capture_process_rows_from_pgrep() {
         assert!(NATIVE_PRIVACY_SHIELD_MACOS_PGREP_CAPTURE_MARKER.contains("pgrep"));
+        assert!(NATIVE_PRIVACY_SHIELD_MACOS_PGREP_FAIL_CLOSED_MARKER.contains("fail-closed"));
 
         assert_eq!(
             parse_pgrep_process_rows(MACOS_SCREEN_CAPTURE_CLI_PROCESS, "123\n456\n"),
