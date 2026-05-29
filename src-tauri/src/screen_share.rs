@@ -901,9 +901,20 @@ fn is_watched_screen_share_process(process: &ScreenShareProcess) -> bool {
         return false;
     }
 
+    if is_macos_core_parsec_system_process(process, &normalized) {
+        return false;
+    }
+
     WATCHED_SCREEN_SHARE_PROCESSES
         .iter()
         .any(|candidate| process_name_matches_candidate(&normalized, candidate))
+}
+
+fn is_macos_core_parsec_system_process(process: &ScreenShareProcess, normalized: &str) -> bool {
+    matches!(normalized, "parsecd" | "parsec-fbf")
+        && process
+            .name
+            .starts_with("/System/Library/PrivateFrameworks/CoreParsec.framework/")
 }
 
 fn is_screen_share_window_title_host_process(name: &str) -> bool {
@@ -1743,6 +1754,25 @@ mod tests {
 
         assert!(!status.active);
         assert_eq!(status.matched_processes, Vec::<ScreenShareProcess>::new());
+    }
+
+    #[test]
+    fn ignores_macos_coreparsec_system_services_without_ignoring_parsec_remote_app() {
+        let processes = parse_unix_process_list(
+            " 1079 /System/Library/PrivateFrameworks/CoreParsec.framework/parsecd\n 2427 /System/Library/PrivateFrameworks/CoreParsec.framework/parsec-fbf\n 2500 /Applications/Parsec.app/Contents/MacOS/parsecd",
+        );
+
+        let status = screen_share_status_for_processes(processes);
+
+        assert!(status.active);
+        assert_eq!(
+            status.matched_processes,
+            vec![ScreenShareProcess {
+                name: "/Applications/Parsec.app/Contents/MacOS/parsecd".to_string(),
+                pid: Some(2500),
+                window_title: None,
+            }]
+        );
     }
 
     #[test]
