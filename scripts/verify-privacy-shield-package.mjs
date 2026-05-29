@@ -34,7 +34,7 @@ export const COMMON_PRIVACY_SHIELD_MARKERS = [
   "Companion app window show was reverted because capture exclusion was not proven after visibility changed.",
   "Overlay show was reverted because screen-share risk was detected after visibility changed.",
   "Companion app window show was reverted because screen-share risk was detected after visibility changed.",
-  "Companion app window bounds are repaired before privacy-approved startup show.",
+  "Companion app window bounds are repaired before and after privacy-approved startup show.",
   "Native privacy shield thread failed to start; refusing to run without fail-closed screen-share guard.",
   "Native privacy shield starts before startup companion window show.",
   "Native privacy shield polls every 100ms for new screen-share risk.",

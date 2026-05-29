@@ -42,13 +42,14 @@ pub const OVERLAY_POST_SHOW_SHARE_RISK_MARKER: &str =
 pub const COMPANION_POST_SHOW_SHARE_RISK_MARKER: &str =
     "Companion app window show was reverted because screen-share risk was detected after visibility changed.";
 pub const COMPANION_WINDOW_BOUNDS_REPAIR_MARKER: &str =
-    "Companion app window bounds are repaired before privacy-approved startup show.";
+    "Companion app window bounds are repaired before and after privacy-approved startup show.";
 const COMPANION_WINDOW_MIN_WIDTH: u32 = 1024;
 const COMPANION_WINDOW_MIN_HEIGHT: u32 = 720;
 const COMPANION_WINDOW_DEFAULT_WIDTH: u32 = 1280;
 const COMPANION_WINDOW_DEFAULT_HEIGHT: u32 = 820;
 const COMPANION_WINDOW_MIN_VISIBLE_WIDTH: u32 = 320;
 const COMPANION_WINDOW_MIN_VISIBLE_HEIGHT: u32 = 240;
+pub const STARTUP_COMPANION_WINDOW_REPAIR_DELAYS_MS: [u64; 3] = [150, 600, 1_500];
 
 pub fn protected_window_labels() -> [&'static str; 2] {
     PROTECTED_WINDOW_LABELS
@@ -450,13 +451,20 @@ pub fn set_companion_windows_visible(
             repair_companion_window_bounds(app, window);
         }
 
-        let visibility_result = if visible {
+        match if visible {
             window.show()
         } else {
             window.hide()
-        };
-        if let Err(error) = visibility_result {
-            visibility_failures.push(format!("{label} window visibility update failed: {error}"));
+        } {
+            Ok(()) => {
+                if visible {
+                    repair_companion_window_bounds(app, window);
+                }
+            }
+            Err(error) => {
+                visibility_failures
+                    .push(format!("{label} window visibility update failed: {error}"));
+            }
         }
     }
 
@@ -544,6 +552,37 @@ pub fn companion_visibility_success_status(
         status.message = Some(join_status_messages(status.message.take(), messages));
     }
     companion_window_status(status)
+}
+
+pub fn focus_companion_windows(app: &tauri::AppHandle) {
+    use tauri::Manager;
+
+    for (label, window) in app.webview_windows() {
+        if !is_companion_window_label(&label) {
+            continue;
+        }
+
+        let _ = window.unminimize();
+        repair_companion_window_bounds(app, &window);
+        let _ = window.set_focus();
+        repair_companion_window_bounds(app, &window);
+    }
+}
+
+pub fn schedule_startup_companion_window_repair(app: tauri::AppHandle) {
+    for delay_ms in STARTUP_COMPANION_WINDOW_REPAIR_DELAYS_MS {
+        let worker_app = app.clone();
+        std::thread::spawn(move || {
+            std::thread::sleep(std::time::Duration::from_millis(delay_ms));
+            let main_thread_app = worker_app.clone();
+            let _ = worker_app.run_on_main_thread(move || {
+                let status = set_companion_windows_visible(&main_thread_app, true, true);
+                if status.visible {
+                    focus_companion_windows(&main_thread_app);
+                }
+            });
+        });
+    }
 }
 
 pub fn set_overlay_window_visible(
@@ -722,6 +761,10 @@ fn repair_companion_window_bounds(app: &tauri::AppHandle, window: &tauri::Webvie
         height: monitor.size().height,
         monitor_name: monitor.name().cloned(),
     };
+    let _ = window.set_min_size(Some(PhysicalSize::new(
+        COMPANION_WINDOW_MIN_WIDTH.min(monitor_bounds.width.max(1)),
+        COMPANION_WINDOW_MIN_HEIGHT.min(monitor_bounds.height.max(1)),
+    )));
     let repaired_bounds = sanitize_companion_window_bounds(current_bounds.clone(), monitor_bounds);
     if repaired_bounds == current_bounds {
         return;

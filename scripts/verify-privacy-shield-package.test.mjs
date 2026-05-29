@@ -290,7 +290,7 @@ test("requires packaged protection refresh fail-closed marker", () => {
   );
   assert.ok(
     COMMON_PRIVACY_SHIELD_MARKERS.includes(
-      "Companion app window bounds are repaired before privacy-approved startup show."
+      "Companion app window bounds are repaired before and after privacy-approved startup show."
     )
   );
   assert.ok(

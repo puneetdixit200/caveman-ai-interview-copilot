@@ -11,7 +11,7 @@ use super::{
     COMPANION_POST_SHOW_UNSAFE_PROTECTION_MARKER, COMPANION_UNSAFE_PROTECTION_MARKER,
     COMPANION_WINDOW_BOUNDS_REPAIR_MARKER, OVERLAY_POST_SHOW_SHARE_RISK_MARKER,
     OVERLAY_POST_SHOW_UNSAFE_PROTECTION_MARKER, PROTECTION_REFRESH_FAIL_CLOSED_MARKER,
-    STARTUP_PRIVACY_SHIELD_DENIED_INITIAL_SHOW_MARKER,
+    STARTUP_COMPANION_WINDOW_REPAIR_DELAYS_MS, STARTUP_PRIVACY_SHIELD_DENIED_INITIAL_SHOW_MARKER,
 };
 use crate::screen_share::NativePrivacyShieldDecision;
 
@@ -85,6 +85,7 @@ fn sanitizes_overlay_bounds_without_breaking_multi_monitor_coordinates() {
 #[test]
 fn repairs_tiny_offscreen_companion_window_to_centered_monitor_bounds() {
     assert!(COMPANION_WINDOW_BOUNDS_REPAIR_MARKER.contains("bounds are repaired"));
+    assert_eq!(STARTUP_COMPANION_WINDOW_REPAIR_DELAYS_MS, [150, 600, 1_500]);
 
     let repaired = sanitize_companion_window_bounds(
         OverlayWindowBounds {
