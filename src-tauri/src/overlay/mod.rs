@@ -43,6 +43,8 @@ pub const COMPANION_POST_SHOW_SHARE_RISK_MARKER: &str =
     "Companion app window show was reverted because screen-share risk was detected after visibility changed.";
 pub const COMPANION_WINDOW_BOUNDS_REPAIR_MARKER: &str =
     "Companion app window bounds are repaired before and after privacy-approved startup show.";
+pub const COMPANION_WINDOW_BACKGROUND_REPAIR_MARKER: &str =
+    "Companion app window bounds are repaired while privacy shield stays clear.";
 const COMPANION_WINDOW_MIN_WIDTH: u32 = 1024;
 const COMPANION_WINDOW_MIN_HEIGHT: u32 = 720;
 const COMPANION_WINDOW_DEFAULT_WIDTH: u32 = 1280;
@@ -565,6 +567,20 @@ pub fn focus_companion_windows(app: &tauri::AppHandle) {
         let _ = window.unminimize();
         repair_companion_window_bounds(app, &window);
         let _ = window.set_focus();
+        repair_companion_window_bounds(app, &window);
+    }
+}
+
+pub fn repair_visible_companion_window_bounds(app: &tauri::AppHandle) {
+    use tauri::Manager;
+
+    std::hint::black_box(COMPANION_WINDOW_BACKGROUND_REPAIR_MARKER);
+
+    for (label, window) in app.webview_windows() {
+        if !is_companion_window_label(&label) || !window.is_visible().unwrap_or(false) {
+            continue;
+        }
+
         repair_companion_window_bounds(app, &window);
     }
 }
