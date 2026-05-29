@@ -1,4 +1,6 @@
 use serde::Serialize;
+#[cfg(target_os = "macos")]
+use std::ffi::c_void;
 use std::{
     io::Read,
     process::{Command, Output, Stdio},
@@ -46,6 +48,9 @@ pub const NATIVE_PRIVACY_SHIELD_MACOS_PGREP_CAPTURE_MARKER: &str =
 #[cfg(target_os = "macos")]
 pub const NATIVE_PRIVACY_SHIELD_MACOS_PGREP_FAIL_CLOSED_MARKER: &str =
     "Native privacy shield treats unexpected macOS pgrep errors as fail-closed before slower process parsing.";
+#[cfg(target_os = "macos")]
+pub const NATIVE_PRIVACY_SHIELD_MACOS_LIBPROC_CAPTURE_MARKER: &str =
+    "Native privacy shield enumerates macOS capture processes through libproc before shell fallbacks.";
 #[cfg(target_os = "macos")]
 pub const NATIVE_PRIVACY_SHIELD_MACOS_WINDOW_TITLE_BACKGROUND_SCAN_MARKER: &str =
     "Native privacy shield scans macOS window titles on a bounded background worker for browser Meet and Teams risk.";
@@ -155,8 +160,17 @@ const MACOS_WINDOW_TITLE_SHORT_TIMEOUT_MARKER: &str =
     "macOS window-title guard uses a short timeout so native privacy polling cannot stall.";
 #[cfg(target_os = "macos")]
 const MACOS_DIRECT_CAPTURE_PGREP_NO_MATCH_EXIT_CODE: i32 = 1;
+#[cfg(target_os = "macos")]
+const MACOS_LIBPROC_ALL_PIDS: u32 = 1;
+#[cfg(target_os = "macos")]
+const MACOS_LIBPROC_NAME_BUFFER_SIZE: usize = 4096;
 const MACOS_PROCESS_GUARD_SHORT_CIRCUIT_MARKER: &str =
     "macOS process screen-share guard skips window-title scan after direct capture-process match.";
+#[cfg(target_os = "macos")]
+extern "C" {
+    fn proc_listpids(type_: u32, typeinfo: u32, buffer: *mut c_void, buffersize: i32) -> i32;
+    fn proc_name(pid: i32, buffer: *mut c_void, buffersize: u32) -> i32;
+}
 #[cfg(target_os = "macos")]
 const MACOS_VISIBLE_WINDOW_TITLE_SCRIPT: &str = r#"
 set previousDelimiters to AppleScript's text item delimiters
@@ -1008,6 +1022,11 @@ fn macos_window_title_privacy_risk_status() -> Option<ScreenShareStatus> {
 fn detect_macos_direct_capture_process_status() -> anyhow::Result<Option<ScreenShareStatus>> {
     std::hint::black_box(NATIVE_PRIVACY_SHIELD_MACOS_PGREP_CAPTURE_MARKER);
     std::hint::black_box(NATIVE_PRIVACY_SHIELD_MACOS_PGREP_FAIL_CLOSED_MARKER);
+    std::hint::black_box(NATIVE_PRIVACY_SHIELD_MACOS_LIBPROC_CAPTURE_MARKER);
+
+    if let Some(status) = detect_macos_libproc_direct_capture_process_status() {
+        return Ok(Some(status));
+    }
 
     let mut matched_processes = Vec::new();
     for name in [
@@ -1038,6 +1057,101 @@ fn detect_macos_direct_capture_process_status() -> anyhow::Result<Option<ScreenS
             message: Some("Known screen-sharing or recording process is running.".to_string()),
         }))
     }
+}
+
+#[cfg(target_os = "macos")]
+fn detect_macos_libproc_direct_capture_process_status() -> Option<ScreenShareStatus> {
+    let processes = macos_libproc_processes()?
+        .into_iter()
+        .filter(|process| is_macos_direct_capture_agent_name(&process.name))
+        .collect();
+    let status = screen_share_status_for_processes(processes);
+    if status.active {
+        Some(status)
+    } else {
+        None
+    }
+}
+
+#[cfg(target_os = "macos")]
+fn is_macos_direct_capture_agent_name(name: &str) -> bool {
+    let normalized = normalize_process_name(name);
+    [
+        MACOS_SCREEN_CAPTURE_CLI_PROCESS,
+        MACOS_SCREEN_CAPTURE_UI_PROCESS,
+        MACOS_SCREEN_CAPTURE_KIT_AGENT_PROCESS,
+    ]
+    .iter()
+    .any(|candidate| process_name_matches_candidate(&normalized, candidate))
+}
+
+#[cfg(target_os = "macos")]
+fn macos_libproc_processes() -> Option<Vec<ScreenShareProcess>> {
+    let requested_bytes =
+        unsafe { proc_listpids(MACOS_LIBPROC_ALL_PIDS, 0, std::ptr::null_mut(), 0) };
+    if requested_bytes <= 0 {
+        return None;
+    }
+
+    let requested_pid_count = (requested_bytes as usize / std::mem::size_of::<i32>()) + 128;
+    let mut pids = vec![0i32; requested_pid_count];
+    let buffer_bytes = pids
+        .len()
+        .checked_mul(std::mem::size_of::<i32>())?
+        .try_into()
+        .ok()?;
+    let returned_bytes = unsafe {
+        proc_listpids(
+            MACOS_LIBPROC_ALL_PIDS,
+            0,
+            pids.as_mut_ptr().cast::<c_void>(),
+            buffer_bytes,
+        )
+    };
+    if returned_bytes <= 0 {
+        return None;
+    }
+
+    let returned_pid_count = returned_bytes as usize / std::mem::size_of::<i32>();
+    Some(
+        pids.into_iter()
+            .take(returned_pid_count)
+            .filter_map(macos_libproc_process)
+            .collect(),
+    )
+}
+
+#[cfg(target_os = "macos")]
+fn macos_libproc_process(pid: i32) -> Option<ScreenShareProcess> {
+    if pid <= 0 {
+        return None;
+    }
+
+    let mut name_buffer = [0u8; MACOS_LIBPROC_NAME_BUFFER_SIZE];
+    let name_length = unsafe {
+        proc_name(
+            pid,
+            name_buffer.as_mut_ptr().cast::<c_void>(),
+            name_buffer.len() as u32,
+        )
+    };
+    if name_length <= 0 {
+        return None;
+    }
+
+    let name = String::from_utf8_lossy(&name_buffer[..name_length as usize])
+        .trim_end_matches('\0')
+        .trim()
+        .to_string();
+    if name.is_empty() {
+        return None;
+    }
+
+    Some(ScreenShareProcess {
+        name,
+        pid: Some(pid as u32),
+        window_title: None,
+    })
 }
 
 #[cfg(target_os = "macos")]
@@ -1985,6 +2099,7 @@ mod tests {
     fn parses_macos_direct_capture_process_rows_from_pgrep() {
         assert!(NATIVE_PRIVACY_SHIELD_MACOS_PGREP_CAPTURE_MARKER.contains("pgrep"));
         assert!(NATIVE_PRIVACY_SHIELD_MACOS_PGREP_FAIL_CLOSED_MARKER.contains("fail-closed"));
+        assert!(NATIVE_PRIVACY_SHIELD_MACOS_LIBPROC_CAPTURE_MARKER.contains("libproc"));
 
         assert_eq!(
             parse_pgrep_process_rows(MACOS_SCREEN_CAPTURE_CLI_PROCESS, "123\n456\n"),
@@ -2001,6 +2116,10 @@ mod tests {
                 },
             ]
         );
+        assert!(is_macos_direct_capture_agent_name(
+            MACOS_SCREEN_CAPTURE_CLI_PROCESS
+        ));
+        assert!(!is_macos_direct_capture_agent_name(MACOS_REPLAYD_PROCESS));
     }
 
     #[test]

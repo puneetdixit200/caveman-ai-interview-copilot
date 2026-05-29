@@ -17,6 +17,8 @@ import {
 } from "./verify-privacy-shield-package.mjs";
 
 const DESKTOP_PROCESS_TARGETS = ["windows-x64", "macos-x64", "macos-arm64"];
+const MACOS_LIBPROC_CAPTURE_MARKER =
+  "Native privacy shield enumerates macOS capture processes through libproc before shell fallbacks.";
 const MACOS_PGREP_FAIL_CLOSED_MARKER =
   "Native privacy shield treats unexpected macOS pgrep errors as fail-closed before slower process parsing.";
 
@@ -362,6 +364,11 @@ test("requires packaged protection refresh fail-closed marker", () => {
       "Native privacy shield scans macOS window titles on a bounded background worker for browser Meet and Teams risk."
     )
   );
+  assert.ok(MACOS_NATIVE_PRIVACY_SHIELD_MARKERS.includes(MACOS_LIBPROC_CAPTURE_MARKER));
+  assert.ok(TARGET_PRIVACY_SHIELD_MARKERS["macos-arm64"].includes(MACOS_LIBPROC_CAPTURE_MARKER));
+  assert.ok(TARGET_PRIVACY_SHIELD_MARKERS["macos-x64"].includes(MACOS_LIBPROC_CAPTURE_MARKER));
+  assert.ok(!TARGET_PRIVACY_SHIELD_MARKERS["windows-x64"].includes(MACOS_LIBPROC_CAPTURE_MARKER));
+  assert.ok(!TARGET_PRIVACY_SHIELD_MARKERS["linux-x64"].includes(MACOS_LIBPROC_CAPTURE_MARKER));
   assert.ok(
     TARGET_PRIVACY_SHIELD_MARKERS["macos-arm64"].includes(
       "macOS process screen-share guard skips window-title scan after direct capture-process match."

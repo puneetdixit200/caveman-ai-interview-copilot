@@ -294,6 +294,15 @@ test("native privacy shield refreshes capture protection before share-risk hide"
     screenShareRs,
     /Native privacy shield treats unexpected macOS pgrep errors as fail-closed before slower process parsing\./
   );
+  assert.match(
+    screenShareRs,
+    /Native privacy shield enumerates macOS capture processes through libproc before shell fallbacks\./
+  );
+  assert.ok(
+    screenShareRs.indexOf("detect_macos_libproc_direct_capture_process_status()") <
+      screenShareRs.indexOf('run_screen_share_guard_command("pgrep"'),
+    "macOS native process enumeration must run before pgrep fallback"
+  );
   assert.match(screenShareRs, /output\.status\.code\(\) != Some\(MACOS_DIRECT_CAPTURE_PGREP_NO_MATCH_EXIT_CODE\)/);
   assert.match(
     screenShareRs,
