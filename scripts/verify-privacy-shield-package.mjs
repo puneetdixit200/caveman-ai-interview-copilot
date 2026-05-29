@@ -46,7 +46,6 @@ export const COMMON_PRIVACY_SHIELD_MARKERS = [
   "Native privacy shield polls every 50ms for new screen-share risk.",
   "Native privacy shield keeps macOS window-title scans out of the fast poll so direct capture polling cannot stall.",
   "Native privacy shield checks macOS capture processes with pgrep before slower process parsing.",
-  "Native privacy shield treats unexpected macOS pgrep errors as fail-closed before slower process parsing.",
   "Native privacy shield refreshes capture exclusion before hiding for screen-share risk.",
   "Native privacy shield applies app-window updates on the Tauri main thread.",
   "Native privacy shield exposes a nonblocking share-risk latch for bounds repair.",
@@ -209,6 +208,7 @@ export const MACOS_COMPANION_WINDOW_REPAIR_MARKERS = [
 export const MACOS_NATIVE_PRIVACY_SHIELD_MARKERS = [
   "macOS process screen-share guard skips window-title scan after direct capture-process match.",
   "macOS window-title guard uses a short timeout so native privacy polling cannot stall.",
+  "Native privacy shield treats unexpected macOS pgrep errors as fail-closed before slower process parsing.",
   "Native privacy shield scans macOS window titles on a bounded background worker for browser Meet and Teams risk.",
   "Companion app windows use a privacy-gated reopen restore when the bundle is reopened."
 ];

@@ -17,6 +17,8 @@ import {
 } from "./verify-privacy-shield-package.mjs";
 
 const DESKTOP_PROCESS_TARGETS = ["windows-x64", "macos-x64", "macos-arm64"];
+const MACOS_PGREP_FAIL_CLOSED_MARKER =
+  "Native privacy shield treats unexpected macOS pgrep errors as fail-closed before slower process parsing.";
 
 function assertDesktopProcessMarker(marker) {
   for (const target of DESKTOP_PROCESS_TARGETS) {
@@ -415,9 +417,19 @@ test("requires packaged protection refresh fail-closed marker", () => {
     )
   );
   assert.ok(
-    COMMON_PRIVACY_SHIELD_MARKERS.includes(
-      "Native privacy shield treats unexpected macOS pgrep errors as fail-closed before slower process parsing."
-    )
+    MACOS_NATIVE_PRIVACY_SHIELD_MARKERS.includes(MACOS_PGREP_FAIL_CLOSED_MARKER)
+  );
+  assert.ok(
+    TARGET_PRIVACY_SHIELD_MARKERS["macos-arm64"].includes(MACOS_PGREP_FAIL_CLOSED_MARKER)
+  );
+  assert.ok(
+    TARGET_PRIVACY_SHIELD_MARKERS["macos-x64"].includes(MACOS_PGREP_FAIL_CLOSED_MARKER)
+  );
+  assert.ok(
+    !TARGET_PRIVACY_SHIELD_MARKERS["windows-x64"].includes(MACOS_PGREP_FAIL_CLOSED_MARKER)
+  );
+  assert.ok(
+    !TARGET_PRIVACY_SHIELD_MARKERS["linux-x64"].includes(MACOS_PGREP_FAIL_CLOSED_MARKER)
   );
   assert.ok(
     COMMON_PRIVACY_SHIELD_MARKERS.includes(
