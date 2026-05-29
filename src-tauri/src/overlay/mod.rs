@@ -49,6 +49,8 @@ pub const COMPANION_WINDOW_FOREGROUND_REPAIR_MARKER: &str =
     "Companion app windows are focused only when unusable bounds need repair after privacy clears.";
 pub const COMPANION_WINDOW_APP_ACTIVATION_REPAIR_MARKER: &str =
     "macOS companion window repair reactivates the app only after unusable bounds are detected.";
+pub const COMPANION_WINDOW_APPLESCRIPT_ACTIVATION_REPAIR_MARKER: &str =
+    "macOS companion window repair uses AppleScript activation when LaunchServices show leaves windows offscreen.";
 pub const COMPANION_WINDOW_SHARE_RISK_CLEAR_REPAIR_MARKER: &str =
     "Companion app windows reactivate after screen-share risk clears to recover usable bounds.";
 const COMPANION_WINDOW_MIN_WIDTH: u32 = 1024;
@@ -847,11 +849,33 @@ fn activate_app_for_companion_window_repair(app: &tauri::AppHandle) {
         .stdout(std::process::Stdio::null())
         .stderr(std::process::Stdio::null())
         .spawn();
+    activate_macos_app_with_applescript(bundle_identifier);
 }
 
 #[cfg(not(target_os = "macos"))]
 fn activate_app_for_companion_window_repair(_app: &tauri::AppHandle) {
     std::hint::black_box(COMPANION_WINDOW_APP_ACTIVATION_REPAIR_MARKER);
+}
+
+#[cfg(target_os = "macos")]
+fn activate_macos_app_with_applescript(bundle_identifier: &str) {
+    std::hint::black_box(COMPANION_WINDOW_APPLESCRIPT_ACTIVATION_REPAIR_MARKER);
+
+    let script = format!(
+        "tell application id {} to activate",
+        applescript_string_literal(bundle_identifier)
+    );
+    let _ = std::process::Command::new("osascript")
+        .args(["-e", script.as_str()])
+        .stdin(std::process::Stdio::null())
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .spawn();
+}
+
+#[cfg(target_os = "macos")]
+fn applescript_string_literal(value: &str) -> String {
+    format!("\"{}\"", value.replace('\\', "\\\\").replace('"', "\\\""))
 }
 
 #[cfg(target_os = "macos")]

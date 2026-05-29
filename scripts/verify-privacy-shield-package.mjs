@@ -38,6 +38,7 @@ export const COMMON_PRIVACY_SHIELD_MARKERS = [
   "Companion app windows are restored and repaired while privacy shield stays clear.",
   "Companion app windows are focused only when unusable bounds need repair after privacy clears.",
   "macOS companion window repair reactivates the app only after unusable bounds are detected.",
+  "macOS companion window repair uses AppleScript activation when LaunchServices show leaves windows offscreen.",
   "Companion app windows reactivate after screen-share risk clears to recover usable bounds.",
   "Native privacy shield thread failed to start; refusing to run without fail-closed screen-share guard.",
   "Native privacy shield starts before startup companion window show.",

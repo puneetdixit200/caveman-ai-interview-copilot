@@ -310,6 +310,11 @@ test("requires packaged protection refresh fail-closed marker", () => {
   );
   assert.ok(
     COMMON_PRIVACY_SHIELD_MARKERS.includes(
+      "macOS companion window repair uses AppleScript activation when LaunchServices show leaves windows offscreen."
+    )
+  );
+  assert.ok(
+    COMMON_PRIVACY_SHIELD_MARKERS.includes(
       "Companion app windows reactivate after screen-share risk clears to recover usable bounds."
     )
   );
