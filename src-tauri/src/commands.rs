@@ -469,7 +469,8 @@ pub fn set_overlay_window_bounds(
 
 #[tauri::command]
 pub fn detect_screen_share_status() -> Result<ScreenShareStatus, String> {
-    crate::screen_share::detect_screen_share_status().map_err(to_command_error)
+    crate::screen_share::detect_screen_share_status_for_native_privacy_shield()
+        .map_err(to_command_error)
 }
 
 #[tauri::command]
@@ -492,7 +493,7 @@ pub fn capture_screen_frame(app_handle: AppHandle) -> Result<ScreenFrame, String
     let protection_status = overlay::protect_overlay_window(&app_handle, true);
     let denial = ocr::native_capture_privacy_gate_message(
         crate::screen_share::native_privacy_shield_decision(
-            crate::screen_share::detect_screen_share_status(),
+            crate::screen_share::detect_screen_share_status_for_native_privacy_shield(),
         ),
         crate::screen_share::native_privacy_shield_decision_for_overlay_protection(
             &protection_status,
@@ -524,7 +525,7 @@ pub fn type_text_into_active_window(
     let protection_status = overlay::protect_overlay_window(&app_handle, true);
     let denial = typing::native_typing_privacy_gate_message(
         crate::screen_share::native_privacy_shield_decision(
-            crate::screen_share::detect_screen_share_status(),
+            crate::screen_share::detect_screen_share_status_for_native_privacy_shield(),
         ),
         crate::screen_share::native_privacy_shield_decision_for_overlay_protection(
             &protection_status,

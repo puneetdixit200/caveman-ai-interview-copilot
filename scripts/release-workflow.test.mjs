@@ -217,7 +217,10 @@ test("startup setup hides app windows when native privacy cannot be proven", asy
       configureBody.indexOf("startup_privacy_shield_hide_reason("),
     "startup hide decision must use the actual capture-exclusion setup results"
   );
-  assert.match(configureBody, /crate::screen_share::detect_screen_share_status\(\)/);
+  assert.match(
+    configureBody,
+    /crate::screen_share::detect_screen_share_status_for_native_privacy_shield\(\)/
+  );
   assert.match(configureBody, /window\.hide\(\)/);
   assert.match(configureBody, /startup_allows_initial_show\s*$/m);
   assert.match(overlayRs.slice(startupDecisionStart), /native_privacy_shield_decision_for_overlay_protection/);
@@ -270,13 +273,60 @@ test("native privacy shield refreshes capture protection before share-risk hide"
   assert.ok(mainThreadDispatch < clearRestore, "share-risk clear restore must run on the Tauri main thread");
   assert.ok(mainThreadDispatch < shareRiskBranchStart, "privacy decisions must dispatch window updates to the main thread");
   assert.ok(refreshIndex < hideIndex, "capture exclusion must be refreshed before app windows are hidden");
-  assert.match(screenShareRs, /Duration::from_millis\(100\)/);
-  assert.match(screenShareRs, /Native privacy shield polls every 100ms for new screen-share risk\./);
+  assert.match(screenShareRs, /Duration::from_millis\(50\)/);
+  assert.match(screenShareRs, /Duration::from_millis\(750\)/);
+  assert.match(screenShareRs, /Native privacy shield polls every 50ms for new screen-share risk\./);
+  assert.match(
+    screenShareRs,
+    /Native privacy shield keeps macOS window-title scans out of the fast poll so direct capture polling cannot stall\./
+  );
+  assert.match(
+    screenShareRs,
+    /Native privacy shield checks macOS capture processes with pgrep before slower process parsing\./
+  );
+  assert.match(
+    screenShareRs,
+    /macOS window-title guard uses a short timeout so native privacy polling cannot stall\./
+  );
+  assert.match(screenShareRs, /detect_screen_share_status_for_native_privacy_shield/);
+  assert.match(screenShareRs, /detect_macos_direct_capture_process_status\(\)\?/);
+  assert.doesNotMatch(screenShareRs, /start_macos_window_title_privacy_scan_thread/);
+  assert.doesNotMatch(screenShareRs, /native_privacy_shield_decision_with_cached_title_scan/);
+  assert.doesNotMatch(screenShareRs, /NativePrivacyShieldPollState::default/);
   assert.match(
     screenShareRs,
     /Native privacy shield refreshes capture exclusion before hiding for screen-share risk\./
   );
   assert.match(screenShareRs, /Native privacy shield applies app-window updates on the Tauri main thread\./);
+});
+
+test("macOS reopen uses the same privacy gate before restoring companion windows", async () => {
+  const libRs = await readFile("src-tauri/src/lib.rs", "utf8");
+  const overlayRs = await readFile("src-tauri/src/overlay/mod.rs", "utf8");
+
+  assert.match(libRs, /build\(tauri::generate_context!\(\)\)/);
+  assert.match(libRs, /tauri::RunEvent::Reopen/);
+  assert.match(libRs, /overlay::restore_companion_windows_after_user_reopen\(app_handle\)/);
+  assert.match(
+    overlayRs,
+    /Companion app windows use a privacy-gated reopen restore when the bundle is reopened\./
+  );
+
+  const restoreStart = overlayRs.indexOf("pub fn restore_companion_windows_after_user_reopen");
+  const restoreEnd = overlayRs.indexOf("pub fn repair_companion_window_bounds_without_show", restoreStart);
+  const restoreBody = overlayRs.slice(restoreStart, restoreEnd);
+
+  assert.notEqual(restoreStart, -1, "reopen restore helper must exist");
+  assert.notEqual(restoreEnd, -1, "reopen restore helper body must be bounded");
+  assert.match(restoreBody, /protect_overlay_window\(app,\s*true\)/);
+  assert.match(restoreBody, /detect_screen_share_status_for_native_privacy_shield\(\)/);
+  assert.match(restoreBody, /set_companion_windows_visible\(app,\s*false,\s*true\)/);
+  assert.match(restoreBody, /restore_companion_windows_after_share_risk_cleared\(app\)/);
+  assert.ok(
+    restoreBody.indexOf("detect_screen_share_status_for_native_privacy_shield()") <
+      restoreBody.indexOf("restore_companion_windows_after_share_risk_cleared(app)"),
+    "reopen must check fast native screen-share risk before restoring windows"
+  );
 });
 
 test("companion bounds watchdog pauses repairs during active share-risk", async () => {
@@ -294,6 +344,8 @@ test("companion bounds watchdog pauses repairs during active share-risk", async 
   const windowLoop = watchdogRepairBody.indexOf("for (label, window) in app.webview_windows()");
   const nativeRepair = watchdogRepairBody.indexOf("repair_native_companion_window_bounds_if_needed");
   const standardRepair = watchdogRepairBody.indexOf("repair_companion_window_bounds(app, &window)");
+  const visibleRestoreFlag = watchdogRepairBody.indexOf("needs_visible_restore");
+  const visibleRestore = watchdogRepairBody.indexOf("restore_companion_windows_after_clear_privacy_check(app)");
 
   assert.notEqual(shareRiskLatch, -1, "watchdog must check the nonblocking share-risk latch");
   assert.equal(fullDetector, -1, "watchdog must not run the full screen-share detector on the UI thread");
@@ -301,13 +353,20 @@ test("companion bounds watchdog pauses repairs during active share-risk", async 
   assert.notEqual(windowLoop, -1, "watchdog must still repair windows after the privacy check clears");
   assert.notEqual(nativeRepair, -1, "watchdog must still run native bounds repair when clear");
   assert.notEqual(standardRepair, -1, "watchdog must still run standard bounds repair when clear");
+  assert.notEqual(visibleRestoreFlag, -1, "watchdog must track when hidden/tiny windows need visible restore");
+  assert.notEqual(visibleRestore, -1, "watchdog must visibly restore unusable windows after privacy clears");
   assert.ok(shareRiskLatch < earlyReturn, "privacy latch must control the watchdog early return");
   assert.ok(earlyReturn < windowLoop, "watchdog must skip all repairs while share-risk is active");
   assert.ok(windowLoop < nativeRepair, "native repair must only run after the privacy pause check");
   assert.ok(windowLoop < standardRepair, "standard repair must only run after the privacy pause check");
+  assert.ok(standardRepair < visibleRestore, "visible restore must run after watchdog has checked repaired bounds");
   assert.match(
     overlayRs,
     /Companion window bounds watchdog pauses repairs while screen-share risk is active\./
+  );
+  assert.match(
+    overlayRs,
+    /Companion window bounds watchdog performs a visible restore only after privacy clears\./
   );
 });
 
@@ -373,7 +432,9 @@ test("native active-window typing fails closed during screen-share or capture-ex
   const appHandleArg = commandBody.indexOf("app_handle: AppHandle");
   const protectionRefresh = commandBody.indexOf("let protection_status = overlay::protect_overlay_window(&app_handle, true)");
   const gateMessage = commandBody.indexOf("typing::native_typing_privacy_gate_message(");
-  const detectShare = commandBody.indexOf("crate::screen_share::detect_screen_share_status()");
+  const detectShare = commandBody.indexOf(
+    "crate::screen_share::detect_screen_share_status_for_native_privacy_shield()"
+  );
   const captureExclusionDecision = commandBody.indexOf(
     "crate::screen_share::native_privacy_shield_decision_for_overlay_protection",
     gateMessage
@@ -385,7 +446,7 @@ test("native active-window typing fails closed during screen-share or capture-ex
   assert.notEqual(appHandleArg, -1, "typing command must receive AppHandle for native privacy controls");
   assert.notEqual(protectionRefresh, -1, "typing command must refresh capture exclusion before typing");
   assert.notEqual(gateMessage, -1, "typing command must consult the native privacy shield");
-  assert.notEqual(detectShare, -1, "typing command must fail closed on screen-share detector state");
+  assert.notEqual(detectShare, -1, "typing command must fail closed on fast native screen-share detector state");
   assert.notEqual(captureExclusionDecision, -1, "typing command must fail closed when capture exclusion is unsafe");
   assert.notEqual(hideOverlay, -1, "typing denial must hide overlay");
   assert.notEqual(hideCompanions, -1, "typing denial must hide companion windows");

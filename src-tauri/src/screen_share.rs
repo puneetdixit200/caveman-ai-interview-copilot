@@ -24,15 +24,21 @@ pub struct ScreenShareStatus {
     pub message: Option<String>,
 }
 
-const NATIVE_PRIVACY_SHIELD_INTERVAL: Duration = Duration::from_millis(100);
+const NATIVE_PRIVACY_SHIELD_INTERVAL: Duration = Duration::from_millis(50);
 const SCREEN_SHARE_GUARD_COMMAND_TIMEOUT: Duration = Duration::from_millis(1_500);
+#[cfg(target_os = "macos")]
+const MACOS_WINDOW_TITLE_GUARD_COMMAND_TIMEOUT: Duration = Duration::from_millis(750);
 static NATIVE_PRIVACY_SHIELD_SHARE_RISK_ACTIVE: AtomicBool = AtomicBool::new(false);
 pub const NATIVE_PRIVACY_SHIELD_THREAD_START_FAILED_MARKER: &str =
     "Native privacy shield thread failed to start; refusing to run without fail-closed screen-share guard.";
 pub const NATIVE_PRIVACY_SHIELD_STARTS_BEFORE_INITIAL_SHOW_MARKER: &str =
     "Native privacy shield starts before startup companion window show.";
 pub const NATIVE_PRIVACY_SHIELD_FAST_POLL_MARKER: &str =
-    "Native privacy shield polls every 100ms for new screen-share risk.";
+    "Native privacy shield polls every 50ms for new screen-share risk.";
+pub const NATIVE_PRIVACY_SHIELD_SKIPS_WINDOW_TITLE_SCAN_MARKER: &str =
+    "Native privacy shield keeps macOS window-title scans out of the fast poll so direct capture polling cannot stall.";
+pub const NATIVE_PRIVACY_SHIELD_MACOS_PGREP_CAPTURE_MARKER: &str =
+    "Native privacy shield checks macOS capture processes with pgrep before slower process parsing.";
 pub const NATIVE_PRIVACY_SHIELD_REFRESHES_CAPTURE_BEFORE_SHARE_HIDE_MARKER: &str =
     "Native privacy shield refreshes capture exclusion before hiding for screen-share risk.";
 pub const NATIVE_PRIVACY_SHIELD_MAIN_THREAD_WINDOW_UPDATE_MARKER: &str =
@@ -134,6 +140,9 @@ const MACOS_WINDOW_TITLE_TRANSIENT_ROW_MARKER: &str =
     "macOS window title screen-share guard skips transient System Events rows.";
 const MACOS_WINDOW_TITLE_TIMEOUT_FALLBACK_MARKER: &str =
     "macOS window title screen-share guard timeout falls back to OS capture protection.";
+#[cfg(target_os = "macos")]
+const MACOS_WINDOW_TITLE_SHORT_TIMEOUT_MARKER: &str =
+    "macOS window-title guard uses a short timeout so native privacy polling cannot stall.";
 const MACOS_PROCESS_GUARD_SHORT_CIRCUIT_MARKER: &str =
     "macOS process screen-share guard skips window-title scan after direct capture-process match.";
 #[cfg(target_os = "macos")]
@@ -256,6 +265,8 @@ const PACKAGE_PRIVACY_SHIELD_WEBVIEW_MARKERS: &[&str] = &[
     MACOS_WINDOW_TITLE_PERMISSION_FALLBACK_MARKER,
     MACOS_WINDOW_TITLE_TRANSIENT_ROW_MARKER,
     MACOS_WINDOW_TITLE_TIMEOUT_FALLBACK_MARKER,
+    #[cfg(target_os = "macos")]
+    MACOS_WINDOW_TITLE_SHORT_TIMEOUT_MARKER,
 ];
 
 #[derive(Debug, Clone, PartialEq)]
@@ -634,9 +645,11 @@ fn retain_package_privacy_shield_webview_markers() {
 fn detect_macos_visible_window_title_processes() -> anyhow::Result<Vec<ScreenShareProcess>> {
     std::hint::black_box(MACOS_WINDOW_TITLE_GUARD_MARKER);
 
-    let output = match run_screen_share_guard_command(
+    std::hint::black_box(MACOS_WINDOW_TITLE_SHORT_TIMEOUT_MARKER);
+    let output = match run_screen_share_guard_command_with_timeout(
         "osascript",
         &["-e", MACOS_VISIBLE_WINDOW_TITLE_SCRIPT],
+        MACOS_WINDOW_TITLE_GUARD_COMMAND_TIMEOUT,
     ) {
         Ok(output) => output,
         Err(error) => {
@@ -848,6 +861,8 @@ pub fn native_privacy_shield_decision_for_overlay_protection(
 pub fn start_native_privacy_shield(app: tauri::AppHandle) -> anyhow::Result<()> {
     std::hint::black_box(NATIVE_PRIVACY_SHIELD_STARTS_BEFORE_INITIAL_SHOW_MARKER);
     std::hint::black_box(NATIVE_PRIVACY_SHIELD_FAST_POLL_MARKER);
+    std::hint::black_box(NATIVE_PRIVACY_SHIELD_SKIPS_WINDOW_TITLE_SCAN_MARKER);
+    std::hint::black_box(NATIVE_PRIVACY_SHIELD_MACOS_PGREP_CAPTURE_MARKER);
     std::hint::black_box(NATIVE_PRIVACY_SHIELD_REFRESHES_CAPTURE_BEFORE_SHARE_HIDE_MARKER);
     std::hint::black_box(NATIVE_PRIVACY_SHIELD_MAIN_THREAD_WINDOW_UPDATE_MARKER);
     std::hint::black_box(NATIVE_PRIVACY_SHIELD_SHARE_RISK_LATCH_MARKER);
@@ -857,7 +872,9 @@ pub fn start_native_privacy_shield(app: tauri::AppHandle) -> anyhow::Result<()> 
         .spawn(move || {
             let mut share_risk_was_active = false;
             loop {
-                let decision = native_privacy_shield_decision(detect_screen_share_status());
+                let decision = native_privacy_shield_decision(
+                    detect_screen_share_status_for_native_privacy_shield(),
+                );
                 let share_risk_is_active =
                     matches!(decision, NativePrivacyShieldDecision::Hide { .. });
                 NATIVE_PRIVACY_SHIELD_SHARE_RISK_ACTIVE
@@ -903,6 +920,85 @@ pub fn start_native_privacy_shield(app: tauri::AppHandle) -> anyhow::Result<()> 
                 native_privacy_shield_thread_start_error_message(error)
             )
         })
+}
+
+pub fn detect_screen_share_status_for_native_privacy_shield() -> anyhow::Result<ScreenShareStatus> {
+    retain_package_privacy_shield_webview_markers();
+
+    #[cfg(target_os = "macos")]
+    {
+        if let Some(status) = detect_macos_direct_capture_process_status()? {
+            return Ok(status);
+        }
+
+        let output = run_screen_share_guard_command("ps", &["-axo", "pid=,comm="])?;
+
+        if !output.status.success() {
+            return Err(anyhow::anyhow!(
+                "Could not query running processes for screen-share guard"
+            ));
+        }
+
+        let processes = parse_unix_process_list(&String::from_utf8_lossy(&output.stdout));
+        let direct_process_status = screen_share_status_for_processes(processes);
+        if direct_process_status.active {
+            std::hint::black_box(MACOS_PROCESS_GUARD_SHORT_CIRCUIT_MARKER);
+            return Ok(direct_process_status);
+        }
+
+        std::hint::black_box(NATIVE_PRIVACY_SHIELD_SKIPS_WINDOW_TITLE_SCAN_MARKER);
+        Ok(direct_process_status)
+    }
+
+    #[cfg(not(target_os = "macos"))]
+    {
+        detect_screen_share_status()
+    }
+}
+
+#[cfg(target_os = "macos")]
+fn detect_macos_direct_capture_process_status() -> anyhow::Result<Option<ScreenShareStatus>> {
+    std::hint::black_box(NATIVE_PRIVACY_SHIELD_MACOS_PGREP_CAPTURE_MARKER);
+
+    let mut matched_processes = Vec::new();
+    for name in [
+        MACOS_SCREEN_CAPTURE_CLI_PROCESS,
+        MACOS_SCREEN_CAPTURE_UI_PROCESS,
+        MACOS_SCREEN_CAPTURE_KIT_AGENT_PROCESS,
+    ] {
+        let output = run_screen_share_guard_command("pgrep", &["-x", name])?;
+        if output.status.success() {
+            matched_processes.extend(parse_pgrep_process_rows(
+                name,
+                &String::from_utf8_lossy(&output.stdout),
+            ));
+        }
+    }
+
+    if matched_processes.is_empty() {
+        Ok(None)
+    } else {
+        Ok(Some(ScreenShareStatus {
+            active: true,
+            matched_processes,
+            message: Some("Known screen-sharing or recording process is running.".to_string()),
+        }))
+    }
+}
+
+#[cfg(target_os = "macos")]
+fn parse_pgrep_process_rows(name: &str, output: &str) -> Vec<ScreenShareProcess> {
+    output
+        .lines()
+        .filter_map(|line| {
+            let pid = line.trim().parse::<u32>().ok()?;
+            Some(ScreenShareProcess {
+                name: name.to_string(),
+                pid: Some(pid),
+                window_title: None,
+            })
+        })
+        .collect()
 }
 
 pub fn native_privacy_shield_thread_start_error_message(error: impl std::fmt::Display) -> String {
@@ -1674,7 +1770,8 @@ mod tests {
                 MACOS_WINDOW_TITLE_GUARD_MARKER,
                 MACOS_WINDOW_TITLE_PERMISSION_FALLBACK_MARKER,
                 MACOS_WINDOW_TITLE_TRANSIENT_ROW_MARKER,
-                MACOS_WINDOW_TITLE_TIMEOUT_FALLBACK_MARKER
+                MACOS_WINDOW_TITLE_TIMEOUT_FALLBACK_MARKER,
+                MACOS_WINDOW_TITLE_SHORT_TIMEOUT_MARKER
             ]
         );
     }
@@ -1784,6 +1881,28 @@ mod tests {
                 "/System/Library/CoreServices/screencaptureui",
                 "/usr/sbin/screencapture",
                 "/System/Library/PrivateFrameworks/ScreenCaptureKit.framework/ScreenCaptureKitAgent",
+            ]
+        );
+    }
+
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn parses_macos_direct_capture_process_rows_from_pgrep() {
+        assert!(NATIVE_PRIVACY_SHIELD_MACOS_PGREP_CAPTURE_MARKER.contains("pgrep"));
+
+        assert_eq!(
+            parse_pgrep_process_rows(MACOS_SCREEN_CAPTURE_CLI_PROCESS, "123\n456\n"),
+            vec![
+                ScreenShareProcess {
+                    name: MACOS_SCREEN_CAPTURE_CLI_PROCESS.to_string(),
+                    pid: Some(123),
+                    window_title: None,
+                },
+                ScreenShareProcess {
+                    name: MACOS_SCREEN_CAPTURE_CLI_PROCESS.to_string(),
+                    pid: Some(456),
+                    window_title: None,
+                },
             ]
         );
     }
@@ -2425,8 +2544,19 @@ mod tests {
 
     #[test]
     fn native_privacy_shield_polls_quickly_enough_for_new_share_sessions() {
-        assert_eq!(NATIVE_PRIVACY_SHIELD_INTERVAL, Duration::from_millis(100));
-        assert!(NATIVE_PRIVACY_SHIELD_FAST_POLL_MARKER.contains("100ms"));
+        assert_eq!(NATIVE_PRIVACY_SHIELD_INTERVAL, Duration::from_millis(50));
+        assert!(NATIVE_PRIVACY_SHIELD_FAST_POLL_MARKER.contains("50ms"));
+        assert!(
+            NATIVE_PRIVACY_SHIELD_SKIPS_WINDOW_TITLE_SCAN_MARKER.contains("direct capture polling")
+        );
+        #[cfg(target_os = "macos")]
+        {
+            assert_eq!(
+                MACOS_WINDOW_TITLE_GUARD_COMMAND_TIMEOUT,
+                Duration::from_millis(750)
+            );
+            assert!(MACOS_WINDOW_TITLE_SHORT_TIMEOUT_MARKER.contains("short timeout"));
+        }
     }
 
     #[test]

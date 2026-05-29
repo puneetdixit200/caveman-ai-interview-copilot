@@ -49,12 +49,16 @@ pub const COMPANION_WINDOW_BACKGROUND_REPAIR_MARKER: &str =
     "Companion app windows are restored and repaired while privacy shield stays clear.";
 pub const COMPANION_WINDOW_WATCHDOG_PRIVACY_PAUSE_MARKER: &str =
     "Companion window bounds watchdog pauses repairs while screen-share risk is active.";
+pub const COMPANION_WINDOW_WATCHDOG_VISIBLE_RESTORE_MARKER: &str =
+    "Companion window bounds watchdog performs a visible restore only after privacy clears.";
 pub const COMPANION_WINDOW_FOREGROUND_REPAIR_MARKER: &str =
     "Companion app windows are focused only when unusable bounds need repair after privacy clears.";
 pub const COMPANION_WINDOW_APP_ACTIVATION_REPAIR_MARKER: &str =
     "macOS companion window repair reactivates the app only after unusable bounds are detected.";
 pub const COMPANION_WINDOW_SHARE_RISK_CLEAR_REPAIR_MARKER: &str =
     "Companion app windows reactivate after screen-share risk clears to recover usable bounds.";
+pub const COMPANION_WINDOW_REOPEN_PRIVACY_RESTORE_MARKER: &str =
+    "Companion app windows use a privacy-gated reopen restore when the bundle is reopened.";
 const COMPANION_WINDOW_MIN_WIDTH: u32 = 1024;
 const COMPANION_WINDOW_MIN_HEIGHT: u32 = 720;
 const COMPANION_WINDOW_DEFAULT_WIDTH: u32 = 1280;
@@ -107,7 +111,7 @@ pub fn configure_overlay_security(app: &mut tauri::App) -> bool {
     let startup_hide_reason = startup_privacy_shield_hide_reason(
         &protection_statuses,
         crate::screen_share::native_privacy_shield_decision(
-            crate::screen_share::detect_screen_share_status(),
+            crate::screen_share::detect_screen_share_status_for_native_privacy_shield(),
         ),
     );
 
@@ -176,7 +180,7 @@ pub fn set_overlay_window_bounds(
     if let Some(message) = bounds_update_privacy_gate_message(
         &protection_status,
         crate::screen_share::native_privacy_shield_decision(
-            crate::screen_share::detect_screen_share_status(),
+            crate::screen_share::detect_screen_share_status_for_native_privacy_shield(),
         ),
     ) {
         let _ = window.hide();
@@ -451,7 +455,7 @@ pub fn set_companion_windows_visible(
             visible,
             protection_status.clone(),
             crate::screen_share::native_privacy_shield_decision(
-                crate::screen_share::detect_screen_share_status(),
+                crate::screen_share::detect_screen_share_status_for_native_privacy_shield(),
             ),
             "companion app windows",
         );
@@ -530,7 +534,7 @@ pub fn set_companion_windows_visible(
             &missing_required_windows,
         );
         let post_show_screen_share_decision = crate::screen_share::native_privacy_shield_decision(
-            crate::screen_share::detect_screen_share_status(),
+            crate::screen_share::detect_screen_share_status_for_native_privacy_shield(),
         );
 
         if let Some(message) = post_show_privacy_recheck_message(
@@ -671,27 +675,57 @@ pub fn restore_companion_windows_after_share_risk_cleared(app: &tauri::AppHandle
     }
 }
 
+pub fn restore_companion_windows_after_user_reopen(app: &tauri::AppHandle) {
+    std::hint::black_box(COMPANION_WINDOW_REOPEN_PRIVACY_RESTORE_MARKER);
+
+    let protection_status = protect_overlay_window(app, true);
+    let screen_share_decision = crate::screen_share::native_privacy_shield_decision(
+        crate::screen_share::detect_screen_share_status_for_native_privacy_shield(),
+    );
+    if matches!(
+        crate::screen_share::native_privacy_shield_decision_for_overlay_protection(
+            &protection_status
+        ),
+        crate::screen_share::NativePrivacyShieldDecision::Hide { .. }
+    ) || matches!(
+        screen_share_decision,
+        crate::screen_share::NativePrivacyShieldDecision::Hide { .. }
+    ) {
+        let _ = set_overlay_window_visible(app, false, true);
+        let _ = set_companion_windows_visible(app, false, true);
+        return;
+    }
+
+    restore_companion_windows_after_share_risk_cleared(app);
+    focus_companion_windows(app);
+}
+
 pub fn repair_companion_window_bounds_without_show(app: &tauri::AppHandle) {
     use tauri::Manager;
 
     std::hint::black_box(COMPANION_WINDOW_BACKGROUND_REPAIR_MARKER);
     std::hint::black_box(COMPANION_WINDOW_WATCHDOG_PRIVACY_PAUSE_MARKER);
+    std::hint::black_box(COMPANION_WINDOW_WATCHDOG_VISIBLE_RESTORE_MARKER);
 
     if crate::screen_share::native_privacy_shield_share_risk_is_active() {
         return;
     }
 
+    let mut needs_visible_restore = false;
     for (label, window) in app.webview_windows() {
         if !is_companion_window_label(&label) {
             continue;
         }
 
-        let _ = repair_native_companion_window_bounds_if_needed(
-            app,
-            &window,
-            companion_window_needs_native_activation(app),
-        );
+        let needs_native_activation = companion_window_needs_native_activation(app);
+        needs_visible_restore = needs_visible_restore || needs_native_activation;
+        let _ =
+            repair_native_companion_window_bounds_if_needed(app, &window, needs_native_activation);
         let _ = repair_companion_window_bounds(app, &window);
+    }
+
+    if needs_visible_restore {
+        restore_companion_windows_after_clear_privacy_check(app);
     }
 }
 
@@ -753,7 +787,7 @@ pub fn set_overlay_window_visible(
             visible,
             status.clone(),
             crate::screen_share::native_privacy_shield_decision(
-                crate::screen_share::detect_screen_share_status(),
+                crate::screen_share::detect_screen_share_status_for_native_privacy_shield(),
             ),
             "the overlay",
         );
@@ -779,7 +813,7 @@ pub fn set_overlay_window_visible(
     if visible && status.visible {
         let post_show_status = protect_overlay_window(app, capture_exclusion_enabled);
         let post_show_screen_share_decision = crate::screen_share::native_privacy_shield_decision(
-            crate::screen_share::detect_screen_share_status(),
+            crate::screen_share::detect_screen_share_status_for_native_privacy_shield(),
         );
         if let Some(message) = post_show_privacy_recheck_message(
             &post_show_status,

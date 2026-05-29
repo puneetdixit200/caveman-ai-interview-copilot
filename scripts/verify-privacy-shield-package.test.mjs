@@ -351,6 +351,11 @@ test("requires packaged protection refresh fail-closed marker", () => {
     )
   );
   assert.ok(
+    MACOS_NATIVE_PRIVACY_SHIELD_MARKERS.includes(
+      "macOS window-title guard uses a short timeout so native privacy polling cannot stall."
+    )
+  );
+  assert.ok(
     TARGET_PRIVACY_SHIELD_MARKERS["macos-arm64"].includes(
       "macOS process screen-share guard skips window-title scan after direct capture-process match."
     )
@@ -377,13 +382,33 @@ test("requires packaged protection refresh fail-closed marker", () => {
   );
   assert.ok(
     COMMON_PRIVACY_SHIELD_MARKERS.includes(
+      "Companion window bounds watchdog performs a visible restore only after privacy clears."
+    )
+  );
+  assert.ok(
+    COMMON_PRIVACY_SHIELD_MARKERS.includes(
+      "Companion app windows use a privacy-gated reopen restore when the bundle is reopened."
+    )
+  );
+  assert.ok(
+    COMMON_PRIVACY_SHIELD_MARKERS.includes(
       "Native privacy shield thread failed to start; refusing to run without fail-closed screen-share guard."
     )
   );
   assert.ok(
     COMMON_PRIVACY_SHIELD_MARKERS.includes("Native privacy shield starts before startup companion window show.")
   );
-  assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("Native privacy shield polls every 100ms for new screen-share risk."));
+  assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("Native privacy shield polls every 50ms for new screen-share risk."));
+  assert.ok(
+    COMMON_PRIVACY_SHIELD_MARKERS.includes(
+      "Native privacy shield keeps macOS window-title scans out of the fast poll so direct capture polling cannot stall."
+    )
+  );
+  assert.ok(
+    COMMON_PRIVACY_SHIELD_MARKERS.includes(
+      "Native privacy shield checks macOS capture processes with pgrep before slower process parsing."
+    )
+  );
   assert.ok(
     COMMON_PRIVACY_SHIELD_MARKERS.includes(
       "Native privacy shield refreshes capture exclusion before hiding for screen-share risk."

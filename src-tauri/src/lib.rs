@@ -15,7 +15,7 @@ pub mod stt;
 pub mod typing;
 
 pub fn run() {
-    tauri::Builder::default()
+    let app = tauri::Builder::default()
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
@@ -100,6 +100,13 @@ pub fn run() {
             commands::list_collaboration_hints,
             commands::clear_collaboration_hint
         ])
-        .run(tauri::generate_context!())
-        .expect("failed to run Caveman");
+        .build(tauri::generate_context!())
+        .expect("failed to build Caveman");
+
+    app.run(|app_handle, event| {
+        #[cfg(target_os = "macos")]
+        if let tauri::RunEvent::Reopen { .. } = event {
+            overlay::restore_companion_windows_after_user_reopen(app_handle);
+        }
+    });
 }
