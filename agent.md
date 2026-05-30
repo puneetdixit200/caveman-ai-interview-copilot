@@ -8,9 +8,12 @@ Make Caveman harder to expose during Google Meet, Microsoft Teams, and screen-sh
 
 - Branch: `main`
 - Remote: `origin/main`
-- Latest implementation commit: `85fb051 test: add macos meeting risk smoke`
-- This handoff file may be committed after that as a docs-only commit.
+- Latest pushed implementation commit before this handoff refresh: `9567b34 test: verify privacy shield installers`
+- This handoff file is being kept current as the screen-share hardening work continues.
 - Previous relevant commits:
+  - `9567b34 test: verify privacy shield installers`
+  - `766e838 docs: add next agent handoff`
+  - `85fb051 test: add macos meeting risk smoke`
   - `e535679 fix: fail closed on redacted macos browser titles`
   - `94ab73e fix: defer dashboard audio device enumeration`
 
@@ -27,37 +30,35 @@ Make Caveman harder to expose during Google Meet, Microsoft Teams, and screen-sh
   - Microsoft Teams in a browser window
   - Microsoft Teams native process window
 - It verifies Caveman starts protected, hides while simulated meeting/share-risk windows are visible, then restores as a protected onscreen window after risk clears.
+- The package smoke workflow now runs both macOS DMG privacy-shield verifier lanes on every push to `main`, not only on manual workflow dispatch, so normal pushes exercise EXE and DMG privacy shield packaging.
 
 ## Verification already run locally
 
 - `node --test scripts/macos-meeting-risk-smoke.test.mjs`
 - `npm run meeting-risk:smoke:mac`
 - `npm run test:release`
+- Manual full Desktop Package Smoke run `26680849312` passed all lanes, including:
+  - Windows MSI/NSIS package privacy shield verification
+  - macOS Intel app/DMG package privacy shield verification
+  - macOS Apple Silicon app/DMG package privacy shield verification
+  - Linux package privacy shield verification
 
 Local meeting-risk smoke result:
 
 ```text
 READY
-- Initial Caveman window 11804 is 1280x820 and protected.
+- Initial Caveman window 12215 is 1249x820 and protected.
 - Google Meet browser window: Caveman hid while the simulated meeting window was visible.
 - Microsoft Teams browser window: Caveman hid while the simulated meeting window was visible.
 - Microsoft Teams native process: Caveman hid while the simulated meeting window was visible.
-- Caveman restored protected onscreen window 11804 at 1280x820.
+- Caveman restored protected onscreen window 12215 at 1249x820.
 ```
 
-`npm run test:release` passed 131 tests.
+`npm run test:release` passed 137 tests after the CI hardening change.
 
 ## CI to check next
 
-The Desktop Package Smoke workflow for commit `85fb051ef69e2fb4d106a0c514659dbfba45135a` was still running when this handoff was written.
-
-Check it with:
-
-```sh
-gh run watch 26680334826 --repo puneetdixit200/caveman-ai-interview-copilot --exit-status
-```
-
-Or list recent runs:
+List recent runs with:
 
 ```sh
 gh run list --repo puneetdixit200/caveman-ai-interview-copilot --branch main --limit 5 --json databaseId,workflowName,headSha,status,conclusion,createdAt,url
@@ -65,8 +66,8 @@ gh run list --repo puneetdixit200/caveman-ai-interview-copilot --branch main --l
 
 ## Suggested next steps
 
-1. Confirm Desktop Package Smoke run `26680334826` finishes successfully.
-2. Recheck the worktree with `git status --short --branch`.
+1. Recheck the worktree with `git status --short --branch`.
+2. Verify the next pushed Desktop Package Smoke run now includes and passes both macOS jobs on the push event.
 3. Verify the installed app window is visible, non-zero-sized, and protected with CoreGraphics window inspection.
 4. If the app is collapsed to `0x0`, restart it after clearing saved state:
 
@@ -78,7 +79,7 @@ open -b com.caveman.desktop
 sleep 5
 ```
 
-5. Continue strengthening only supported protections: content protection, fail-closed share-risk detection, deterministic hide/restore behavior, and package/runtime verification.
+5. Continue strengthening only supported protections: content protection, fail-closed share-risk detection, deterministic hide/restore behavior, and package/runtime verification. Do not add kernel extensions, drivers, rootkits, or universal bypass behavior.
 
 ## Local cleanup note
 

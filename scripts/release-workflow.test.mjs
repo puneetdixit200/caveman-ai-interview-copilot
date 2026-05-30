@@ -119,6 +119,22 @@ test("release workflow notarizes generated macOS DMGs before upload", async () =
   );
 });
 
+test("desktop package smoke verifies macOS DMG privacy shield on every push", async () => {
+  const workflow = await readFile(desktopSmokeWorkflowPath, "utf8");
+  const macosIntelStart = workflow.indexOf("build-macos-intel:");
+  const macosArm64Start = workflow.indexOf("build-macos-arm64:");
+  const linuxStart = workflow.indexOf("build-linux:");
+  const macosIntelJob = workflow.slice(macosIntelStart, macosArm64Start);
+  const macosArm64Job = workflow.slice(macosArm64Start, linuxStart);
+
+  assert.notEqual(macosIntelStart, -1, "macOS Intel DMG smoke job must exist");
+  assert.notEqual(macosArm64Start, -1, "macOS Apple Silicon DMG smoke job must exist");
+  assert.doesNotMatch(macosIntelJob, /github\.event_name\s*==\s*'workflow_dispatch'/);
+  assert.doesNotMatch(macosArm64Job, /github\.event_name\s*==\s*'workflow_dispatch'/);
+  assert.match(macosIntelJob, /node scripts\/verify-privacy-shield-package\.mjs --target macos-x64/);
+  assert.match(macosArm64Job, /node scripts\/verify-privacy-shield-package\.mjs --target macos-arm64/);
+});
+
 test("macOS bundle declares privacy usage descriptions for audio capture", async () => {
   const tauriConfig = JSON.parse(await readFile("src-tauri/tauri.conf.json", "utf8"));
   const infoPlist = await readFile("src-tauri/Info.plist", "utf8");
@@ -881,7 +897,7 @@ test("desktop package smoke workflow builds macOS and Windows installers without
   assert.match(workflow, /libwebkit2gtk-4\.1-dev/);
   assert.match(workflow, /libpipewire-0\.3-dev/);
   assert.doesNotMatch(workflow, /macos-13/);
-  assert.match(workflow, /if:\s*\$\{\{\s*github\.event_name == 'workflow_dispatch'\s*\}\}/);
+  assert.doesNotMatch(workflow, /if:\s*\$\{\{\s*github\.event_name == 'workflow_dispatch'\s*\}\}/);
   assert.match(workflow, /npm ci/);
   assert.match(workflow, /npm run test:release/);
   assert.match(workflow, /npm run tauri:build:windows/);
