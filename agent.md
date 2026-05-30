@@ -156,6 +156,11 @@ Follow-up CI hardening verification:
   - `node --test scripts/verify-privacy-shield-package.test.mjs scripts/windows-meeting-risk-smoke.test.mjs scripts/release-workflow.test.mjs` passed 70 tests locally without opening the app.
   - `npm run test:release` passed 155 tests.
   - Desktop Package Smoke run `26693132929` for `8e34e97` failed the new Windows EXE smoke before this retry fix because no initial protected visible EXE window was found; rerun CI after pushing the retry fix.
+  - Desktop Package Smoke run `26693615193` for `6fcddc9` passed all lanes after rerunning a transient macOS Intel DNS failure:
+    - Windows installers: native privacy tests, release contracts, package build, bundled sidecar verification, packaged privacy shield, packaged Windows meeting-risk smoke, and artifact upload passed.
+    - Windows smoke output: `READY`; initial `caveman.exe` window was `1044x788` and protected with `WDA_EXCLUDEFROMCAPTURE`; Caveman hid during simulated Google Meet, browser share, and Microsoft Teams native windows.
+    - macOS Intel app/DMG: native privacy tests, release contracts, package build, sidecar verification, packaged privacy shield, packaged meeting-risk smoke, and artifact upload passed on rerun.
+    - macOS Apple Silicon app/DMG and Linux AppImage/DEB passed their full package lanes.
   - The actual Windows runtime smoke is wired into CI and must pass on Windows package/signed-release runners before EXE/MSI artifacts upload.
 
 ## CI to check next
@@ -166,7 +171,7 @@ List recent runs with:
 gh run list --repo puneetdixit200/caveman-ai-interview-copilot --branch main --limit 5 --json databaseId,workflowName,headSha,status,conclusion,createdAt,url
 ```
 
-Latest verified package-smoke run before this handoff refresh: `26692539422` for `7b3bd8b`, green in all lanes. This run verified the focus-repair post-show recheck and strong native Teams title fallback, including the macOS Intel DMG meeting-risk smoke.
+Latest verified package-smoke run before this handoff refresh: `26693615193` for `6fcddc9`, green in all lanes after a failed-job rerun. This run verified the Windows packaged EXE meeting-risk smoke, Windows post-show display-affinity retry, and the existing macOS Intel/Apple Silicon DMG meeting-risk smokes.
 
 ## Suggested next steps
 
