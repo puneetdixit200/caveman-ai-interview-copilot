@@ -8,6 +8,7 @@ import test from "node:test";
 import {
   WINDOWS_MEETING_RISK_ACTIVE_WAIT_MS,
   WINDOWS_MEETING_RISK_FAKE_MEETING_DURATION_MS,
+  WINDOWS_MEETING_RISK_INITIAL_WAIT_MS,
   WINDOWS_MEETING_RISK_SMOKE_MARKER,
   parseWindowsWindowRows,
   runWindowsMeetingRiskSmoke,
@@ -97,6 +98,7 @@ test("uses PowerShell command mode for Windows window enumeration", () => {
 });
 
 test("keeps simulated meeting windows alive long enough for Windows title scans", () => {
+  assert.ok(WINDOWS_MEETING_RISK_INITIAL_WAIT_MS >= 30_000);
   assert.ok(WINDOWS_MEETING_RISK_ACTIVE_WAIT_MS >= 18_000);
   assert.ok(WINDOWS_MEETING_RISK_FAKE_MEETING_DURATION_MS > WINDOWS_MEETING_RISK_ACTIVE_WAIT_MS);
 });

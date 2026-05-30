@@ -12,7 +12,6 @@ const REPO_ROOT = resolve(__dirname, "..");
 const DEFAULT_WINDOWS_APP_EXE = join(REPO_ROOT, "src-tauri", "target", "release", "caveman.exe");
 const POWERSHELL = process.env.CAVEMAN_WINDOWS_POWERSHELL || "powershell.exe";
 const QUERY_MAX_BUFFER = 1024 * 1024 * 8;
-const INITIAL_WAIT_MS = 8_000;
 const RESTORE_WAIT_MS = 8_000;
 const POLL_INTERVAL_MS = 250;
 const WDA_MONITOR = 1;
@@ -20,6 +19,7 @@ const WDA_EXCLUDEFROMCAPTURE = 17;
 
 export const WINDOWS_MEETING_RISK_ACTIVE_WAIT_MS = 18_000;
 export const WINDOWS_MEETING_RISK_FAKE_MEETING_DURATION_MS = 24_000;
+export const WINDOWS_MEETING_RISK_INITIAL_WAIT_MS = 30_000;
 export const WINDOWS_MEETING_RISK_SMOKE_MARKER =
   "Windows EXE meeting-risk smoke launches the built app and verifies Caveman hides during simulated Google Meet and Teams windows.";
 
@@ -331,7 +331,7 @@ export async function runWindowsMeetingRiskSmoke({
   try {
     const initialWindow = await waitForVisibleUsableProtectedWindow({
       commandRunner,
-      timeoutMs: INITIAL_WAIT_MS
+      timeoutMs: WINDOWS_MEETING_RISK_INITIAL_WAIT_MS
     });
     if (!initialWindow) {
       return summarizeWindowsMeetingRiskSmoke({
