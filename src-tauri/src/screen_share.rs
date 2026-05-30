@@ -71,6 +71,9 @@ pub const NATIVE_PRIVACY_SHIELD_MACOS_REDACTED_BROWSER_TITLE_MARKER: &str =
 pub const NATIVE_PRIVACY_SHIELD_WINDOWS_ENUMWINDOWS_TITLE_MARKER: &str =
     "Native privacy shield enumerates Windows visible window titles with EnumWindows for browser Meet and Teams risk.";
 #[cfg(target_os = "windows")]
+pub const NATIVE_PRIVACY_SHIELD_WINDOWS_ENUMWINDOWS_FAST_GATE_MARKER: &str =
+    "Native privacy shield checks Windows EnumWindows visible titles before tasklist fallback.";
+#[cfg(target_os = "windows")]
 pub const NATIVE_PRIVACY_SHIELD_WINDOWS_UNAVAILABLE_BROWSER_TITLE_MARKER: &str =
     "Windows visible browser title guard hides when a visible browser window title is unavailable.";
 pub const NATIVE_PRIVACY_SHIELD_REFRESHES_CAPTURE_BEFORE_SHARE_HIDE_MARKER: &str =
@@ -322,6 +325,8 @@ const PACKAGE_PRIVACY_SHIELD_WEBVIEW_MARKERS: &[&str] = &[
     NATIVE_PRIVACY_SHIELD_MACOS_REDACTED_BROWSER_TITLE_MARKER,
     #[cfg(target_os = "windows")]
     NATIVE_PRIVACY_SHIELD_WINDOWS_ENUMWINDOWS_TITLE_MARKER,
+    #[cfg(target_os = "windows")]
+    NATIVE_PRIVACY_SHIELD_WINDOWS_ENUMWINDOWS_FAST_GATE_MARKER,
     #[cfg(target_os = "windows")]
     NATIVE_PRIVACY_SHIELD_WINDOWS_UNAVAILABLE_BROWSER_TITLE_MARKER,
 ];
@@ -1007,7 +1012,16 @@ pub fn detect_screen_share_status_for_native_privacy_shield() -> anyhow::Result<
         Ok(direct_process_status)
     }
 
-    #[cfg(not(target_os = "macos"))]
+    #[cfg(target_os = "windows")]
+    {
+        if let Some(status) = detect_windows_visible_window_title_privacy_status() {
+            return Ok(status);
+        }
+
+        detect_screen_share_status()
+    }
+
+    #[cfg(not(any(target_os = "macos", target_os = "windows")))]
     {
         detect_screen_share_status()
     }
@@ -1407,6 +1421,14 @@ fn detect_windows_visible_window_title_processes() -> Vec<ScreenShareProcess> {
     let lparam = LPARAM((&mut processes as *mut Vec<ScreenShareProcess>) as isize);
     let _ = unsafe { EnumWindows(Some(collect_window), lparam) };
     processes
+}
+
+#[cfg(target_os = "windows")]
+fn detect_windows_visible_window_title_privacy_status() -> Option<ScreenShareStatus> {
+    std::hint::black_box(NATIVE_PRIVACY_SHIELD_WINDOWS_ENUMWINDOWS_FAST_GATE_MARKER);
+
+    let status = screen_share_status_for_processes(detect_windows_visible_window_title_processes());
+    status.active.then_some(status)
 }
 
 #[cfg(target_os = "windows")]

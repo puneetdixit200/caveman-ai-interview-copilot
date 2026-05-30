@@ -221,6 +221,7 @@ export const MACOS_NATIVE_PRIVACY_SHIELD_MARKERS = [
 
 export const WINDOWS_NATIVE_PRIVACY_SHIELD_MARKERS = [
   "Native privacy shield enumerates Windows visible window titles with EnumWindows for browser Meet and Teams risk.",
+  "Native privacy shield checks Windows EnumWindows visible titles before tasklist fallback.",
   "Windows visible browser title guard hides when a visible browser window title is unavailable."
 ];
 

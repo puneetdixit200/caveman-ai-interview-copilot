@@ -348,9 +348,28 @@ test("native privacy shield refreshes capture protection before share-risk hide"
   );
   assert.match(
     screenShareRs,
+    /Native privacy shield checks Windows EnumWindows visible titles before tasklist fallback\./
+  );
+  assert.match(
+    screenShareRs,
     /Windows visible browser title guard hides when a visible browser window title is unavailable\./
   );
   assert.match(screenShareRs, /detect_windows_visible_window_title_processes\(\)/);
+  const nativePrivacyDetectorStart = screenShareRs.indexOf(
+    "pub fn detect_screen_share_status_for_native_privacy_shield()"
+  );
+  const nativePrivacyDetectorEnd = screenShareRs.indexOf(
+    "pub fn detect_screen_share_status_for_native_visibility_gate",
+    nativePrivacyDetectorStart
+  );
+  assert.notEqual(nativePrivacyDetectorStart, -1, "native privacy detector must exist");
+  assert.notEqual(nativePrivacyDetectorEnd, -1, "native privacy detector body must be bounded");
+  const nativePrivacyDetectorBody = screenShareRs.slice(nativePrivacyDetectorStart, nativePrivacyDetectorEnd);
+  assert.ok(
+    nativePrivacyDetectorBody.indexOf("detect_windows_visible_window_title_privacy_status()") <
+      nativePrivacyDetectorBody.indexOf("detect_screen_share_status()"),
+    "Windows native privacy polling must check visible titles before tasklist fallback"
+  );
   assert.match(
     screenShareRs,
     /macOS window-title guard uses a short timeout so native privacy polling cannot stall\./

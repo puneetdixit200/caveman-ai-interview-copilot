@@ -24,6 +24,8 @@ const MACOS_PGREP_FAIL_CLOSED_MARKER =
   "Native privacy shield treats unexpected macOS pgrep errors as fail-closed before slower process parsing.";
 const WINDOWS_ENUMWINDOWS_TITLE_MARKER =
   "Native privacy shield enumerates Windows visible window titles with EnumWindows for browser Meet and Teams risk.";
+const WINDOWS_ENUMWINDOWS_FAST_GATE_MARKER =
+  "Native privacy shield checks Windows EnumWindows visible titles before tasklist fallback.";
 const WINDOWS_UNAVAILABLE_BROWSER_TITLE_MARKER =
   "Windows visible browser title guard hides when a visible browser window title is unavailable.";
 
@@ -395,6 +397,11 @@ test("requires packaged protection refresh fail-closed marker", () => {
   assert.ok(!TARGET_PRIVACY_SHIELD_MARKERS["macos-arm64"].includes(WINDOWS_ENUMWINDOWS_TITLE_MARKER));
   assert.ok(!TARGET_PRIVACY_SHIELD_MARKERS["macos-x64"].includes(WINDOWS_ENUMWINDOWS_TITLE_MARKER));
   assert.ok(!TARGET_PRIVACY_SHIELD_MARKERS["linux-x64"].includes(WINDOWS_ENUMWINDOWS_TITLE_MARKER));
+  assert.ok(WINDOWS_NATIVE_PRIVACY_SHIELD_MARKERS.includes(WINDOWS_ENUMWINDOWS_FAST_GATE_MARKER));
+  assert.ok(TARGET_PRIVACY_SHIELD_MARKERS["windows-x64"].includes(WINDOWS_ENUMWINDOWS_FAST_GATE_MARKER));
+  assert.ok(!TARGET_PRIVACY_SHIELD_MARKERS["macos-arm64"].includes(WINDOWS_ENUMWINDOWS_FAST_GATE_MARKER));
+  assert.ok(!TARGET_PRIVACY_SHIELD_MARKERS["macos-x64"].includes(WINDOWS_ENUMWINDOWS_FAST_GATE_MARKER));
+  assert.ok(!TARGET_PRIVACY_SHIELD_MARKERS["linux-x64"].includes(WINDOWS_ENUMWINDOWS_FAST_GATE_MARKER));
   assert.ok(WINDOWS_NATIVE_PRIVACY_SHIELD_MARKERS.includes(WINDOWS_UNAVAILABLE_BROWSER_TITLE_MARKER));
   assert.ok(TARGET_PRIVACY_SHIELD_MARKERS["windows-x64"].includes(WINDOWS_UNAVAILABLE_BROWSER_TITLE_MARKER));
   assert.ok(!TARGET_PRIVACY_SHIELD_MARKERS["macos-arm64"].includes(WINDOWS_UNAVAILABLE_BROWSER_TITLE_MARKER));
