@@ -62,6 +62,7 @@ Make Caveman harder to expose during Google Meet, Microsoft Teams, and screen-sh
 - Companion-window focus repair now performs a second privacy recheck after native `unminimize`/`show`/`set_focus`, then hides the overlay and companion windows again if a Meet/Teams/share-risk window appears during that focus transition.
 - The macOS visible-window title guard now treats strong meeting/share titles from any foreground app as screen-share risk, not only from browser/PWA host processes. This covers native-style Teams windows that surface a title like `Microsoft Teams - Interview` through CoreGraphics while still ignoring ordinary note titles like `Google Meet prep notes`.
 - Windows package and signed-release lanes now run a packaged EXE meeting-risk smoke before artifact upload. The smoke launches `src-tauri/target/release/caveman.exe` in CI, verifies the visible Caveman window has `WDA_EXCLUDEFROMCAPTURE` or `WDA_MONITOR`, then requires it to hide while simulated Google Meet, browser share, and Microsoft Teams windows are visible.
+- Windows startup/show privacy gating now treats a hidden-window display-affinity readback failure as retryable only on the pre-show path, then relies on the existing post-show privacy recheck to hide again if `WDA_EXCLUDEFROMCAPTURE`/`WDA_MONITOR` is still not proven after the native window becomes visible. Screen-share risk still blocks before show.
 
 ## Verification already run locally
 
@@ -150,7 +151,11 @@ Follow-up CI hardening verification:
   - macOS Apple Silicon app/DMG: native privacy tests, release contracts, package build, sidecar verification, packaged privacy shield, packaged meeting-risk smoke, and DMG artifact upload passed.
   - Linux AppImage/DEB: native privacy tests, release contracts, package build, sidecar verification, packaged privacy shield, and artifact upload passed.
 - Windows EXE meeting-risk smoke follow-up local verification:
-  - `node --test scripts/windows-meeting-risk-smoke.test.mjs scripts/release-workflow.test.mjs` passed locally without opening the app.
+  - `cargo test --manifest-path src-tauri/Cargo.toml overlay:: --lib` passed 34 tests after adding the Windows pre-show display-affinity retry.
+  - `cargo test --manifest-path src-tauri/Cargo.toml screen_share --lib` passed 60 tests.
+  - `node --test scripts/verify-privacy-shield-package.test.mjs scripts/windows-meeting-risk-smoke.test.mjs scripts/release-workflow.test.mjs` passed 70 tests locally without opening the app.
+  - `npm run test:release` passed 155 tests.
+  - Desktop Package Smoke run `26693132929` for `8e34e97` failed the new Windows EXE smoke before this retry fix because no initial protected visible EXE window was found; rerun CI after pushing the retry fix.
   - The actual Windows runtime smoke is wired into CI and must pass on Windows package/signed-release runners before EXE/MSI artifacts upload.
 
 ## CI to check next

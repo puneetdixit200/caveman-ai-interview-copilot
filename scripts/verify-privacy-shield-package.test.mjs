@@ -316,6 +316,11 @@ test("requires packaged macOS system capture detector markers", () => {
 test("requires packaged Windows display-affinity readback marker", () => {
   assert.ok(TARGET_PRIVACY_SHIELD_MARKERS["windows-x64"].includes("SetWindowDisplayAffinity"));
   assert.ok(TARGET_PRIVACY_SHIELD_MARKERS["windows-x64"].includes("GetWindowDisplayAffinity"));
+  assert.ok(
+    TARGET_PRIVACY_SHIELD_MARKERS["windows-x64"].includes(
+      "Windows native show gate retries display-affinity verification after the window becomes visible."
+    )
+  );
 });
 
 test("requires packaged OCR capture settle marker", () => {

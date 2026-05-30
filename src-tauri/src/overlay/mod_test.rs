@@ -1,13 +1,15 @@
 use super::{
     bounds_update_privacy_gate_message, capture_exclusion_disabled_status,
-    capture_exclusion_enabled_status, capture_exclusion_unavailable_status,
-    companion_capture_exclusion_status, companion_focus_post_show_privacy_recheck_message,
-    companion_restore_privacy_gate_status, companion_visibility_success_status,
-    enforce_capture_exclusion_setting, is_companion_window_label, is_overlay_window_label,
-    native_show_privacy_gate_status, post_show_privacy_recheck_message, protected_window_labels,
+    capture_exclusion_enabled_status, capture_exclusion_show_block_reason,
+    capture_exclusion_unavailable_status, companion_capture_exclusion_status,
+    companion_focus_post_show_privacy_recheck_message, companion_restore_privacy_gate_status,
+    companion_visibility_success_status, enforce_capture_exclusion_setting,
+    is_companion_window_label, is_overlay_window_label, native_show_privacy_gate_status,
+    post_show_privacy_recheck_message, protected_window_labels,
     protection_refresh_fail_closed_message, sanitize_companion_window_bounds,
     sanitize_overlay_bounds, startup_privacy_shield_hide_reason, windows_capture_exclusion_status,
-    OverlayProtectionStatus, OverlayWindowBounds, BOUNDS_UPDATE_UNSAFE_PROTECTION_MARKER,
+    windows_pre_show_capture_exclusion_can_recheck_after_show, OverlayProtectionStatus,
+    OverlayWindowBounds, BOUNDS_UPDATE_UNSAFE_PROTECTION_MARKER,
     COMPANION_HIDE_UNSAFE_PROTECTION_MARKER, COMPANION_POST_SHOW_SHARE_RISK_MARKER,
     COMPANION_POST_SHOW_UNSAFE_PROTECTION_MARKER, COMPANION_UNSAFE_PROTECTION_MARKER,
     COMPANION_WINDOW_APP_ACTIVATION_REPAIR_MARKER, COMPANION_WINDOW_BACKGROUND_REPAIR_MARKER,
@@ -21,6 +23,7 @@ use super::{
     COMPANION_WINDOW_WATCHDOG_VISIBLE_RESTORE_MARKER, OVERLAY_POST_SHOW_SHARE_RISK_MARKER,
     OVERLAY_POST_SHOW_UNSAFE_PROTECTION_MARKER, PROTECTION_REFRESH_FAIL_CLOSED_MARKER,
     STARTUP_COMPANION_WINDOW_REPAIR_DELAYS_MS, STARTUP_PRIVACY_SHIELD_DENIED_INITIAL_SHOW_MARKER,
+    WINDOWS_PRE_SHOW_CAPTURE_EXCLUSION_RECHECK_MARKER,
 };
 use crate::screen_share::NativePrivacyShieldDecision;
 
@@ -201,6 +204,31 @@ fn windows_capture_exclusion_fails_closed_when_readback_does_not_confirm_exclusi
         .message
         .unwrap()
         .contains("Windows display-affinity readback did not confirm capture exclusion"));
+}
+
+#[test]
+fn windows_pre_show_capture_exclusion_can_retry_after_native_show() {
+    let retryable = windows_capture_exclusion_status(false, true, false, false, false);
+
+    assert!(WINDOWS_PRE_SHOW_CAPTURE_EXCLUSION_RECHECK_MARKER
+        .contains("after the window becomes visible"));
+    assert!(windows_pre_show_capture_exclusion_can_recheck_after_show(
+        &retryable
+    ));
+    assert_eq!(capture_exclusion_show_block_reason(&retryable, true), None);
+    assert!(capture_exclusion_show_block_reason(&retryable, false)
+        .expect("non-Windows startup should keep failing closed")
+        .contains("Capture exclusion is not enforced"));
+
+    let visible_failure = windows_capture_exclusion_status(true, true, false, false, false);
+    assert!(!windows_pre_show_capture_exclusion_can_recheck_after_show(
+        &visible_failure
+    ));
+    assert!(
+        capture_exclusion_show_block_reason(&capture_exclusion_unavailable_status(), true)
+            .expect("unsupported capture exclusion is not a Windows pre-show retry")
+            .contains("unsupported")
+    );
 }
 
 #[test]

@@ -67,6 +67,8 @@ pub const COMPANION_WINDOW_FOCUS_PRIVACY_RECHECK_MARKER: &str =
     "Companion app window focus repair rechecks privacy before raising windows.";
 pub const COMPANION_WINDOW_FOCUS_POST_SHOW_RECHECK_MARKER: &str =
     "Companion app window focus repair rechecks privacy again after raising windows.";
+pub const WINDOWS_PRE_SHOW_CAPTURE_EXCLUSION_RECHECK_MARKER: &str =
+    "Windows native show gate retries display-affinity verification after the window becomes visible.";
 pub const COMPANION_WINDOW_RESTORE_PRIVACY_PAUSE_MARKER: &str =
     "Companion app window restore stays paused after a native privacy denial.";
 const COMPANION_WINDOW_MIN_WIDTH: u32 = 1024;
@@ -150,8 +152,8 @@ pub fn startup_privacy_shield_hide_reason(
     }
 
     for status in protection_statuses {
-        if let crate::screen_share::NativePrivacyShieldDecision::Hide { reason } =
-            crate::screen_share::native_privacy_shield_decision_for_overlay_protection(status)
+        if let Some(reason) =
+            capture_exclusion_show_block_reason(status, cfg!(target_os = "windows"))
         {
             reasons.push(reason);
         }
@@ -962,8 +964,7 @@ pub fn native_show_privacy_gate_status(
         reasons.push(reason);
     }
 
-    if let crate::screen_share::NativePrivacyShieldDecision::Hide { reason } =
-        crate::screen_share::native_privacy_shield_decision_for_overlay_protection(&status)
+    if let Some(reason) = capture_exclusion_show_block_reason(&status, cfg!(target_os = "windows"))
     {
         reasons.push(reason);
     }
@@ -978,6 +979,40 @@ pub fn native_show_privacy_gate_status(
         reasons.join(" ")
     ));
     status
+}
+
+pub fn capture_exclusion_show_block_reason(
+    status: &OverlayProtectionStatus,
+    allow_windows_post_show_recheck: bool,
+) -> Option<String> {
+    match crate::screen_share::native_privacy_shield_decision_for_overlay_protection(status) {
+        crate::screen_share::NativePrivacyShieldDecision::Allow => None,
+        crate::screen_share::NativePrivacyShieldDecision::Hide { reason } => {
+            if allow_windows_post_show_recheck
+                && windows_pre_show_capture_exclusion_can_recheck_after_show(status)
+            {
+                return None;
+            }
+            Some(reason)
+        }
+    }
+}
+
+pub fn windows_pre_show_capture_exclusion_can_recheck_after_show(
+    status: &OverlayProtectionStatus,
+) -> bool {
+    std::hint::black_box(WINDOWS_PRE_SHOW_CAPTURE_EXCLUSION_RECHECK_MARKER);
+
+    if status.visible || status.capture_exclusion != "failed" {
+        return false;
+    }
+
+    status.message.as_deref().is_some_and(|message| {
+        message.contains("Windows display-affinity readback did not confirm capture exclusion.")
+            || message.contains(
+                "Windows rejected WDA_EXCLUDEFROMCAPTURE and legacy WDA_MONITOR fallback.",
+            )
+    })
 }
 
 pub fn post_show_privacy_recheck_message(

@@ -346,6 +346,8 @@ test("startup setup hides app windows when native privacy cannot be proven", asy
   assert.match(configureBody, /startup_allows_initial_show\s*$/m);
   assert.match(overlayRs.slice(startupDecisionStart), /native_privacy_shield_decision_for_overlay_protection/);
   assert.match(overlayRs.slice(startupDecisionStart), /STARTUP_PRIVACY_SHIELD_DENIED_INITIAL_SHOW_MARKER/);
+  assert.match(overlayRs.slice(startupDecisionStart), /WINDOWS_PRE_SHOW_CAPTURE_EXCLUSION_RECHECK_MARKER/);
+  assert.match(overlayRs.slice(startupDecisionStart), /capture_exclusion_show_block_reason\(status,\s*cfg!\(target_os = "windows"\)\)/);
 });
 
 test("startup refuses to run when the native privacy shield thread cannot start", async () => {
