@@ -8,10 +8,12 @@ Make Caveman harder to expose during Google Meet, Microsoft Teams, and screen-sh
 
 - Branch: `main`
 - Remote: `origin/main`
-- Latest pushed implementation commit before this handoff refresh: `99d33cc test: let meeting smoke clear naturally`
+- Latest pushed implementation commit before this handoff refresh: `a8cd8f9 test: sync app frame host marker anchor`
 - This handoff file is being kept current as the screen-share hardening work continues.
 - Previous relevant commits:
   - `c7569f5 ci: verify macos privacy shield on push`
+  - `a8cd8f9 test: sync app frame host marker anchor`
+  - `1512358 test: require windows app frame host marker`
   - `99d33cc test: let meeting smoke clear naturally`
   - `3c8f89b test: allow slower macos meeting restore`
   - `1a5b4bf test: run meeting risk smoke from dmg`
@@ -37,6 +39,7 @@ Make Caveman harder to expose during Google Meet, Microsoft Teams, and screen-sh
 - The package smoke workflow now runs both macOS DMG privacy-shield verifier lanes on every push to `main`, not only on manual workflow dispatch, so normal pushes exercise EXE and DMG privacy shield packaging.
 - The macOS meeting-risk smoke can launch a specific `Caveman.app` path. Package smoke mounts the generated DMG and verifies the app inside the mounted installer is protected and hidden during simulated Google Meet/Teams windows; the installed-app smoke still verifies hide and restore.
 - The package privacy-shield attestation now also requires the Windows `applicationframehost.exe` marker, matching the runtime detector path for Store/WebView-hosted Google Meet and Teams windows.
+- The packaged DMG meeting-risk smoke keeps simulated browser meeting windows alive longer and gives macOS title-scan detection more time on slower Intel runners, while still requiring Caveman to hide during Google Meet and Teams risk.
 
 ## Verification already run locally
 
@@ -61,7 +64,7 @@ READY
 - Caveman restored protected onscreen window 12215 at 1249x820.
 ```
 
-`npm run test:release` passed 142 tests after the DMG runtime-smoke wiring edits. `npm run meeting-risk:smoke:mac` also passed after restarting the local app from clean saved state.
+`npm run test:release` passed 144 tests after the Intel DMG timing fix. `npm run meeting-risk:smoke:mac` also passed earlier after restarting the local app from clean saved state.
 
 ## CI to check next
 
