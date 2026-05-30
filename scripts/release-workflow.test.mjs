@@ -5,7 +5,11 @@ import test from "node:test";
 const workflowPath = ".github/workflows/release.yml";
 const desktopSmokeWorkflowPath = ".github/workflows/desktop-package-smoke.yml";
 
-const normalizeLineEndings = (text) => text.replace(/\r\n/g, "\n");
+const normalizeLineEndings = (text) => text.replace(/\r\n?/g, "\n");
+const indexOfRegex = (text, pattern) => {
+  const match = pattern.exec(text);
+  return match ? match.index : -1;
+};
 const cavemanCargoLockVersionPattern = /\[\[package\]\]\nname = "caveman"\nversion = "0\.1\.1"/;
 const updaterPublicKey =
   "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDhFREQ5MzAzMUExN0VGNkUKUldSdTd4Y2FBNVBkam9EeDJFNmpqbCtPZkpDTmZ4T05HOHVhVEo5MmNwSFdqSTl4MHdwWHZqNXcK";
@@ -375,7 +379,10 @@ test("native privacy shield refreshes capture protection before share-risk hide"
       nativePrivacyDetectorBody.indexOf("detect_screen_share_status()"),
     "Windows native privacy polling must check visible titles before tasklist fallback"
   );
-  const windowsDetectorStart = screenShareRs.indexOf("#[cfg(target_os = \"windows\")]\n    {");
+  const windowsDetectorStart = indexOfRegex(
+    screenShareRs,
+    /#\[cfg\(target_os = "windows"\)\]\s*\{/
+  );
   const windowsDetectorEnd = screenShareRs.indexOf("#[cfg(target_os = \"macos\")]", windowsDetectorStart);
   const windowsDetectorBody = screenShareRs.slice(windowsDetectorStart, windowsDetectorEnd);
   assert.notEqual(windowsDetectorStart, -1, "Windows screen-share detector branch must exist");
@@ -475,7 +482,7 @@ test("companion bounds watchdog pauses repairs during active share-risk", async 
 
 test("macOS process guard short-circuits before window-title scan", async () => {
   const screenShareRs = normalizeLineEndings(await readFile("src-tauri/src/screen_share.rs", "utf8"));
-  const macosBranchStart = screenShareRs.indexOf("#[cfg(target_os = \"macos\")]\n    {");
+  const macosBranchStart = indexOfRegex(screenShareRs, /#\[cfg\(target_os = "macos"\)\]\s*\{/);
   const macosBranchEnd = screenShareRs.indexOf("#[cfg(not(any(target_os = \"macos\", target_os = \"windows\")))]", macosBranchStart);
 
   assert.notEqual(macosBranchStart, -1, "macOS screen-share detector branch must exist");
