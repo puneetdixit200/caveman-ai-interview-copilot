@@ -1,9 +1,11 @@
 import assert from "node:assert/strict";
+import { EventEmitter } from "node:events";
 import test from "node:test";
 
 import {
   MACOS_MEETING_RISK_SMOKE_MARKER,
   cavemanActivationArgs,
+  runMacosMeetingRiskSmoke,
   summarizeMacosMeetingRiskSmoke
 } from "./macos-meeting-risk-smoke.mjs";
 
@@ -50,6 +52,21 @@ test("summarizes simulated meeting risk hide and restore states", () => {
 
   assert.equal(
     summarizeMacosMeetingRiskSmoke({
+      platform: "darwin",
+      initialWindow: WINDOW,
+      scenarioResults: [
+        { label: "Google Meet browser window", hiddenDuringRisk: true },
+        { label: "Microsoft Teams browser window", hiddenDuringRisk: true },
+        { label: "Microsoft Teams native process", hiddenDuringRisk: true }
+      ],
+      restoredWindow: null,
+      requireRestore: false
+    }).status,
+    "ready"
+  );
+
+  assert.equal(
+    summarizeMacosMeetingRiskSmoke({
       platform: "linux",
       initialWindow: null,
       scenarioResults: [],
@@ -67,4 +84,51 @@ test("can launch a specific packaged Caveman app bundle for meeting-risk smoke",
     "-b",
     "com.example.caveman"
   ]);
+});
+
+test("lets simulated meeting apps exit before checking Caveman restoration", async () => {
+  const visibleWindowRows = JSON.stringify([WINDOW]);
+  const queryOutputs = [visibleWindowRows, "[]", visibleWindowRows];
+  const killSignals = [];
+
+  const commandRunner = async (command) => {
+    if (command === "swift") {
+      return { stdout: queryOutputs.shift() ?? visibleWindowRows };
+    }
+    return { stdout: "" };
+  };
+
+  const processSpawner = () => {
+    const child = new EventEmitter();
+    child.exitCode = null;
+    child.signalCode = null;
+    child.kill = (signal) => {
+      killSignals.push(signal);
+      child.signalCode = signal;
+      child.emit("exit");
+      return true;
+    };
+    setTimeout(() => {
+      child.exitCode = 0;
+      child.emit("exit");
+    }, 0);
+    return child;
+  };
+
+  const result = await runMacosMeetingRiskSmoke({
+    platform: "darwin",
+    commandRunner,
+    processSpawner,
+    scenarios: [
+      {
+        id: "teams-native",
+        label: "Microsoft Teams native process",
+        executableName: "MSTeams",
+        windowTitle: "Microsoft Teams - Interview"
+      }
+    ]
+  });
+
+  assert.equal(result.status, "ready");
+  assert.deepEqual(killSignals, []);
 });

@@ -51,7 +51,9 @@ export async function runMacosDmgMeetingRiskSmoke({
       commandRunner,
       processSpawner,
       bundleId,
-      appPath
+      appPath,
+      requireRestore: false,
+      restoreWaitMs: 5_000
     });
 
     return {

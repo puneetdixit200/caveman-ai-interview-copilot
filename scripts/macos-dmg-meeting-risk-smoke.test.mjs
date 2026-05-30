@@ -47,8 +47,10 @@ test("runs meeting-risk smoke against the mounted DMG app bundle", async () => {
         }
         return { stdout: "", stderr: "" };
       },
-      meetingRiskRunner: async ({ appPath }) => {
+      meetingRiskRunner: async ({ appPath, requireRestore, restoreWaitMs }) => {
         assert.match(appPath, /Caveman\.app$/);
+        assert.equal(requireRestore, false);
+        assert.equal(restoreWaitMs, 5_000);
         return {
           status: "ready",
           messages: [`ran against ${appPath}`]

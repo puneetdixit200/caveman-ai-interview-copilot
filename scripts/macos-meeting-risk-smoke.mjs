@@ -21,7 +21,7 @@ const DEFAULT_BUNDLE_ID = "com.caveman.desktop";
 const QUERY_MAX_BUFFER = 1024 * 1024;
 const INITIAL_WAIT_MS = 6_000;
 const ACTIVE_RISK_WAIT_MS = 8_000;
-const RESTORE_WAIT_MS = 30_000;
+const RESTORE_WAIT_MS = 12_000;
 const POLL_INTERVAL_MS = 250;
 const FAKE_MEETING_DURATION_MS = 10_000;
 
@@ -76,7 +76,8 @@ export function summarizeMacosMeetingRiskSmoke({
   initialWindow,
   scenarioResults = [],
   restoredWindow,
-  detail
+  detail,
+  requireRestore = true
 }) {
   if (platform !== "darwin") {
     return {
@@ -117,7 +118,7 @@ export function summarizeMacosMeetingRiskSmoke({
   const allScenariosHid =
     scenarioResults.length > 0 && scenarioResults.every((result) => result.hiddenDuringRisk);
   return {
-    status: initialWindow && allScenariosHid && restoredWindow ? "ready" : "blocked",
+    status: initialWindow && allScenariosHid && (restoredWindow || !requireRestore) ? "ready" : "blocked",
     messages
   };
 }
@@ -128,6 +129,8 @@ export async function runMacosMeetingRiskSmoke({
   processSpawner = spawn,
   bundleId = process.env.CAVEMAN_BUNDLE_ID || DEFAULT_BUNDLE_ID,
   appPath = process.env.CAVEMAN_APP_PATH || null,
+  requireRestore = true,
+  restoreWaitMs = RESTORE_WAIT_MS,
   scenarios = DEFAULT_SCENARIOS
 } = {}) {
   if (platform !== "darwin") {
@@ -155,24 +158,26 @@ export async function runMacosMeetingRiskSmoke({
           tempDir,
           scenario,
           commandRunner,
-          processSpawner
+          processSpawner,
+          restoreWaitMs
         })
       );
     }
 
-    const restoredWindow = await waitForVisibleUsableWindow({ commandRunner, timeoutMs: RESTORE_WAIT_MS });
+    const restoredWindow = await waitForVisibleUsableWindow({ commandRunner, timeoutMs: restoreWaitMs });
     return summarizeMacosMeetingRiskSmoke({
       platform,
       initialWindow,
       scenarioResults,
-      restoredWindow
+      restoredWindow,
+      requireRestore
     });
   } finally {
     await rm(tempDir, { recursive: true, force: true });
   }
 }
 
-async function runMeetingRiskScenario({ tempDir, scenario, commandRunner, processSpawner }) {
+async function runMeetingRiskScenario({ tempDir, scenario, commandRunner, processSpawner, restoreWaitMs }) {
   const binaryPath = join(tempDir, scenario.executableName);
   const sourcePath = join(tempDir, `${scenario.id}.swift`);
   await writeFile(sourcePath, FAKE_MEETING_APP_SWIFT, "utf8");
@@ -198,6 +203,9 @@ async function runMeetingRiskScenario({ tempDir, scenario, commandRunner, proces
       predicate: (rows) => !selectVisibleUsableCavemanWindow(rows),
       shouldStop: () => riskProcessExited
     });
+    if (hiddenDuringRisk) {
+      await waitForChildExit(riskProcess, FAKE_MEETING_DURATION_MS + 5_000);
+    }
     return {
       ...scenario,
       hiddenDuringRisk,
@@ -205,7 +213,7 @@ async function runMeetingRiskScenario({ tempDir, scenario, commandRunner, proces
     };
   } finally {
     await stopProcess(riskProcess);
-    await waitForVisibleUsableWindow({ commandRunner, timeoutMs: RESTORE_WAIT_MS });
+    await waitForVisibleUsableWindow({ commandRunner, timeoutMs: restoreWaitMs });
   }
 }
 

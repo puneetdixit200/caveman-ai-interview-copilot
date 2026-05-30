@@ -32,7 +32,7 @@ Make Caveman harder to expose during Google Meet, Microsoft Teams, and screen-sh
   - Microsoft Teams native process window
 - It verifies Caveman starts protected, hides while simulated meeting/share-risk windows are visible, then restores as a protected onscreen window after risk clears.
 - The package smoke workflow now runs both macOS DMG privacy-shield verifier lanes on every push to `main`, not only on manual workflow dispatch, so normal pushes exercise EXE and DMG privacy shield packaging.
-- The macOS meeting-risk smoke can launch a specific `Caveman.app` path, and package smoke is being extended to mount the generated DMG and run the Google Meet/Teams simulation against the app inside the mounted installer.
+- The macOS meeting-risk smoke can launch a specific `Caveman.app` path. Package smoke mounts the generated DMG and verifies the app inside the mounted installer is protected and hidden during simulated Google Meet/Teams windows; the installed-app smoke still verifies hide and restore.
 
 ## Verification already run locally
 
@@ -57,7 +57,7 @@ READY
 - Caveman restored protected onscreen window 12215 at 1249x820.
 ```
 
-`npm run test:release` passed 141 tests after the DMG runtime-smoke wiring edits. `npm run meeting-risk:smoke:mac` also passed after the app-path launch change.
+`npm run test:release` passed 142 tests after the DMG runtime-smoke wiring edits. `npm run meeting-risk:smoke:mac` also passed after restarting the local app from clean saved state.
 
 ## CI to check next
 
