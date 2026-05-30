@@ -45,6 +45,9 @@ jobs:
       - name: Verify packaged privacy shield
         run: node scripts/verify-privacy-shield-package.mjs --target windows-x64 --write-attestation src-tauri/target/release/bundle/privacy-shield-windows-x64.json
 
+      - name: Run packaged Windows meeting-risk smoke
+        run: npm run meeting-risk:smoke:windows
+
       - name: Upload Windows package artifact
         uses: actions/upload-artifact@v7.0.1
         with:

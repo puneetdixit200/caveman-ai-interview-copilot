@@ -220,6 +220,16 @@ test("signed release workflow runs native privacy gates before publishing artifa
       `${label} signed release must pass DMG meeting-risk smoke before artifact upload`
     );
   }
+
+  assert.match(windowsJob, /npm run meeting-risk:smoke:windows/, "Windows signed EXE must run meeting-risk smoke");
+  assert.ok(
+    windowsJob.indexOf("Verify packaged privacy shield") < windowsJob.indexOf("npm run meeting-risk:smoke:windows"),
+    "Windows signed release must attest the packaged privacy shield before launching EXE smoke"
+  );
+  assert.ok(
+    windowsJob.indexOf("npm run meeting-risk:smoke:windows") < windowsJob.indexOf("Upload Windows build artifact"),
+    "Windows signed release must pass EXE meeting-risk smoke before artifact upload"
+  );
 });
 
 test("macOS bundle declares privacy usage descriptions for audio capture", async () => {
@@ -975,6 +985,7 @@ test("release workflow contract is part of the release test suite", async () => 
   assert.match(packageJson.scripts["test:release"], /notarize-macos-dmg\.test\.mjs/);
   assert.match(packageJson.scripts["test:release"], /obs-stealth-smoke\.test\.mjs/);
   assert.match(packageJson.scripts["test:release"], /macos-dmg-meeting-risk-smoke\.test\.mjs/);
+  assert.match(packageJson.scripts["test:release"], /windows-meeting-risk-smoke\.test\.mjs/);
   assert.match(packageJson.scripts["test:release"], /audio-environment-smoke\.test\.mjs/);
   assert.match(packageJson.scripts["test:release"], /commercial-readiness\.test\.mjs/);
   assert.equal(packageJson.scripts["sidecars:prepare"], "node scripts/prepare-whisper-sidecars.mjs --target current --output-config src-tauri/target/tauri.sidecars.generated.conf.json");
@@ -985,6 +996,7 @@ test("release workflow contract is part of the release test suite", async () => 
   assert.equal(packageJson.scripts["ai:smoke:openrouter"], "node scripts/openrouter-smoke.mjs");
   assert.equal(packageJson.scripts["obs:smoke"], "node scripts/obs-stealth-smoke.mjs");
   assert.equal(packageJson.scripts["dmg-meeting-risk:smoke:mac"], "node scripts/macos-dmg-meeting-risk-smoke.mjs");
+  assert.equal(packageJson.scripts["meeting-risk:smoke:windows"], "node scripts/windows-meeting-risk-smoke.mjs");
   assert.equal(packageJson.scripts["audio:smoke"], "node scripts/audio-environment-smoke.mjs");
   assert.equal(packageJson.scripts["commercial:check"], "node scripts/commercial-readiness.mjs");
   assert.equal(packageJson.scripts["commercial:secrets"], "node scripts/configure-commercial-secrets.mjs");
@@ -1016,6 +1028,7 @@ test("package scripts expose repeatable macOS and Windows installer builds", asy
   assert.match(workflow, /npm run tauri:build:windows/);
   assert.match(workflow, /npm run tauri:build:mac/);
   assert.match(workflow, /npm run tauri:build:linux/);
+  assert.match(workflow, /npm run meeting-risk:smoke:windows/);
   assert.match(workflow, /npm run dmg-meeting-risk:smoke:mac/);
 });
 
@@ -1065,6 +1078,7 @@ test("desktop package smoke workflow builds macOS and Windows installers without
   assert.match(workflow, /npm run tauri:build:mac/);
   assert.match(workflow, /npm run tauri:build:linux/);
   assert.match(workflow, /npm run package:verify-sidecar/);
+  assert.match(workflow, /npm run meeting-risk:smoke:windows/);
   assert.match(workflow, /npm run dmg-meeting-risk:smoke:mac/);
   assert.match(workflow, /src-tauri\/target\/release\/bundle\/dmg\/\*\.dmg/);
   assert.doesNotMatch(workflow, /src-tauri\/target\/release\/bundle\/macos\/Caveman\.app/);
@@ -1093,4 +1107,22 @@ test("desktop package smoke uploads privacy shield attestations from every targe
       `${target} package smoke must upload privacy shield attestation`
     );
   }
+});
+
+test("desktop package smoke runs Windows EXE meeting-risk smoke before upload", async () => {
+  const workflow = await readFile(desktopSmokeWorkflowPath, "utf8");
+  const windowsStart = workflow.indexOf("build-windows:");
+  const macosIntelStart = workflow.indexOf("build-macos-intel:");
+  const windowsJob = workflow.slice(windowsStart, macosIntelStart);
+
+  assert.notEqual(windowsStart, -1, "Windows package smoke job must exist");
+  assert.match(windowsJob, /npm run meeting-risk:smoke:windows/);
+  assert.ok(
+    windowsJob.indexOf("Verify packaged privacy shield") < windowsJob.indexOf("npm run meeting-risk:smoke:windows"),
+    "Windows package smoke must attest the packaged privacy shield before launching EXE smoke"
+  );
+  assert.ok(
+    windowsJob.indexOf("npm run meeting-risk:smoke:windows") < windowsJob.indexOf("Upload Windows package artifact"),
+    "Windows package smoke must pass EXE meeting-risk smoke before artifact upload"
+  );
 });

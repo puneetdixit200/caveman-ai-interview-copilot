@@ -61,6 +61,7 @@ Make Caveman harder to expose during Google Meet, Microsoft Teams, and screen-sh
 - Companion-window restore now also pauses briefly after any native privacy denial or share-risk hide, so the fast repair loop cannot immediately re-show the dashboard between macOS title-scan detections.
 - Companion-window focus repair now performs a second privacy recheck after native `unminimize`/`show`/`set_focus`, then hides the overlay and companion windows again if a Meet/Teams/share-risk window appears during that focus transition.
 - The macOS visible-window title guard now treats strong meeting/share titles from any foreground app as screen-share risk, not only from browser/PWA host processes. This covers native-style Teams windows that surface a title like `Microsoft Teams - Interview` through CoreGraphics while still ignoring ordinary note titles like `Google Meet prep notes`.
+- Windows package and signed-release lanes now run a packaged EXE meeting-risk smoke before artifact upload. The smoke launches `src-tauri/target/release/caveman.exe` in CI, verifies the visible Caveman window has `WDA_EXCLUDEFROMCAPTURE` or `WDA_MONITOR`, then requires it to hide while simulated Google Meet, browser share, and Microsoft Teams windows are visible.
 
 ## Verification already run locally
 
@@ -148,6 +149,9 @@ Follow-up CI hardening verification:
   - macOS Intel app/DMG: native privacy tests, release contracts, package build, sidecar verification, packaged privacy shield, packaged meeting-risk smoke, and DMG artifact upload passed.
   - macOS Apple Silicon app/DMG: native privacy tests, release contracts, package build, sidecar verification, packaged privacy shield, packaged meeting-risk smoke, and DMG artifact upload passed.
   - Linux AppImage/DEB: native privacy tests, release contracts, package build, sidecar verification, packaged privacy shield, and artifact upload passed.
+- Windows EXE meeting-risk smoke follow-up local verification:
+  - `node --test scripts/windows-meeting-risk-smoke.test.mjs scripts/release-workflow.test.mjs` passed locally without opening the app.
+  - The actual Windows runtime smoke is wired into CI and must pass on Windows package/signed-release runners before EXE/MSI artifacts upload.
 
 ## CI to check next
 
@@ -163,7 +167,7 @@ Latest verified package-smoke run before this handoff refresh: `26692539422` for
 
 1. Recheck the worktree with `git status --short --branch`.
 2. If code changes resume, verify the next pushed Desktop Package Smoke run includes and passes `Run native privacy shield tests` in all four package lanes and both macOS DMG `Run packaged meeting-risk smoke` steps.
-3. Only verify the installed app window is visible, non-zero-sized, and protected with CoreGraphics window inspection when the user allows opening the app.
+3. Only verify the installed app window is visible, non-zero-sized, and protected with CoreGraphics/window inspection when the user allows opening the app.
 4. If the app is collapsed to `0x0`, restart it after clearing saved state:
 
 ```sh
