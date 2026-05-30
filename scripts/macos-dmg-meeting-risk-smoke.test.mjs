@@ -65,6 +65,9 @@ test("runs meeting-risk smoke against the mounted DMG app bundle", async () => {
         assert.ok(scenarios.some((scenario) => scenario.windowTitle === "Zoom Meeting - Candidate"));
         assert.ok(scenarios.some((scenario) => scenario.windowTitle === "Webex Meeting - Candidate"));
         assert.ok(scenarios.some((scenario) => scenario.windowTitle === "Screen recording"));
+        assert.ok(scenarios.some((scenario) => scenario.windowTitle === "Slack Huddle - Candidate"));
+        assert.ok(scenarios.some((scenario) => scenario.windowTitle === "Remote Desktop - Session"));
+        assert.ok(scenarios.some((scenario) => scenario.windowTitle === "Screen Recorder - Active"));
         return {
           status: "ready",
           messages: [`ran against ${appPath}`]

@@ -177,6 +177,15 @@ const BROWSER_RECORDING_YOUR_SCREEN_TITLE: &str = "recording your screen";
 const BROWSER_RECORDING_SCREEN_TITLE: &str = "recording screen";
 const BROWSER_SCREEN_IS_BEING_RECORDED_TITLE: &str = "screen is being recorded";
 const BROWSER_BEING_RECORDED_TITLE: &str = "being recorded";
+const BROWSER_SCREEN_SHARING_TITLE: &str = "screen sharing";
+const BROWSER_SCREEN_SHARE_TITLE: &str = "screen share";
+const BROWSER_SCREEN_RECORDER_TITLE: &str = "screen recorder";
+const BROWSER_LIVE_STREAMING_TITLE: &str = "live streaming";
+const BROWSER_BROADCASTING_TITLE: &str = "broadcasting";
+const SLACK_HUDDLE_TITLE: &str = "slack huddle";
+const DISCORD_VOICE_TITLE: &str = "discord voice";
+const WHATSAPP_VIDEO_CALL_TITLE: &str = "whatsapp video call";
+const REMOTE_DESKTOP_TITLE: &str = "remote desktop";
 const WINDOW_TITLE_PUNCTUATION_NORMALIZATION_MARKER: &str =
     "Screen-share window title guard normalizes UI punctuation before matching.";
 const STRONG_WINDOW_TITLE_ANY_APP_MARKER: &str =
@@ -330,6 +339,15 @@ const PACKAGE_PRIVACY_SHIELD_WEBVIEW_MARKERS: &[&str] = &[
     BROWSER_RECORDING_SCREEN_TITLE,
     BROWSER_SCREEN_IS_BEING_RECORDED_TITLE,
     BROWSER_BEING_RECORDED_TITLE,
+    BROWSER_SCREEN_SHARING_TITLE,
+    BROWSER_SCREEN_SHARE_TITLE,
+    BROWSER_SCREEN_RECORDER_TITLE,
+    BROWSER_LIVE_STREAMING_TITLE,
+    BROWSER_BROADCASTING_TITLE,
+    SLACK_HUDDLE_TITLE,
+    DISCORD_VOICE_TITLE,
+    WHATSAPP_VIDEO_CALL_TITLE,
+    REMOTE_DESKTOP_TITLE,
     SCREEN_SHARE_GUARD_COMMAND_TIMEOUT_MARKER,
     WINDOW_TITLE_PUNCTUATION_NORMALIZATION_MARKER,
     STRONG_WINDOW_TITLE_ANY_APP_MARKER,
@@ -718,6 +736,15 @@ const WATCHED_SCREEN_SHARE_TITLES: &[&str] = &[
     BROWSER_RECORDING_SCREEN_TITLE,
     BROWSER_SCREEN_IS_BEING_RECORDED_TITLE,
     BROWSER_BEING_RECORDED_TITLE,
+    BROWSER_SCREEN_SHARING_TITLE,
+    BROWSER_SCREEN_SHARE_TITLE,
+    BROWSER_SCREEN_RECORDER_TITLE,
+    BROWSER_LIVE_STREAMING_TITLE,
+    BROWSER_BROADCASTING_TITLE,
+    SLACK_HUDDLE_TITLE,
+    DISCORD_VOICE_TITLE,
+    WHATSAPP_VIDEO_CALL_TITLE,
+    REMOTE_DESKTOP_TITLE,
     #[cfg(target_os = "macos")]
     NATIVE_PRIVACY_SHIELD_MACOS_REDACTED_BROWSER_TITLE_MARKER,
     #[cfg(target_os = "windows")]
@@ -1842,6 +1869,15 @@ fn is_strong_screen_share_window_title(title: Option<&str>) -> bool {
         BROWSER_RECORDING_SCREEN_TITLE,
         BROWSER_SCREEN_IS_BEING_RECORDED_TITLE,
         BROWSER_BEING_RECORDED_TITLE,
+        BROWSER_SCREEN_SHARING_TITLE,
+        BROWSER_SCREEN_SHARE_TITLE,
+        BROWSER_SCREEN_RECORDER_TITLE,
+        BROWSER_LIVE_STREAMING_TITLE,
+        BROWSER_BROADCASTING_TITLE,
+        SLACK_HUDDLE_TITLE,
+        DISCORD_VOICE_TITLE,
+        WHATSAPP_VIDEO_CALL_TITLE,
+        REMOTE_DESKTOP_TITLE,
     ];
 
     active_share_titles
@@ -2459,6 +2495,16 @@ mod tests {
             "Recording screen",
             "Your screen is being recorded",
             "Meeting is being recorded",
+            "Screen sharing - Browser",
+            "Screen share: active session",
+            "Screen recorder - active",
+            "Live streaming - StreamYard",
+            "Broadcasting | Restream",
+            "Slack Huddle - Candidate",
+            "Discord Voice - Candidate",
+            "WhatsApp Video Call - Candidate",
+            "Remote Desktop - Session",
+            "Remote Desktop Connection",
         ] {
             assert!(is_watched_screen_share_window_title(Some(title)));
         }
@@ -2605,6 +2651,15 @@ mod tests {
                 BROWSER_RECORDING_SCREEN_TITLE,
                 BROWSER_SCREEN_IS_BEING_RECORDED_TITLE,
                 BROWSER_BEING_RECORDED_TITLE,
+                BROWSER_SCREEN_SHARING_TITLE,
+                BROWSER_SCREEN_SHARE_TITLE,
+                BROWSER_SCREEN_RECORDER_TITLE,
+                BROWSER_LIVE_STREAMING_TITLE,
+                BROWSER_BROADCASTING_TITLE,
+                SLACK_HUDDLE_TITLE,
+                DISCORD_VOICE_TITLE,
+                WHATSAPP_VIDEO_CALL_TITLE,
+                REMOTE_DESKTOP_TITLE,
                 SCREEN_SHARE_GUARD_COMMAND_TIMEOUT_MARKER,
                 WINDOW_TITLE_PUNCTUATION_NORMALIZATION_MARKER,
                 STRONG_WINDOW_TITLE_ANY_APP_MARKER,
@@ -2739,6 +2794,58 @@ mod tests {
                 ("teams-native", Some("Microsoft Teams - Interview")),
                 ("meet-window", Some("Google Meet - Candidate Screen")),
                 ("share-indicator", Some("This window is being shared"))
+            ]
+        );
+    }
+
+    #[test]
+    fn detects_strong_huddle_remote_capture_titles_from_unclassified_visible_apps() {
+        let status = screen_share_status_for_processes(vec![
+            ScreenShareProcess {
+                name: "share-indicator".to_string(),
+                pid: Some(781),
+                window_title: Some("Screen sharing - Browser".to_string()),
+            },
+            ScreenShareProcess {
+                name: "screen-recorder".to_string(),
+                pid: Some(782),
+                window_title: Some("Screen recorder - active".to_string()),
+            },
+            ScreenShareProcess {
+                name: "slack-huddle".to_string(),
+                pid: Some(783),
+                window_title: Some("Slack Huddle - Candidate".to_string()),
+            },
+            ScreenShareProcess {
+                name: "discord-call".to_string(),
+                pid: Some(784),
+                window_title: Some("Discord Voice - Candidate".to_string()),
+            },
+            ScreenShareProcess {
+                name: "remote-session".to_string(),
+                pid: Some(785),
+                window_title: Some("Remote Desktop - Session".to_string()),
+            },
+            ScreenShareProcess {
+                name: "notes".to_string(),
+                pid: Some(786),
+                window_title: Some("Screen share design notes".to_string()),
+            },
+        ]);
+
+        assert!(status.active);
+        assert_eq!(
+            status
+                .matched_processes
+                .iter()
+                .map(|process| (process.name.as_str(), process.window_title.as_deref()))
+                .collect::<Vec<_>>(),
+            vec![
+                ("share-indicator", Some("Screen sharing - Browser")),
+                ("screen-recorder", Some("Screen recorder - active")),
+                ("slack-huddle", Some("Slack Huddle - Candidate")),
+                ("discord-call", Some("Discord Voice - Candidate")),
+                ("remote-session", Some("Remote Desktop - Session")),
             ]
         );
     }

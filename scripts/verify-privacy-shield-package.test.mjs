@@ -270,6 +270,15 @@ test("requires packaged web meeting and recording title detector markers", () =>
   assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("recording screen"));
   assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("screen is being recorded"));
   assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("being recorded"));
+  assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("screen sharing"));
+  assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("screen share"));
+  assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("screen recorder"));
+  assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("live streaming"));
+  assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("broadcasting"));
+  assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("slack huddle"));
+  assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("discord voice"));
+  assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("whatsapp video call"));
+  assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("remote desktop"));
   assert.ok(
     COMMON_PRIVACY_SHIELD_MARKERS.includes(
       "Screen-share guard command timeout failed closed before privacy polling could stall."

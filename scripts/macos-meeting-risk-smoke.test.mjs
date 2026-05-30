@@ -27,6 +27,8 @@ test("summarizes simulated meeting risk hide and restore states", () => {
   assert.ok(MACOS_MEETING_RISK_SMOKE_MARKER.includes("Teams"));
   assert.ok(MACOS_MEETING_RISK_SMOKE_MARKER.includes("Zoom"));
   assert.ok(MACOS_MEETING_RISK_SMOKE_MARKER.includes("Webex"));
+  assert.ok(MACOS_MEETING_RISK_SMOKE_MARKER.includes("huddle"));
+  assert.ok(MACOS_MEETING_RISK_SMOKE_MARKER.includes("remote desktop"));
 
   assert.equal(
     summarizeMacosMeetingRiskSmoke({
@@ -39,7 +41,12 @@ test("summarizes simulated meeting risk hide and restore states", () => {
         { label: "Zoom meeting window", hiddenDuringRisk: true },
         { label: "Webex meeting window", hiddenDuringRisk: true },
         { label: "Browser presenting indicator", hiddenDuringRisk: true },
-        { label: "Screen recording indicator", hiddenDuringRisk: true }
+        { label: "Screen recording indicator", hiddenDuringRisk: true },
+        { label: "Slack huddle window", hiddenDuringRisk: true },
+        { label: "Discord voice window", hiddenDuringRisk: true },
+        { label: "WhatsApp video call window", hiddenDuringRisk: true },
+        { label: "Remote desktop window", hiddenDuringRisk: true },
+        { label: "Screen recorder window", hiddenDuringRisk: true }
       ],
       restoredWindow: WINDOW
     }).status,
@@ -70,7 +77,12 @@ test("summarizes simulated meeting risk hide and restore states", () => {
         { label: "Zoom meeting window", hiddenDuringRisk: true },
         { label: "Webex meeting window", hiddenDuringRisk: true },
         { label: "Browser presenting indicator", hiddenDuringRisk: true },
-        { label: "Screen recording indicator", hiddenDuringRisk: true }
+        { label: "Screen recording indicator", hiddenDuringRisk: true },
+        { label: "Slack huddle window", hiddenDuringRisk: true },
+        { label: "Discord voice window", hiddenDuringRisk: true },
+        { label: "WhatsApp video call window", hiddenDuringRisk: true },
+        { label: "Remote desktop window", hiddenDuringRisk: true },
+        { label: "Screen recorder window", hiddenDuringRisk: true }
       ],
       restoredWindow: null,
       requireRestore: false
@@ -111,7 +123,12 @@ test("keeps simulated meeting windows alive long enough for macOS title scans", 
       "Zoom Meeting - Candidate",
       "Webex Meeting - Candidate",
       "You are presenting",
-      "Screen recording"
+      "Screen recording",
+      "Slack Huddle - Candidate",
+      "Discord Voice - Candidate",
+      "WhatsApp Video Call - Candidate",
+      "Remote Desktop - Session",
+      "Screen Recorder - Active"
     ]
   );
 });

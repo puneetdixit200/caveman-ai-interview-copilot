@@ -36,6 +36,8 @@ test("selects only visible usable protected Caveman windows", () => {
   assert.ok(WINDOWS_MEETING_RISK_SMOKE_MARKER.includes("Teams"));
   assert.ok(WINDOWS_MEETING_RISK_SMOKE_MARKER.includes("Zoom"));
   assert.ok(WINDOWS_MEETING_RISK_SMOKE_MARKER.includes("Webex"));
+  assert.ok(WINDOWS_MEETING_RISK_SMOKE_MARKER.includes("huddle"));
+  assert.ok(WINDOWS_MEETING_RISK_SMOKE_MARKER.includes("remote desktop"));
 
   const rows = parseWindowsWindowRows(
     JSON.stringify([
@@ -63,7 +65,12 @@ test("summarizes Windows meeting risk hide states", () => {
         { label: "Zoom meeting window", hiddenDuringRisk: true },
         { label: "Webex meeting window", hiddenDuringRisk: true },
         { label: "Browser presenting indicator", hiddenDuringRisk: true },
-        { label: "Screen recording indicator", hiddenDuringRisk: true }
+        { label: "Screen recording indicator", hiddenDuringRisk: true },
+        { label: "Slack huddle window", hiddenDuringRisk: true },
+        { label: "Discord voice window", hiddenDuringRisk: true },
+        { label: "WhatsApp video call window", hiddenDuringRisk: true },
+        { label: "Remote desktop window", hiddenDuringRisk: true },
+        { label: "Screen recorder window", hiddenDuringRisk: true }
       ],
       restoredWindow: null,
       requireRestore: false
@@ -117,7 +124,12 @@ test("keeps simulated meeting windows alive long enough for Windows title scans"
       "Zoom Meeting - Candidate",
       "Webex Meeting - Candidate",
       "You are presenting",
-      "Screen recording"
+      "Screen recording",
+      "Slack Huddle - Candidate",
+      "Discord Voice - Candidate",
+      "WhatsApp Video Call - Candidate",
+      "Remote Desktop - Session",
+      "Screen Recorder - Active"
     ]
   );
 });

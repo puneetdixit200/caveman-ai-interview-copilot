@@ -64,6 +64,7 @@ Make Caveman harder to expose during Google Meet, Microsoft Teams, and screen-sh
 - Windows package and signed-release lanes now run a packaged EXE meeting-risk smoke before artifact upload. The smoke launches `src-tauri/target/release/caveman.exe` in CI, verifies the visible Caveman window has `WDA_EXCLUDEFROMCAPTURE` or `WDA_MONITOR`, then requires it to hide while simulated Google Meet, browser share, and Microsoft Teams windows are visible.
 - Windows startup/show privacy gating now treats a hidden-window display-affinity readback failure as retryable only on the pre-show path, then relies on the existing post-show privacy recheck to hide again if `WDA_EXCLUDEFROMCAPTURE`/`WDA_MONITOR` is still not proven after the native window becomes visible. Screen-share risk still blocks before show.
 - Packaged Windows EXE and macOS DMG meeting-risk smokes now cover a wider supported "other screen share" set: Google Meet, Teams browser/native, Zoom meeting, Webex meeting, generic presenting UI, and generic screen-recording UI.
+- Strong visible-window title detection now also treats huddle, voice-call, remote-desktop, streaming/broadcasting, and generic screen-recorder titles as screen-share risk from any visible app. Packaged Windows EXE and macOS DMG meeting-risk smokes now simulate Slack huddle, Discord voice, WhatsApp video call, remote desktop, and screen-recorder windows in addition to Meet/Teams/Zoom/Webex/presenting/recording.
 
 ## Verification already run locally
 
@@ -165,6 +166,10 @@ Follow-up CI hardening verification:
   - The actual Windows runtime smoke is wired into CI and must pass on Windows package/signed-release runners before EXE/MSI artifacts upload.
 - Expanded meeting-risk scenario local verification:
   - `node --test scripts/windows-meeting-risk-smoke.test.mjs scripts/macos-meeting-risk-smoke.test.mjs scripts/macos-dmg-meeting-risk-smoke.test.mjs` passed 14 tests after adding Zoom, Webex, presenting, and recording scenarios to packaged runtime smokes.
+  - `npm run test:release` passed 156 tests.
+- Huddle/remote/capture title expansion local verification:
+  - `node --test scripts/windows-meeting-risk-smoke.test.mjs scripts/macos-meeting-risk-smoke.test.mjs scripts/macos-dmg-meeting-risk-smoke.test.mjs scripts/verify-privacy-shield-package.test.mjs` passed 36 tests.
+  - `cargo test --manifest-path src-tauri/Cargo.toml screen_share --lib` passed 61 tests.
   - `npm run test:release` passed 156 tests.
 - Push Desktop Package Smoke run `26694632145` for `011fb25` passed all lanes:
   - Windows installers: native privacy tests, release contracts, package build, bundled sidecar verification, packaged privacy shield, packaged Windows meeting-risk smoke, and artifact upload passed.

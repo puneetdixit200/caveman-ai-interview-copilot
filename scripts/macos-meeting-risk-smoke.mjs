@@ -15,7 +15,7 @@ import { selectVisibleUsableCavemanWindow } from "./macos-share-risk-smoke.mjs";
 const execFileAsync = promisify(execFile);
 
 export const MACOS_MEETING_RISK_SMOKE_MARKER =
-  "macOS meeting-risk smoke verifies Caveman hides during simulated Google Meet, Teams, Zoom, Webex, presenting, and recording windows and restores after risk clears.";
+  "macOS meeting-risk smoke verifies Caveman hides during simulated Google Meet, Teams, Zoom, Webex, huddle, remote desktop, presenting, and recording windows and restores after risk clears.";
 
 const DEFAULT_BUNDLE_ID = "com.caveman.desktop";
 const QUERY_MAX_BUFFER = 1024 * 1024;
@@ -96,6 +96,36 @@ export const MACOS_PACKAGED_MEETING_RISK_SCENARIOS = [
     label: "Screen recording indicator",
     executableName: "ScreenRecordingIndicator",
     windowTitle: "Screen recording"
+  },
+  {
+    id: "slack-huddle",
+    label: "Slack huddle window",
+    executableName: "SlackHuddleIndicator",
+    windowTitle: "Slack Huddle - Candidate"
+  },
+  {
+    id: "discord-voice",
+    label: "Discord voice window",
+    executableName: "DiscordVoiceIndicator",
+    windowTitle: "Discord Voice - Candidate"
+  },
+  {
+    id: "whatsapp-video-call",
+    label: "WhatsApp video call window",
+    executableName: "WhatsAppCallIndicator",
+    windowTitle: "WhatsApp Video Call - Candidate"
+  },
+  {
+    id: "remote-desktop",
+    label: "Remote desktop window",
+    executableName: "RemoteDesktopIndicator",
+    windowTitle: "Remote Desktop - Session"
+  },
+  {
+    id: "screen-recorder",
+    label: "Screen recorder window",
+    executableName: "ScreenRecorderIndicator",
+    windowTitle: "Screen Recorder - Active"
   }
 ];
 

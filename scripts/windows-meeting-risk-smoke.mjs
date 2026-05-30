@@ -21,7 +21,7 @@ export const WINDOWS_MEETING_RISK_ACTIVE_WAIT_MS = 18_000;
 export const WINDOWS_MEETING_RISK_FAKE_MEETING_DURATION_MS = 24_000;
 export const WINDOWS_MEETING_RISK_INITIAL_WAIT_MS = 30_000;
 export const WINDOWS_MEETING_RISK_SMOKE_MARKER =
-  "Windows EXE meeting-risk smoke launches the built app and verifies Caveman hides during simulated Google Meet, Teams, Zoom, Webex, presenting, and recording windows.";
+  "Windows EXE meeting-risk smoke launches the built app and verifies Caveman hides during simulated Google Meet, Teams, Zoom, Webex, huddle, remote desktop, presenting, and recording windows.";
 
 export const WINDOWS_CAVEMAN_WINDOW_QUERY_POWERSHELL = `
 $ErrorActionPreference = "Stop"
@@ -214,6 +214,31 @@ export const WINDOWS_MEETING_RISK_SCENARIOS = [
     id: "screen-recording",
     label: "Screen recording indicator",
     windowTitle: "Screen recording"
+  },
+  {
+    id: "slack-huddle",
+    label: "Slack huddle window",
+    windowTitle: "Slack Huddle - Candidate"
+  },
+  {
+    id: "discord-voice",
+    label: "Discord voice window",
+    windowTitle: "Discord Voice - Candidate"
+  },
+  {
+    id: "whatsapp-video-call",
+    label: "WhatsApp video call window",
+    windowTitle: "WhatsApp Video Call - Candidate"
+  },
+  {
+    id: "remote-desktop",
+    label: "Remote desktop window",
+    windowTitle: "Remote Desktop - Session"
+  },
+  {
+    id: "screen-recorder",
+    label: "Screen recorder window",
+    windowTitle: "Screen Recorder - Active"
   }
 ];
 
