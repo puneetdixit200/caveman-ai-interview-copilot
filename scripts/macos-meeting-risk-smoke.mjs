@@ -20,10 +20,10 @@ export const MACOS_MEETING_RISK_SMOKE_MARKER =
 const DEFAULT_BUNDLE_ID = "com.caveman.desktop";
 const QUERY_MAX_BUFFER = 1024 * 1024;
 const INITIAL_WAIT_MS = 6_000;
-const ACTIVE_RISK_WAIT_MS = 8_000;
+export const MACOS_MEETING_RISK_ACTIVE_WAIT_MS = 15_000;
 const RESTORE_WAIT_MS = 12_000;
 const POLL_INTERVAL_MS = 250;
-const FAKE_MEETING_DURATION_MS = 10_000;
+export const MACOS_MEETING_RISK_FAKE_MEETING_DURATION_MS = 20_000;
 
 const FAKE_MEETING_APP_SWIFT = `
 import AppKit
@@ -32,7 +32,7 @@ let app = NSApplication.shared
 app.setActivationPolicy(.regular)
 
 let title = CommandLine.arguments.dropFirst().first ?? "Google Meet - Candidate Screen"
-let durationMs = Double(CommandLine.arguments.dropFirst(2).first ?? "10000") ?? 10000
+let durationMs = Double(CommandLine.arguments.dropFirst(2).first ?? "20000") ?? 20000
 let window = NSWindow(
   contentRect: NSRect(x: 160, y: 160, width: 720, height: 420),
   styleMask: [.titled, .closable, .resizable],
@@ -107,6 +107,8 @@ export function summarizeMacosMeetingRiskSmoke({
     messages.push(
       `Caveman restored protected onscreen window ${restoredWindow.windowNumber} at ${restoredWindow.width}x${restoredWindow.height}.`
     );
+  } else if (!requireRestore) {
+    messages.push("Caveman restoration check was skipped for this smoke run.");
   } else {
     messages.push("Caveman did not restore a protected onscreen usable window after meeting risk cleared.");
   }
@@ -131,6 +133,8 @@ export async function runMacosMeetingRiskSmoke({
   appPath = process.env.CAVEMAN_APP_PATH || null,
   requireRestore = true,
   restoreWaitMs = RESTORE_WAIT_MS,
+  activeRiskWaitMs = MACOS_MEETING_RISK_ACTIVE_WAIT_MS,
+  fakeMeetingDurationMs = MACOS_MEETING_RISK_FAKE_MEETING_DURATION_MS,
   scenarios = DEFAULT_SCENARIOS
 } = {}) {
   if (platform !== "darwin") {
@@ -159,12 +163,17 @@ export async function runMacosMeetingRiskSmoke({
           scenario,
           commandRunner,
           processSpawner,
-          restoreWaitMs
+          requireRestore,
+          restoreWaitMs,
+          activeRiskWaitMs,
+          fakeMeetingDurationMs
         })
       );
     }
 
-    const restoredWindow = await waitForVisibleUsableWindow({ commandRunner, timeoutMs: restoreWaitMs });
+    const restoredWindow = requireRestore
+      ? await waitForVisibleUsableWindow({ commandRunner, timeoutMs: restoreWaitMs })
+      : null;
     return summarizeMacosMeetingRiskSmoke({
       platform,
       initialWindow,
@@ -177,13 +186,22 @@ export async function runMacosMeetingRiskSmoke({
   }
 }
 
-async function runMeetingRiskScenario({ tempDir, scenario, commandRunner, processSpawner, restoreWaitMs }) {
+async function runMeetingRiskScenario({
+  tempDir,
+  scenario,
+  commandRunner,
+  processSpawner,
+  requireRestore,
+  restoreWaitMs,
+  activeRiskWaitMs,
+  fakeMeetingDurationMs
+}) {
   const binaryPath = join(tempDir, scenario.executableName);
   const sourcePath = join(tempDir, `${scenario.id}.swift`);
   await writeFile(sourcePath, FAKE_MEETING_APP_SWIFT, "utf8");
   await commandRunner("swiftc", ["-o", binaryPath, sourcePath], { maxBuffer: QUERY_MAX_BUFFER });
 
-  const riskProcess = processSpawner(binaryPath, [scenario.windowTitle, String(FAKE_MEETING_DURATION_MS)], {
+  const riskProcess = processSpawner(binaryPath, [scenario.windowTitle, String(fakeMeetingDurationMs)], {
     stdio: "ignore"
   });
   let riskProcessExited = false;
@@ -198,13 +216,13 @@ async function runMeetingRiskScenario({ tempDir, scenario, commandRunner, proces
 
   try {
     const hiddenDuringRisk = await waitForCondition({
-      timeoutMs: ACTIVE_RISK_WAIT_MS,
+      timeoutMs: activeRiskWaitMs,
       commandRunner,
       predicate: (rows) => !selectVisibleUsableCavemanWindow(rows),
       shouldStop: () => riskProcessExited
     });
-    if (hiddenDuringRisk) {
-      await waitForChildExit(riskProcess, FAKE_MEETING_DURATION_MS + 5_000);
+    if (hiddenDuringRisk && requireRestore) {
+      await waitForChildExit(riskProcess, fakeMeetingDurationMs + 5_000);
     }
     return {
       ...scenario,
@@ -213,7 +231,9 @@ async function runMeetingRiskScenario({ tempDir, scenario, commandRunner, proces
     };
   } finally {
     await stopProcess(riskProcess);
-    await waitForVisibleUsableWindow({ commandRunner, timeoutMs: restoreWaitMs });
+    if (requireRestore) {
+      await waitForVisibleUsableWindow({ commandRunner, timeoutMs: restoreWaitMs });
+    }
   }
 }
 

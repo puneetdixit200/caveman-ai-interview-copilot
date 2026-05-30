@@ -6,6 +6,8 @@ import test from "node:test";
 
 import {
   MACOS_DMG_MEETING_RISK_SMOKE_MARKER,
+  PACKAGED_DMG_ACTIVE_RISK_WAIT_MS,
+  PACKAGED_DMG_FAKE_MEETING_DURATION_MS,
   findSingleMacosDmg,
   runMacosDmgMeetingRiskSmoke
 } from "./macos-dmg-meeting-risk-smoke.mjs";
@@ -47,10 +49,18 @@ test("runs meeting-risk smoke against the mounted DMG app bundle", async () => {
         }
         return { stdout: "", stderr: "" };
       },
-      meetingRiskRunner: async ({ appPath, requireRestore, restoreWaitMs }) => {
+      meetingRiskRunner: async ({
+        appPath,
+        requireRestore,
+        restoreWaitMs,
+        activeRiskWaitMs,
+        fakeMeetingDurationMs
+      }) => {
         assert.match(appPath, /Caveman\.app$/);
         assert.equal(requireRestore, false);
         assert.equal(restoreWaitMs, 5_000);
+        assert.equal(activeRiskWaitMs, PACKAGED_DMG_ACTIVE_RISK_WAIT_MS);
+        assert.equal(fakeMeetingDurationMs, PACKAGED_DMG_FAKE_MEETING_DURATION_MS);
         return {
           status: "ready",
           messages: [`ran against ${appPath}`]

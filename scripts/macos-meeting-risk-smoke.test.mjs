@@ -3,6 +3,8 @@ import { EventEmitter } from "node:events";
 import test from "node:test";
 
 import {
+  MACOS_MEETING_RISK_ACTIVE_WAIT_MS,
+  MACOS_MEETING_RISK_FAKE_MEETING_DURATION_MS,
   MACOS_MEETING_RISK_SMOKE_MARKER,
   cavemanActivationArgs,
   runMacosMeetingRiskSmoke,
@@ -86,6 +88,11 @@ test("can launch a specific packaged Caveman app bundle for meeting-risk smoke",
   ]);
 });
 
+test("keeps simulated meeting windows alive long enough for macOS title scans", () => {
+  assert.ok(MACOS_MEETING_RISK_ACTIVE_WAIT_MS >= 15_000);
+  assert.ok(MACOS_MEETING_RISK_FAKE_MEETING_DURATION_MS > MACOS_MEETING_RISK_ACTIVE_WAIT_MS);
+});
+
 test("lets simulated meeting apps exit before checking Caveman restoration", async () => {
   const visibleWindowRows = JSON.stringify([WINDOW]);
   const queryOutputs = [visibleWindowRows, "[]", visibleWindowRows];
@@ -131,4 +138,53 @@ test("lets simulated meeting apps exit before checking Caveman restoration", asy
 
   assert.equal(result.status, "ready");
   assert.deepEqual(killSignals, []);
+});
+
+test("terminates simulated meeting apps promptly when restoration is not required", async () => {
+  const visibleWindowRows = JSON.stringify([WINDOW]);
+  const queryOutputs = [visibleWindowRows, "[]", visibleWindowRows];
+  const killSignals = [];
+
+  const commandRunner = async (command) => {
+    if (command === "swift") {
+      return { stdout: queryOutputs.shift() ?? visibleWindowRows };
+    }
+    return { stdout: "" };
+  };
+
+  const processSpawner = () => {
+    const child = new EventEmitter();
+    child.exitCode = null;
+    child.signalCode = null;
+    child.kill = (signal) => {
+      killSignals.push(signal);
+      child.signalCode = signal;
+      child.emit("exit");
+      return true;
+    };
+    setTimeout(() => {
+      child.exitCode = 0;
+      child.emit("exit");
+    }, 0);
+    return child;
+  };
+
+  const result = await runMacosMeetingRiskSmoke({
+    platform: "darwin",
+    commandRunner,
+    processSpawner,
+    requireRestore: false,
+    restoreWaitMs: 0,
+    scenarios: [
+      {
+        id: "teams-native",
+        label: "Microsoft Teams native process",
+        executableName: "MSTeams",
+        windowTitle: "Microsoft Teams - Interview"
+      }
+    ]
+  });
+
+  assert.equal(result.status, "ready");
+  assert.deepEqual(killSignals, ["SIGTERM"]);
 });

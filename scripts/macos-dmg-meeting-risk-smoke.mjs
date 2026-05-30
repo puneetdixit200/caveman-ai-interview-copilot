@@ -15,6 +15,8 @@ const DEFAULT_RELEASE_DIR = join(REPO_ROOT, "src-tauri", "target", "release");
 const DEFAULT_APP_NAME = "Caveman";
 const DEFAULT_BUNDLE_ID = "com.caveman.desktop";
 const COMMAND_MAX_BUFFER = 1024 * 1024 * 20;
+export const PACKAGED_DMG_ACTIVE_RISK_WAIT_MS = 18_000;
+export const PACKAGED_DMG_FAKE_MEETING_DURATION_MS = 24_000;
 
 export const MACOS_DMG_MEETING_RISK_SMOKE_MARKER =
   "macOS DMG meeting-risk smoke launches the mounted DMG app before simulating Google Meet and Teams windows.";
@@ -53,7 +55,9 @@ export async function runMacosDmgMeetingRiskSmoke({
       bundleId,
       appPath,
       requireRestore: false,
-      restoreWaitMs: 5_000
+      restoreWaitMs: 5_000,
+      activeRiskWaitMs: PACKAGED_DMG_ACTIVE_RISK_WAIT_MS,
+      fakeMeetingDurationMs: PACKAGED_DMG_FAKE_MEETING_DURATION_MS
     });
 
     return {
