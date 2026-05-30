@@ -93,6 +93,11 @@ Follow-up CI hardening verification:
 - `cargo test --manifest-path src-tauri/Cargo.toml screen_share --lib` passed 59 tests locally without opening the app.
 - `npm run test:release` passed 145 tests after adding the workflow hardening contract.
 - `fa32b93` package smoke was canceled after the added cross-platform native test exposed unguarded macOS-only marker expectations on Windows/Linux and a macOS artifact upload stalled; `50a2cf9` added target guards and the next workflow change removes raw `.app` directory uploads from package-smoke artifacts.
+- Push Desktop Package Smoke run `26689263325` for `3c1245b` passed all lanes after the final workflow fix:
+  - Windows installers: native privacy tests, release contracts, package build, sidecar verification, packaged privacy shield, and artifact upload passed.
+  - macOS Intel app/DMG: native privacy tests, release contracts, package build, sidecar verification, packaged privacy shield, packaged meeting-risk smoke, and DMG artifact upload passed.
+  - macOS Apple Silicon app/DMG: native privacy tests, release contracts, package build, sidecar verification, packaged privacy shield, packaged meeting-risk smoke, and DMG artifact upload passed.
+  - Linux AppImage/DEB: native privacy tests, release contracts, package build, sidecar verification, packaged privacy shield, and artifact upload passed.
 
 ## CI to check next
 
@@ -102,12 +107,12 @@ List recent runs with:
 gh run list --repo puneetdixit200/caveman-ai-interview-copilot --branch main --limit 5 --json databaseId,workflowName,headSha,status,conclusion,createdAt,url
 ```
 
-After the workflow hardening commit lands, verify its Desktop Package Smoke run passes with the new `Run native privacy shield tests` step in every package lane.
+Latest verified package-smoke run before this handoff refresh: `26689263325` for `3c1245b`, green in all lanes.
 
 ## Suggested next steps
 
 1. Recheck the worktree with `git status --short --branch`.
-2. Verify the next pushed Desktop Package Smoke run includes and passes `Run native privacy shield tests` in all four package lanes and both macOS DMG `Run packaged meeting-risk smoke` steps.
+2. If code changes resume, verify the next pushed Desktop Package Smoke run includes and passes `Run native privacy shield tests` in all four package lanes and both macOS DMG `Run packaged meeting-risk smoke` steps.
 3. Only verify the installed app window is visible, non-zero-sized, and protected with CoreGraphics window inspection when the user allows opening the app.
 4. If the app is collapsed to `0x0`, restart it after clearing saved state:
 
