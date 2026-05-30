@@ -493,7 +493,7 @@ pub fn capture_screen_frame(app_handle: AppHandle) -> Result<ScreenFrame, String
     let protection_status = overlay::protect_overlay_window(&app_handle, true);
     let denial = ocr::native_capture_privacy_gate_message(
         crate::screen_share::native_privacy_shield_decision(
-            crate::screen_share::detect_screen_share_status_for_native_privacy_shield(),
+            crate::screen_share::detect_screen_share_status_for_native_visibility_gate(),
         ),
         crate::screen_share::native_privacy_shield_decision_for_overlay_protection(
             &protection_status,
@@ -525,7 +525,7 @@ pub fn type_text_into_active_window(
     let protection_status = overlay::protect_overlay_window(&app_handle, true);
     let denial = typing::native_typing_privacy_gate_message(
         crate::screen_share::native_privacy_shield_decision(
-            crate::screen_share::detect_screen_share_status_for_native_privacy_shield(),
+            crate::screen_share::detect_screen_share_status_for_native_visibility_gate(),
         ),
         crate::screen_share::native_privacy_shield_decision_for_overlay_protection(
             &protection_status,

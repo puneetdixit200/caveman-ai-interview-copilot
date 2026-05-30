@@ -364,6 +364,16 @@ test("requires packaged protection refresh fail-closed marker", () => {
       "Native privacy shield scans macOS window titles on a bounded background worker for browser Meet and Teams risk."
     )
   );
+  assert.ok(
+    MACOS_NATIVE_PRIVACY_SHIELD_MARKERS.includes(
+      "Native privacy shield checks macOS CoreGraphics visible window titles before app windows can show."
+    )
+  );
+  assert.ok(
+    MACOS_NATIVE_PRIVACY_SHIELD_MARKERS.includes(
+      "macOS CoreGraphics title guard hides when a visible browser window title is unavailable."
+    )
+  );
   assert.ok(MACOS_NATIVE_PRIVACY_SHIELD_MARKERS.includes(MACOS_LIBPROC_CAPTURE_MARKER));
   assert.ok(TARGET_PRIVACY_SHIELD_MARKERS["macos-arm64"].includes(MACOS_LIBPROC_CAPTURE_MARKER));
   assert.ok(TARGET_PRIVACY_SHIELD_MARKERS["macos-x64"].includes(MACOS_LIBPROC_CAPTURE_MARKER));

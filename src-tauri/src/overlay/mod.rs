@@ -111,7 +111,7 @@ pub fn configure_overlay_security(app: &mut tauri::App) -> bool {
     let startup_hide_reason = startup_privacy_shield_hide_reason(
         &protection_statuses,
         crate::screen_share::native_privacy_shield_decision(
-            crate::screen_share::detect_screen_share_status_for_native_privacy_shield(),
+            crate::screen_share::detect_screen_share_status_for_native_visibility_gate(),
         ),
     );
 
@@ -180,7 +180,7 @@ pub fn set_overlay_window_bounds(
     if let Some(message) = bounds_update_privacy_gate_message(
         &protection_status,
         crate::screen_share::native_privacy_shield_decision(
-            crate::screen_share::detect_screen_share_status_for_native_privacy_shield(),
+            crate::screen_share::detect_screen_share_status_for_native_visibility_gate(),
         ),
     ) {
         let _ = window.hide();
@@ -455,7 +455,7 @@ pub fn set_companion_windows_visible(
             visible,
             protection_status.clone(),
             crate::screen_share::native_privacy_shield_decision(
-                crate::screen_share::detect_screen_share_status_for_native_privacy_shield(),
+                crate::screen_share::detect_screen_share_status_for_native_visibility_gate(),
             ),
             "companion app windows",
         );
@@ -534,7 +534,7 @@ pub fn set_companion_windows_visible(
             &missing_required_windows,
         );
         let post_show_screen_share_decision = crate::screen_share::native_privacy_shield_decision(
-            crate::screen_share::detect_screen_share_status_for_native_privacy_shield(),
+            crate::screen_share::detect_screen_share_status_for_native_visibility_gate(),
         );
 
         if let Some(message) = post_show_privacy_recheck_message(
@@ -680,7 +680,7 @@ pub fn restore_companion_windows_after_user_reopen(app: &tauri::AppHandle) {
 
     let protection_status = protect_overlay_window(app, true);
     let screen_share_decision = crate::screen_share::native_privacy_shield_decision(
-        crate::screen_share::detect_screen_share_status_for_native_privacy_shield(),
+        crate::screen_share::detect_screen_share_status_for_native_visibility_gate(),
     );
     if matches!(
         crate::screen_share::native_privacy_shield_decision_for_overlay_protection(
@@ -787,7 +787,7 @@ pub fn set_overlay_window_visible(
             visible,
             status.clone(),
             crate::screen_share::native_privacy_shield_decision(
-                crate::screen_share::detect_screen_share_status_for_native_privacy_shield(),
+                crate::screen_share::detect_screen_share_status_for_native_visibility_gate(),
             ),
             "the overlay",
         );
@@ -813,7 +813,7 @@ pub fn set_overlay_window_visible(
     if visible && status.visible {
         let post_show_status = protect_overlay_window(app, capture_exclusion_enabled);
         let post_show_screen_share_decision = crate::screen_share::native_privacy_shield_decision(
-            crate::screen_share::detect_screen_share_status_for_native_privacy_shield(),
+            crate::screen_share::detect_screen_share_status_for_native_visibility_gate(),
         );
         if let Some(message) = post_show_privacy_recheck_message(
             &post_show_status,

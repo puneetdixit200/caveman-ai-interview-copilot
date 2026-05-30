@@ -227,7 +227,7 @@ test("startup setup hides app windows when native privacy cannot be proven", asy
   );
   assert.match(
     configureBody,
-    /crate::screen_share::detect_screen_share_status_for_native_privacy_shield\(\)/
+    /crate::screen_share::detect_screen_share_status_for_native_visibility_gate\(\)/
   );
   assert.match(configureBody, /window\.hide\(\)/);
   assert.match(configureBody, /startup_allows_initial_show\s*$/m);
@@ -318,9 +318,18 @@ test("native privacy shield refreshes capture protection before share-risk hide"
   );
   assert.match(
     screenShareRs,
+    /Native privacy shield checks macOS CoreGraphics visible window titles before app windows can show\./
+  );
+  assert.match(
+    screenShareRs,
+    /macOS CoreGraphics title guard hides when a visible browser window title is unavailable\./
+  );
+  assert.match(
+    screenShareRs,
     /macOS window-title guard uses a short timeout so native privacy polling cannot stall\./
   );
   assert.match(screenShareRs, /detect_screen_share_status_for_native_privacy_shield/);
+  assert.match(screenShareRs, /detect_screen_share_status_for_native_visibility_gate/);
   assert.match(screenShareRs, /detect_macos_direct_capture_process_status\(\)\?/);
   assert.match(screenShareRs, /start_macos_window_title_privacy_scan_thread\(\)\?/);
   assert.match(screenShareRs, /MACOS_WINDOW_TITLE_PRIVACY_RISK_ACTIVE\.load/);
@@ -352,13 +361,13 @@ test("macOS reopen uses the same privacy gate before restoring companion windows
   assert.notEqual(restoreStart, -1, "reopen restore helper must exist");
   assert.notEqual(restoreEnd, -1, "reopen restore helper body must be bounded");
   assert.match(restoreBody, /protect_overlay_window\(app,\s*true\)/);
-  assert.match(restoreBody, /detect_screen_share_status_for_native_privacy_shield\(\)/);
+  assert.match(restoreBody, /detect_screen_share_status_for_native_visibility_gate\(\)/);
   assert.match(restoreBody, /set_companion_windows_visible\(app,\s*false,\s*true\)/);
   assert.match(restoreBody, /restore_companion_windows_after_share_risk_cleared\(app\)/);
   assert.ok(
-    restoreBody.indexOf("detect_screen_share_status_for_native_privacy_shield()") <
+    restoreBody.indexOf("detect_screen_share_status_for_native_visibility_gate()") <
       restoreBody.indexOf("restore_companion_windows_after_share_risk_cleared(app)"),
-    "reopen must check fast native screen-share risk before restoring windows"
+    "reopen must check the native visibility gate before restoring windows"
   );
 });
 
@@ -415,15 +424,18 @@ test("macOS process guard short-circuits before window-title scan", async () => 
   const processParse = macosBranch.indexOf("parse_unix_process_list");
   const directStatus = macosBranch.indexOf("let direct_process_status = screen_share_status_for_processes(processes.clone())");
   const directReturn = macosBranch.indexOf("return Ok(direct_process_status)");
+  const coreGraphicsTitleScan = macosBranch.indexOf("detect_macos_core_graphics_visible_window_title_processes()");
   const titleScan = macosBranch.indexOf("detect_macos_visible_window_title_processes()");
 
   assert.notEqual(processParse, -1, "macOS detector must parse process list first");
   assert.notEqual(directStatus, -1, "macOS detector must evaluate direct process matches");
   assert.notEqual(directReturn, -1, "macOS detector must return direct process matches immediately");
+  assert.notEqual(coreGraphicsTitleScan, -1, "macOS detector must try prompt-safe CoreGraphics window titles before slower fallbacks");
   assert.notEqual(titleScan, -1, "macOS detector must still scan window titles when no direct process risk exists");
   assert.ok(processParse < directStatus, "direct status must use parsed process rows");
   assert.ok(directStatus < directReturn, "direct process status must control short-circuit return");
-  assert.ok(directReturn < titleScan, "direct process risks must skip the slower window-title scan");
+  assert.ok(directReturn < coreGraphicsTitleScan, "direct process risks must skip CoreGraphics title scanning");
+  assert.ok(coreGraphicsTitleScan < titleScan, "CoreGraphics title scanning must run before the slower window-title scan");
   assert.match(
     screenShareRs,
     /macOS process screen-share guard skips window-title scan after direct capture-process match\./
@@ -443,12 +455,17 @@ test("native screen OCR capture hides app windows before creating screenshots", 
   const commandBody = commandsRs.slice(commandStart, commandsRs.indexOf("#[tauri::command]", commandStart + 1));
   const hideOverlay = commandBody.indexOf("overlay::set_overlay_window_visible(&app_handle, false, true)");
   const hideCompanions = commandBody.indexOf("overlay::set_companion_windows_visible(&app_handle, false, true)");
+  const detectShare = commandBody.indexOf(
+    "crate::screen_share::detect_screen_share_status_for_native_visibility_gate()"
+  );
   const settleWait = commandBody.indexOf("ocr::wait_for_app_windows_to_leave_capture_surfaces()");
   const captureCall = commandBody.indexOf("ocr::capture_screen_frame()");
 
   assert.notEqual(hideOverlay, -1, "OCR capture must hide overlay window before screenshotting");
   assert.notEqual(hideCompanions, -1, "OCR capture must hide companion app windows before screenshotting");
+  assert.notEqual(detectShare, -1, "OCR capture must use the native visibility gate before screenshotting");
   assert.notEqual(settleWait, -1, "OCR capture must wait for hidden app windows to leave capture surfaces");
+  assert.ok(detectShare < captureCall, "screen-share detection must run before native screenshot capture");
   assert.ok(hideOverlay < captureCall, "overlay hide must run before native screenshot capture");
   assert.ok(hideCompanions < captureCall, "companion window hide must run before native screenshot capture");
   assert.ok(settleWait < captureCall, "capture settle wait must run before native screenshot capture");
@@ -466,7 +483,7 @@ test("native active-window typing fails closed during screen-share or capture-ex
   const protectionRefresh = commandBody.indexOf("let protection_status = overlay::protect_overlay_window(&app_handle, true)");
   const gateMessage = commandBody.indexOf("typing::native_typing_privacy_gate_message(");
   const detectShare = commandBody.indexOf(
-    "crate::screen_share::detect_screen_share_status_for_native_privacy_shield()"
+    "crate::screen_share::detect_screen_share_status_for_native_visibility_gate()"
   );
   const captureExclusionDecision = commandBody.indexOf(
     "crate::screen_share::native_privacy_shield_decision_for_overlay_protection",
@@ -479,7 +496,7 @@ test("native active-window typing fails closed during screen-share or capture-ex
   assert.notEqual(appHandleArg, -1, "typing command must receive AppHandle for native privacy controls");
   assert.notEqual(protectionRefresh, -1, "typing command must refresh capture exclusion before typing");
   assert.notEqual(gateMessage, -1, "typing command must consult the native privacy shield");
-  assert.notEqual(detectShare, -1, "typing command must fail closed on fast native screen-share detector state");
+  assert.notEqual(detectShare, -1, "typing command must fail closed on native visibility-gate screen-share state");
   assert.notEqual(captureExclusionDecision, -1, "typing command must fail closed when capture exclusion is unsafe");
   assert.notEqual(hideOverlay, -1, "typing denial must hide overlay");
   assert.notEqual(hideCompanions, -1, "typing denial must hide companion windows");

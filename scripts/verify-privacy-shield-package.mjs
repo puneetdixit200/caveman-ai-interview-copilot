@@ -212,6 +212,8 @@ export const MACOS_NATIVE_PRIVACY_SHIELD_MARKERS = [
   "Native privacy shield enumerates macOS capture processes through libproc before shell fallbacks.",
   "Native privacy shield treats unexpected macOS pgrep errors as fail-closed before slower process parsing.",
   "Native privacy shield scans macOS window titles on a bounded background worker for browser Meet and Teams risk.",
+  "Native privacy shield checks macOS CoreGraphics visible window titles before app windows can show.",
+  "macOS CoreGraphics title guard hides when a visible browser window title is unavailable.",
   "Companion app windows use a privacy-gated reopen restore when the bundle is reopened."
 ];
 

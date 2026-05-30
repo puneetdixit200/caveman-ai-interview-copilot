@@ -54,6 +54,12 @@ pub const NATIVE_PRIVACY_SHIELD_MACOS_LIBPROC_CAPTURE_MARKER: &str =
 #[cfg(target_os = "macos")]
 pub const NATIVE_PRIVACY_SHIELD_MACOS_WINDOW_TITLE_BACKGROUND_SCAN_MARKER: &str =
     "Native privacy shield scans macOS window titles on a bounded background worker for browser Meet and Teams risk.";
+#[cfg(target_os = "macos")]
+pub const NATIVE_PRIVACY_SHIELD_MACOS_CORE_GRAPHICS_TITLE_GATE_MARKER: &str =
+    "Native privacy shield checks macOS CoreGraphics visible window titles before app windows can show.";
+#[cfg(target_os = "macos")]
+pub const NATIVE_PRIVACY_SHIELD_MACOS_REDACTED_BROWSER_TITLE_MARKER: &str =
+    "macOS CoreGraphics title guard hides when a visible browser window title is unavailable.";
 pub const NATIVE_PRIVACY_SHIELD_REFRESHES_CAPTURE_BEFORE_SHARE_HIDE_MARKER: &str =
     "Native privacy shield refreshes capture exclusion before hiding for screen-share risk.";
 pub const NATIVE_PRIVACY_SHIELD_MAIN_THREAD_WINDOW_UPDATE_MARKER: &str =
@@ -293,6 +299,10 @@ const PACKAGE_PRIVACY_SHIELD_WEBVIEW_MARKERS: &[&str] = &[
     MACOS_WINDOW_TITLE_TIMEOUT_FALLBACK_MARKER,
     #[cfg(target_os = "macos")]
     MACOS_WINDOW_TITLE_SHORT_TIMEOUT_MARKER,
+    #[cfg(target_os = "macos")]
+    NATIVE_PRIVACY_SHIELD_MACOS_CORE_GRAPHICS_TITLE_GATE_MARKER,
+    #[cfg(target_os = "macos")]
+    NATIVE_PRIVACY_SHIELD_MACOS_REDACTED_BROWSER_TITLE_MARKER,
 ];
 
 #[derive(Debug, Clone, PartialEq)]
@@ -594,6 +604,8 @@ const WATCHED_SCREEN_SHARE_TITLES: &[&str] = &[
     BROWSER_RECORDING_SCREEN_TITLE,
     BROWSER_SCREEN_IS_BEING_RECORDED_TITLE,
     BROWSER_BEING_RECORDED_TITLE,
+    #[cfg(target_os = "macos")]
+    NATIVE_PRIVACY_SHIELD_MACOS_REDACTED_BROWSER_TITLE_MARKER,
     "presenting",
     "hackerrank interview",
     "interview - google meet",
@@ -643,6 +655,12 @@ pub fn detect_screen_share_status() -> anyhow::Result<ScreenShareStatus> {
         if direct_process_status.active {
             std::hint::black_box(MACOS_PROCESS_GUARD_SHORT_CIRCUIT_MARKER);
             return Ok(direct_process_status);
+        }
+
+        processes.extend(detect_macos_core_graphics_visible_window_title_processes());
+        let core_graphics_status = screen_share_status_for_processes(processes.clone());
+        if core_graphics_status.active {
+            return Ok(core_graphics_status);
         }
 
         processes.extend(detect_macos_visible_window_title_processes()?);
@@ -970,6 +988,50 @@ pub fn detect_screen_share_status_for_native_privacy_shield() -> anyhow::Result<
     }
 }
 
+pub fn detect_screen_share_status_for_native_visibility_gate() -> anyhow::Result<ScreenShareStatus>
+{
+    retain_package_privacy_shield_webview_markers();
+
+    #[cfg(target_os = "macos")]
+    {
+        detect_macos_visibility_gate_process_status()
+    }
+
+    #[cfg(not(target_os = "macos"))]
+    {
+        detect_screen_share_status_for_native_privacy_shield()
+    }
+}
+
+#[cfg(target_os = "macos")]
+fn detect_macos_visibility_gate_process_status() -> anyhow::Result<ScreenShareStatus> {
+    std::hint::black_box(NATIVE_PRIVACY_SHIELD_MACOS_CORE_GRAPHICS_TITLE_GATE_MARKER);
+
+    if let Some(status) = detect_macos_direct_capture_process_status()? {
+        return Ok(status);
+    }
+
+    let output = run_screen_share_guard_command("ps", &["-axo", "pid=,comm="])?;
+
+    if !output.status.success() {
+        return Err(anyhow::anyhow!(
+            "Could not query running processes for screen-share guard"
+        ));
+    }
+
+    let mut processes = parse_unix_process_list(&String::from_utf8_lossy(&output.stdout));
+    let direct_process_status = screen_share_status_for_processes(processes.clone());
+    if direct_process_status.active {
+        std::hint::black_box(MACOS_PROCESS_GUARD_SHORT_CIRCUIT_MARKER);
+        return Ok(direct_process_status);
+    }
+
+    processes.extend(detect_macos_core_graphics_visible_window_title_processes());
+    let status = screen_share_status_for_processes(processes);
+    MACOS_WINDOW_TITLE_PRIVACY_RISK_ACTIVE.store(status.active, Ordering::Relaxed);
+    Ok(status)
+}
+
 #[cfg(target_os = "macos")]
 fn start_macos_window_title_privacy_scan_thread() -> anyhow::Result<()> {
     std::hint::black_box(NATIVE_PRIVACY_SHIELD_MACOS_WINDOW_TITLE_BACKGROUND_SCAN_MARKER);
@@ -996,6 +1058,11 @@ fn start_macos_window_title_privacy_scan_thread() -> anyhow::Result<()> {
 
 #[cfg(target_os = "macos")]
 fn detect_macos_window_title_privacy_risk() -> anyhow::Result<bool> {
+    let processes = detect_macos_core_graphics_visible_window_title_processes();
+    if screen_share_status_for_processes(processes).active {
+        return Ok(true);
+    }
+
     let processes = detect_macos_visible_window_title_processes()?;
     Ok(screen_share_status_for_processes(processes).active)
 }
@@ -1181,6 +1248,94 @@ fn parse_pgrep_process_rows(name: &str, output: &str) -> Vec<ScreenShareProcess>
             })
         })
         .collect()
+}
+
+#[cfg(target_os = "macos")]
+fn detect_macos_core_graphics_visible_window_title_processes() -> Vec<ScreenShareProcess> {
+    use objc2_core_foundation::CFDictionary;
+    use objc2_core_graphics::{CGWindowListCopyWindowInfo, CGWindowListOption};
+
+    std::hint::black_box(NATIVE_PRIVACY_SHIELD_MACOS_CORE_GRAPHICS_TITLE_GATE_MARKER);
+
+    let mut processes = Vec::new();
+    unsafe {
+        let Some(windows) = CGWindowListCopyWindowInfo(
+            CGWindowListOption::OptionOnScreenOnly | CGWindowListOption::ExcludeDesktopElements,
+            0,
+        ) else {
+            return processes;
+        };
+
+        for index in 0..windows.count() {
+            let window_ref = windows.value_at_index(index) as *const CFDictionary;
+            if window_ref.is_null() {
+                continue;
+            }
+
+            let window = &*window_ref;
+            let Some(name) = cf_string(window, "kCGWindowOwnerName") else {
+                continue;
+            };
+            let window_title = cf_string(window, "kCGWindowName")
+                .map(|title| title.trim().to_string())
+                .filter(|title| !title.is_empty());
+            let window_title = match window_title {
+                Some(title) => Some(title),
+                None if is_screen_share_window_title_host_process(&name) => {
+                    std::hint::black_box(NATIVE_PRIVACY_SHIELD_MACOS_REDACTED_BROWSER_TITLE_MARKER);
+                    Some(NATIVE_PRIVACY_SHIELD_MACOS_REDACTED_BROWSER_TITLE_MARKER.to_string())
+                }
+                None => continue,
+            };
+
+            processes.push(ScreenShareProcess {
+                name,
+                pid: cf_number_i32(window, "kCGWindowOwnerPID").and_then(|pid| {
+                    if pid <= 0 {
+                        None
+                    } else {
+                        Some(pid as u32)
+                    }
+                }),
+                window_title,
+            });
+        }
+    }
+
+    processes
+}
+
+#[cfg(target_os = "macos")]
+fn cf_value<T>(dictionary: &objc2_core_foundation::CFDictionary, key: &str) -> Option<*const T> {
+    unsafe {
+        let key = objc2_core_foundation::CFString::from_str(key);
+        let value =
+            dictionary.value((key.as_ref() as *const objc2_core_foundation::CFString).cast());
+        if value.is_null() {
+            None
+        } else {
+            Some(value as *const T)
+        }
+    }
+}
+
+#[cfg(target_os = "macos")]
+fn cf_string(dictionary: &objc2_core_foundation::CFDictionary, key: &str) -> Option<String> {
+    let value = cf_value::<objc2_core_foundation::CFString>(dictionary, key)?;
+    Some(unsafe { (*value).to_string() })
+}
+
+#[cfg(target_os = "macos")]
+fn cf_number_i32(dictionary: &objc2_core_foundation::CFDictionary, key: &str) -> Option<i32> {
+    let value = cf_value::<objc2_core_foundation::CFNumber>(dictionary, key)?;
+    let mut output = 0_i32;
+    let ok = unsafe {
+        (*value).value(
+            objc2_core_foundation::CFNumberType::IntType,
+            (&mut output as *mut i32).cast(),
+        )
+    };
+    ok.then_some(output)
 }
 
 pub fn native_privacy_shield_thread_start_error_message(error: impl std::fmt::Display) -> String {
@@ -1881,6 +2036,14 @@ mod tests {
         assert!(!is_watched_screen_share_window_title(Some("Meet notes")));
     }
 
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn treats_redacted_visible_browser_titles_as_share_risk() {
+        assert!(is_watched_screen_share_window_title(Some(
+            NATIVE_PRIVACY_SHIELD_MACOS_REDACTED_BROWSER_TITLE_MARKER
+        )));
+    }
+
     #[test]
     fn anchors_webview_markers_for_packaged_privacy_attestation() {
         assert_eq!(
@@ -1980,7 +2143,9 @@ mod tests {
                 MACOS_WINDOW_TITLE_PERMISSION_FALLBACK_MARKER,
                 MACOS_WINDOW_TITLE_TRANSIENT_ROW_MARKER,
                 MACOS_WINDOW_TITLE_TIMEOUT_FALLBACK_MARKER,
-                MACOS_WINDOW_TITLE_SHORT_TIMEOUT_MARKER
+                MACOS_WINDOW_TITLE_SHORT_TIMEOUT_MARKER,
+                NATIVE_PRIVACY_SHIELD_MACOS_CORE_GRAPHICS_TITLE_GATE_MARKER,
+                NATIVE_PRIVACY_SHIELD_MACOS_REDACTED_BROWSER_TITLE_MARKER
             ]
         );
     }
@@ -2778,6 +2943,11 @@ mod tests {
             assert!(
                 NATIVE_PRIVACY_SHIELD_MACOS_WINDOW_TITLE_BACKGROUND_SCAN_MARKER
                     .contains("background worker")
+            );
+            assert!(NATIVE_PRIVACY_SHIELD_MACOS_CORE_GRAPHICS_TITLE_GATE_MARKER
+                .contains("CoreGraphics"));
+            assert!(
+                NATIVE_PRIVACY_SHIELD_MACOS_REDACTED_BROWSER_TITLE_MARKER.contains("unavailable")
             );
         }
     }
