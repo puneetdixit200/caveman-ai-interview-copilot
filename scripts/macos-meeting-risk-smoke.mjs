@@ -100,55 +100,55 @@ export const MACOS_PACKAGED_MEETING_RISK_SCENARIOS = [
   {
     id: "slack-huddle",
     label: "Slack huddle window",
-    executableName: "SlackHuddleIndicator",
+    executableName: "Slack",
     windowTitle: "Slack Huddle - Candidate"
   },
   {
     id: "discord-voice",
     label: "Discord voice window",
-    executableName: "DiscordVoiceIndicator",
+    executableName: "Discord",
     windowTitle: "Discord Voice - Candidate"
   },
   {
     id: "whatsapp-video-call",
     label: "WhatsApp video call window",
-    executableName: "WhatsAppCallIndicator",
-    windowTitle: "WhatsApp Video Call - Candidate"
+    executableName: "Google Chrome",
+    windowTitle: "web.whatsapp.com - Video call"
   },
   {
     id: "remote-desktop",
     label: "Remote desktop window",
-    executableName: "RemoteDesktopIndicator",
+    executableName: "AnyDesk",
     windowTitle: "Remote Desktop - Session"
   },
   {
     id: "screen-recorder",
     label: "Screen recorder window",
-    executableName: "ScreenRecorderIndicator",
+    executableName: "OBS",
     windowTitle: "Screen Recorder - Active"
   },
   {
     id: "window-sharing-indicator",
     label: "Window sharing indicator",
-    executableName: "WindowSharingIndicator",
+    executableName: "Google Chrome",
     windowTitle: "You're sharing a window"
   },
   {
     id: "screen-shared-indicator",
     label: "Screen shared indicator",
-    executableName: "ScreenSharedIndicator",
+    executableName: "Google Chrome",
     windowTitle: "Your screen is being shared"
   },
   {
     id: "meeting-recorded-indicator",
     label: "Meeting recording indicator",
-    executableName: "MeetingRecordingIndicator",
+    executableName: "Google Chrome",
     windowTitle: "Meeting is being recorded"
   },
   {
     id: "recording-progress-indicator",
     label: "Recording in progress indicator",
-    executableName: "RecordingProgressIndicator",
+    executableName: "Google Chrome",
     windowTitle: "Recording in progress"
   }
 ];

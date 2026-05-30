@@ -62,13 +62,18 @@ test("runs meeting-risk smoke against the mounted DMG app bundle", async () => {
         assert.equal(restoreWaitMs, 5_000);
         assert.equal(activeRiskWaitMs, PACKAGED_DMG_ACTIVE_RISK_WAIT_MS);
         assert.equal(fakeMeetingDurationMs, PACKAGED_DMG_FAKE_MEETING_DURATION_MS);
+        const hasScenario = (executableName, windowTitle) =>
+          scenarios.some(
+            (scenario) => scenario.executableName === executableName && scenario.windowTitle === windowTitle
+          );
         assert.ok(scenarios.some((scenario) => scenario.windowTitle === "Zoom Meeting - Candidate"));
         assert.ok(scenarios.some((scenario) => scenario.windowTitle === "Webex Meeting - Candidate"));
         assert.ok(scenarios.some((scenario) => scenario.windowTitle === "Screen recording"));
-        assert.ok(scenarios.some((scenario) => scenario.windowTitle === "Slack Huddle - Candidate"));
-        assert.ok(scenarios.some((scenario) => scenario.windowTitle === "Remote Desktop - Session"));
-        assert.ok(scenarios.some((scenario) => scenario.windowTitle === "Screen Recorder - Active"));
-        assert.ok(scenarios.some((scenario) => scenario.windowTitle === "You're sharing a window"));
+        assert.ok(hasScenario("Slack", "Slack Huddle - Candidate"));
+        assert.ok(hasScenario("Google Chrome", "web.whatsapp.com - Video call"));
+        assert.ok(hasScenario("AnyDesk", "Remote Desktop - Session"));
+        assert.ok(hasScenario("OBS", "Screen Recorder - Active"));
+        assert.ok(hasScenario("Google Chrome", "You're sharing a window"));
         assert.ok(scenarios.some((scenario) => scenario.windowTitle === "Your screen is being shared"));
         assert.ok(scenarios.some((scenario) => scenario.windowTitle === "Meeting is being recorded"));
         assert.ok(scenarios.some((scenario) => scenario.windowTitle === "Recording in progress"));
