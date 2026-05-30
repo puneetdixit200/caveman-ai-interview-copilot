@@ -991,6 +991,8 @@ test("desktop package smoke workflow builds macOS and Windows installers without
   assert.match(workflow, /npm run tauri:build:linux/);
   assert.match(workflow, /npm run package:verify-sidecar/);
   assert.match(workflow, /npm run dmg-meeting-risk:smoke:mac/);
+  assert.match(workflow, /src-tauri\/target\/release\/bundle\/dmg\/\*\.dmg/);
+  assert.doesNotMatch(workflow, /src-tauri\/target\/release\/bundle\/macos\/Caveman\.app/);
   assert.match(workflow, /actions\/upload-artifact@v7\.0\.1/);
   assert.doesNotMatch(workflow, /actions\/(?:checkout|setup-node|upload-artifact)@v4/);
   assert.doesNotMatch(workflow, /softprops\/action-gh-release/);

@@ -97,7 +97,6 @@ jobs:
           name: caveman-macos-intel-package-smoke
           if-no-files-found: error
           path: |
-            src-tauri/target/release/bundle/macos/Caveman.app
             src-tauri/target/release/bundle/dmg/*.dmg
             src-tauri/target/release/bundle/privacy-shield-macos-x64.json
 
@@ -143,7 +142,6 @@ jobs:
           name: caveman-macos-arm64-package-smoke
           if-no-files-found: error
           path: |
-            src-tauri/target/release/bundle/macos/Caveman.app
             src-tauri/target/release/bundle/dmg/*.dmg
             src-tauri/target/release/bundle/privacy-shield-macos-arm64.json
 

@@ -55,6 +55,7 @@ Make Caveman harder to expose during Google Meet, Microsoft Teams, and screen-sh
 - Release-contract tests normalize Windows CRLF checkouts before asserting detector ordering, including the native shield contract test that checks ToolHelp before `tasklist`.
 - The detector catalog was expanded for more supported "all screen share" coverage: additional web meeting/capture origins, desktop meeting apps, screen recorders, and remote-support clients are now anchored in source and package privacy-shield attestations.
 - The package smoke workflow now runs `cargo test --manifest-path src-tauri/Cargo.toml screen_share --lib` in every Windows, macOS, and Linux package lane before packaging contract checks, so EXE/DMG package smoke also compiles and exercises the native detector unit tests.
+- macOS package-smoke artifacts upload the generated DMG and privacy-shield attestation instead of the raw `.app` directory; the DMG smoke still mounts and verifies the app inside the installer before upload.
 
 ## Verification already run locally
 
@@ -91,6 +92,7 @@ Follow-up CI hardening verification:
 - `node --test scripts/release-workflow.test.mjs` passed 39 tests after adding the package-lane native detector test assertion.
 - `cargo test --manifest-path src-tauri/Cargo.toml screen_share --lib` passed 59 tests locally without opening the app.
 - `npm run test:release` passed 145 tests after adding the workflow hardening contract.
+- `fa32b93` package smoke was canceled after the added cross-platform native test exposed unguarded macOS-only marker expectations on Windows/Linux and a macOS artifact upload stalled; `50a2cf9` added target guards and the next workflow change removes raw `.app` directory uploads from package-smoke artifacts.
 
 ## CI to check next
 
