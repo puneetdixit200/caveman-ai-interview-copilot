@@ -8,8 +8,8 @@ Make Caveman harder to expose during Google Meet, Microsoft Teams, and screen-sh
 
 - Branch: `main`
 - Remote: `origin/main`
-- Latest implementation commit before this handoff refresh: `011fb25 test: expand meeting risk package smokes`.
-- This handoff file is current as of Desktop Package Smoke run `26694632145`.
+- Latest implementation commit before this handoff refresh: `79dc564 test: expand huddle and remote share risk smokes`.
+- This handoff file is current as of Desktop Package Smoke run `26695279321`.
 - Previous relevant commits:
   - `c7569f5 ci: verify macos privacy shield on push`
   - `bdce589 fix: check windows processes before tasklist`
@@ -178,6 +178,15 @@ Follow-up CI hardening verification:
   - macOS Intel DMG smoke output: mounted `Caveman_0.1.1_x64.dmg`; initial Caveman window was `1280x820` and protected; Caveman hid during simulated Google Meet browser, Teams browser, Teams native process, Zoom meeting, Webex meeting, browser presenting indicator, and screen-recording indicator windows.
   - macOS Apple Silicon app/DMG and Linux AppImage/DEB passed their full package lanes.
   - No local app launch was performed for this handoff refresh; verification used local non-UI tests and GitHub Actions package smokes.
+- Push Desktop Package Smoke run `26695279321` for `79dc564` passed all lanes after rerunning a transient macOS Apple Silicon artifact-upload stall:
+  - Windows installers: native privacy tests, release contracts, package build, bundled sidecar verification, packaged privacy shield, packaged Windows meeting-risk smoke, and artifact upload passed.
+  - Windows smoke output: `READY`; initial `caveman.exe` window was `1044x788` and protected with `WDA_EXCLUDEFROMCAPTURE`; Caveman hid during simulated Google Meet browser, Teams browser share, Teams native process, Zoom meeting, Webex meeting, browser presenting indicator, screen-recording indicator, Slack huddle, Discord voice, WhatsApp video call, remote desktop, and screen-recorder windows.
+  - macOS Intel app/DMG: native privacy tests, release contracts, package build, sidecar verification, packaged privacy shield, packaged meeting-risk smoke, DMG artifact upload, and job cleanup passed.
+  - macOS Intel DMG smoke output: mounted `Caveman_0.1.1_x64.dmg`; initial Caveman window was `1280x820` and protected; Caveman hid during the same 12 simulated scenarios, including Slack huddle, Discord voice, WhatsApp video call, remote desktop, and screen-recorder windows.
+  - macOS Apple Silicon app/DMG rerun: native privacy tests, release contracts, package build, sidecar verification, packaged privacy shield, packaged meeting-risk smoke, DMG artifact upload, and job cleanup passed.
+  - macOS Apple Silicon DMG smoke output: mounted `Caveman_0.1.1_aarch64.dmg`; initial Caveman window was `1024x720` and protected; Caveman hid during the same 12 simulated scenarios.
+  - Linux AppImage/DEB passed native privacy tests, release contracts, package build, sidecar verification, packaged privacy shield, and artifact upload.
+  - No local app launch was performed for this handoff refresh; verification used local non-UI tests and GitHub Actions package smokes.
 
 ## CI to check next
 
@@ -187,7 +196,7 @@ List recent runs with:
 gh run list --repo puneetdixit200/caveman-ai-interview-copilot --branch main --limit 5 --json databaseId,workflowName,headSha,status,conclusion,createdAt,url
 ```
 
-Latest verified package-smoke run before this handoff refresh: `26694632145` for `011fb25`, green in all lanes. This run verified the expanded packaged Windows EXE and macOS DMG meeting-risk smokes for Google Meet, Teams browser/native, Zoom, Webex, generic presenting UI, and generic screen-recording UI.
+Latest verified package-smoke run before this handoff refresh: `26695279321` for `79dc564`, green in all lanes after a failed-job rerun for a transient macOS Apple Silicon artifact-upload stall. This run verified the expanded packaged Windows EXE and macOS DMG meeting-risk smokes for Google Meet, Teams browser/native, Zoom, Webex, generic presenting UI, generic screen-recording UI, Slack huddle, Discord voice, WhatsApp video call, remote desktop, and screen-recorder windows.
 
 ## Suggested next steps
 
