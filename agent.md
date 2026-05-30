@@ -59,6 +59,7 @@ Make Caveman harder to expose during Google Meet, Microsoft Teams, and screen-sh
 - Signed release publishing now mirrors the package-smoke privacy gates: every Windows, macOS, and Linux signed-release lane runs native screen-share detector tests and release contracts before building, and both signed macOS DMG lanes run packaged meeting-risk smoke before uploading release artifacts.
 - Companion-window restore and focus-repair paths now re-enter the native show privacy gate before raising the dashboard after a clear check, share-risk clear, reopen, or bounds repair. This keeps repair logic from bypassing the same capture-exclusion and screen-share checks used by manual overlay show.
 - Companion-window restore now also pauses briefly after any native privacy denial or share-risk hide, so the fast repair loop cannot immediately re-show the dashboard between macOS title-scan detections.
+- Companion-window focus repair now performs a second privacy recheck after native `unminimize`/`show`/`set_focus`, then hides the overlay and companion windows again if a Meet/Teams/share-risk window appears during that focus transition.
 
 ## Verification already run locally
 
@@ -126,6 +127,11 @@ Follow-up CI hardening verification:
   - macOS Apple Silicon app/DMG: native privacy tests, release contracts, package build, sidecar verification, packaged privacy shield, packaged meeting-risk smoke, and DMG artifact upload passed.
   - Windows installers: native privacy tests, release contracts, package build, sidecar verification, packaged privacy shield, and artifact upload passed.
   - Linux AppImage/DEB: native privacy tests, release contracts, package build, sidecar verification, packaged privacy shield, and artifact upload passed.
+- Focus-repair post-show recheck local verification:
+  - `cargo test --manifest-path src-tauri/Cargo.toml overlay:: --lib` passed 33 tests after adding the post-focus privacy recheck.
+  - `cargo test --manifest-path src-tauri/Cargo.toml screen_share --lib` passed 59 tests.
+  - `node --test scripts/verify-privacy-shield-package.test.mjs scripts/release-workflow.test.mjs` passed 63 tests and requires the post-focus privacy marker in packaged binaries.
+  - `npm run test:release` passed 148 tests.
 
 ## CI to check next
 

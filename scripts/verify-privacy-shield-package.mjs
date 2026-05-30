@@ -44,6 +44,7 @@ export const COMMON_PRIVACY_SHIELD_MARKERS = [
   "Native privacy shield thread failed to start; refusing to run without fail-closed screen-share guard.",
   "Companion app window restore paths use the native show privacy gate before raising windows.",
   "Companion app window focus repair rechecks privacy before raising windows.",
+  "Companion app window focus repair rechecks privacy again after raising windows.",
   "Companion app window restore stays paused after a native privacy denial.",
   "Native privacy shield starts before startup companion window show.",
   "Native privacy shield polls every 50ms for new screen-share risk.",

@@ -1,10 +1,10 @@
 use super::{
     bounds_update_privacy_gate_message, capture_exclusion_disabled_status,
     capture_exclusion_enabled_status, capture_exclusion_unavailable_status,
-    companion_capture_exclusion_status, companion_restore_privacy_gate_status,
-    companion_visibility_success_status, enforce_capture_exclusion_setting,
-    is_companion_window_label, is_overlay_window_label, native_show_privacy_gate_status,
-    post_show_privacy_recheck_message, protected_window_labels,
+    companion_capture_exclusion_status, companion_focus_post_show_privacy_recheck_message,
+    companion_restore_privacy_gate_status, companion_visibility_success_status,
+    enforce_capture_exclusion_setting, is_companion_window_label, is_overlay_window_label,
+    native_show_privacy_gate_status, post_show_privacy_recheck_message, protected_window_labels,
     protection_refresh_fail_closed_message, sanitize_companion_window_bounds,
     sanitize_overlay_bounds, startup_privacy_shield_hide_reason, windows_capture_exclusion_status,
     OverlayProtectionStatus, OverlayWindowBounds, BOUNDS_UPDATE_UNSAFE_PROTECTION_MARKER,
@@ -12,8 +12,9 @@ use super::{
     COMPANION_POST_SHOW_UNSAFE_PROTECTION_MARKER, COMPANION_UNSAFE_PROTECTION_MARKER,
     COMPANION_WINDOW_APP_ACTIVATION_REPAIR_MARKER, COMPANION_WINDOW_BACKGROUND_REPAIR_MARKER,
     COMPANION_WINDOW_BOUNDS_REPAIR_MARKER, COMPANION_WINDOW_BOUNDS_WATCHDOG_INTERVAL_MS,
-    COMPANION_WINDOW_FOCUS_PRIVACY_RECHECK_MARKER, COMPANION_WINDOW_FOREGROUND_REPAIR_MARKER,
-    COMPANION_WINDOW_NATIVE_BOUNDS_REPAIR_MARKER, COMPANION_WINDOW_REOPEN_PRIVACY_RESTORE_MARKER,
+    COMPANION_WINDOW_FOCUS_POST_SHOW_RECHECK_MARKER, COMPANION_WINDOW_FOCUS_PRIVACY_RECHECK_MARKER,
+    COMPANION_WINDOW_FOREGROUND_REPAIR_MARKER, COMPANION_WINDOW_NATIVE_BOUNDS_REPAIR_MARKER,
+    COMPANION_WINDOW_REOPEN_PRIVACY_RESTORE_MARKER,
     COMPANION_WINDOW_RESTORE_NATIVE_SHOW_GATE_MARKER,
     COMPANION_WINDOW_RESTORE_PRIVACY_PAUSE_MARKER, COMPANION_WINDOW_SHARE_RISK_CLEAR_REPAIR_MARKER,
     COMPANION_WINDOW_WATCHDOG_PRIVACY_PAUSE_MARKER,
@@ -103,6 +104,7 @@ fn repairs_tiny_offscreen_companion_window_to_centered_monitor_bounds() {
     assert!(COMPANION_WINDOW_REOPEN_PRIVACY_RESTORE_MARKER.contains("bundle is reopened"));
     assert!(COMPANION_WINDOW_RESTORE_NATIVE_SHOW_GATE_MARKER.contains("native show privacy gate"));
     assert!(COMPANION_WINDOW_FOCUS_PRIVACY_RECHECK_MARKER.contains("rechecks privacy"));
+    assert!(COMPANION_WINDOW_FOCUS_POST_SHOW_RECHECK_MARKER.contains("after raising windows"));
     assert!(COMPANION_WINDOW_RESTORE_PRIVACY_PAUSE_MARKER.contains("restore stays paused"));
     assert_eq!(STARTUP_COMPANION_WINDOW_REPAIR_DELAYS_MS, [150, 600, 1_500]);
     assert_eq!(COMPANION_WINDOW_BOUNDS_WATCHDOG_INTERVAL_MS, 500);
@@ -513,4 +515,32 @@ fn companion_restore_gate_allows_when_share_clear_and_capture_exclusion_enabled(
     assert_eq!(status.capture_exclusion, "enabled");
     assert!(!status.visible);
     assert!(status.message.is_none());
+}
+
+#[test]
+fn companion_focus_post_show_recheck_blocks_new_share_risk_after_focus() {
+    let message = companion_focus_post_show_privacy_recheck_message(
+        &capture_exclusion_enabled_status(true),
+        NativePrivacyShieldDecision::Hide {
+            reason: "Known screen-sharing or recording process is running.".to_string(),
+        },
+    )
+    .expect("focus repair must be reverted when screen-share risk appears after focus");
+
+    assert!(message.contains(COMPANION_WINDOW_FOCUS_POST_SHOW_RECHECK_MARKER));
+    assert!(message.contains(COMPANION_POST_SHOW_SHARE_RISK_MARKER));
+    assert!(message.contains("Known screen-sharing or recording process"));
+}
+
+#[test]
+fn companion_focus_post_show_recheck_blocks_new_capture_failure_after_focus() {
+    let message = companion_focus_post_show_privacy_recheck_message(
+        &capture_exclusion_disabled_status(true),
+        NativePrivacyShieldDecision::Allow,
+    )
+    .expect("focus repair must be reverted when capture exclusion changes after focus");
+
+    assert!(message.contains(COMPANION_WINDOW_FOCUS_POST_SHOW_RECHECK_MARKER));
+    assert!(message.contains(COMPANION_POST_SHOW_UNSAFE_PROTECTION_MARKER));
+    assert!(message.contains("Capture exclusion is not enforced"));
 }

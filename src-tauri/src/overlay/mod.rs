@@ -65,6 +65,8 @@ pub const COMPANION_WINDOW_RESTORE_NATIVE_SHOW_GATE_MARKER: &str =
     "Companion app window restore paths use the native show privacy gate before raising windows.";
 pub const COMPANION_WINDOW_FOCUS_PRIVACY_RECHECK_MARKER: &str =
     "Companion app window focus repair rechecks privacy before raising windows.";
+pub const COMPANION_WINDOW_FOCUS_POST_SHOW_RECHECK_MARKER: &str =
+    "Companion app window focus repair rechecks privacy again after raising windows.";
 pub const COMPANION_WINDOW_RESTORE_PRIVACY_PAUSE_MARKER: &str =
     "Companion app window restore stays paused after a native privacy denial.";
 const COMPANION_WINDOW_MIN_WIDTH: u32 = 1024;
@@ -705,6 +707,40 @@ fn companion_focus_privacy_gate_denied(app: &tauri::AppHandle) -> bool {
     false
 }
 
+pub fn companion_focus_post_show_privacy_recheck_message(
+    status: &OverlayProtectionStatus,
+    screen_share_decision: crate::screen_share::NativePrivacyShieldDecision,
+) -> Option<String> {
+    std::hint::black_box(COMPANION_WINDOW_FOCUS_POST_SHOW_RECHECK_MARKER);
+
+    post_show_privacy_recheck_message(
+        status,
+        screen_share_decision,
+        COMPANION_POST_SHOW_UNSAFE_PROTECTION_MARKER,
+        COMPANION_POST_SHOW_SHARE_RISK_MARKER,
+    )
+    .map(|message| format!("{COMPANION_WINDOW_FOCUS_POST_SHOW_RECHECK_MARKER} {message}"))
+}
+
+fn companion_focus_post_show_privacy_recheck_denied(app: &tauri::AppHandle) -> bool {
+    let post_focus_status = protect_overlay_window(app, true);
+    let post_focus_screen_share_decision = crate::screen_share::native_privacy_shield_decision(
+        crate::screen_share::detect_screen_share_status_for_native_visibility_gate(),
+    );
+
+    let Some(_message) = companion_focus_post_show_privacy_recheck_message(
+        &post_focus_status,
+        post_focus_screen_share_decision,
+    ) else {
+        return false;
+    };
+
+    pause_companion_window_restore_after_privacy_denial();
+    let _ = set_overlay_window_visible(app, false, true);
+    let _ = set_companion_windows_visible(app, false, true);
+    true
+}
+
 pub fn focus_companion_windows(app: &tauri::AppHandle) {
     use tauri::Manager;
 
@@ -729,6 +765,9 @@ pub fn focus_companion_windows(app: &tauri::AppHandle) {
         }
         let _ = window.set_focus();
         let _ = repair_companion_window_bounds(app, &window);
+        if companion_focus_post_show_privacy_recheck_denied(app) {
+            return;
+        }
     }
 }
 
@@ -986,6 +1025,7 @@ fn focus_repaired_companion_window(app: &tauri::AppHandle, window: &tauri::Webvi
     let _ = window.show();
     let _ = window.set_focus();
     let _ = repair_companion_window_bounds(app, window);
+    let _ = companion_focus_post_show_privacy_recheck_denied(app);
 }
 
 #[cfg(target_os = "macos")]

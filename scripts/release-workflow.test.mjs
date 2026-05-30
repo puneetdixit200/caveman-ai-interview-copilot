@@ -804,6 +804,30 @@ test("native companion show rechecks privacy after the OS visibility transition"
   );
 });
 
+test("companion focus repair rechecks privacy after raising windows", async () => {
+  const overlayRs = normalizeLineEndings(await readFile("src-tauri/src/overlay/mod.rs", "utf8"));
+  const commandStart = overlayRs.indexOf("pub fn focus_companion_windows(");
+  const commandEnd = overlayRs.indexOf("pub fn restore_companion_windows_after_clear_privacy_check", commandStart);
+
+  assert.notEqual(commandStart, -1, "companion focus repair command must exist");
+  assert.notEqual(commandEnd, -1, "companion focus repair body must be bounded by restore helper");
+
+  const commandBody = overlayRs.slice(commandStart, commandEnd);
+  const preFocusGate = commandBody.indexOf("companion_focus_privacy_gate_denied(app)");
+  const focusCall = commandBody.indexOf("window.set_focus()");
+  const postFocusGate = commandBody.indexOf("companion_focus_post_show_privacy_recheck_denied(app)", focusCall);
+
+  assert.notEqual(preFocusGate, -1, "focus repair must still check privacy before focus");
+  assert.notEqual(focusCall, -1, "focus repair must still call native focus");
+  assert.notEqual(postFocusGate, -1, "focus repair must recheck privacy after native focus");
+  assert.ok(preFocusGate < focusCall, "pre-focus privacy gate must run before native focus");
+  assert.ok(focusCall < postFocusGate, "post-focus privacy recheck must run after native focus");
+  assert.match(
+    overlayRs,
+    /Companion app window focus repair rechecks privacy again after raising windows\./
+  );
+});
+
 test("default desktop capability denies raw window visibility bypasses", async () => {
   const capability = JSON.parse(await readFile("src-tauri/capabilities/default.json", "utf8"));
   const permissions = new Set(capability.permissions);

@@ -78,6 +78,11 @@ test("requires packaged companion restore privacy gate markers", () => {
   );
   assert.ok(
     COMMON_PRIVACY_SHIELD_MARKERS.includes(
+      "Companion app window focus repair rechecks privacy again after raising windows."
+    )
+  );
+  assert.ok(
+    COMMON_PRIVACY_SHIELD_MARKERS.includes(
       "Companion app window restore stays paused after a native privacy denial."
     )
   );
