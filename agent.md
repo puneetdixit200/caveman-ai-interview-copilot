@@ -66,6 +66,7 @@ Make Caveman harder to expose during Google Meet, Microsoft Teams, and screen-sh
 - Packaged Windows EXE and macOS DMG meeting-risk smokes now cover a wider supported "other screen share" set: Google Meet, Teams browser/native, Zoom meeting, Webex meeting, generic presenting UI, and generic screen-recording UI.
 - Strong visible-window title detection now also treats huddle, voice-call, remote-desktop, streaming/broadcasting, and generic screen-recorder titles as screen-share risk from any visible app. Packaged Windows EXE and macOS DMG meeting-risk smokes now simulate Slack huddle, Discord voice, WhatsApp video call, remote desktop, and screen-recorder windows in addition to Meet/Teams/Zoom/Webex/presenting/recording.
 - Strong visible-window title detection now also treats active share and recording status indicators as screen-share risk from any visible app, including `You're sharing a window`, `Your screen is being shared`, `Meeting is being recorded`, and `Recording in progress`. Packaged Windows EXE and macOS DMG meeting-risk smokes now simulate these four indicators in addition to the prior 12 scenarios.
+- macOS native privacy gating now enumerates watched meeting/capture process names through `libproc` before shell `ps` fallback. This is specifically to make native-style Teams process detection deterministic on the slower Intel DMG package-smoke runner while keeping the existing supported OS-level detection boundary.
 
 ## Verification already run locally
 
@@ -177,6 +178,13 @@ Follow-up CI hardening verification:
   - `cargo test --manifest-path src-tauri/Cargo.toml screen_share --lib` passed 62 tests.
   - `npm run test:release` passed 156 tests.
   - No local app launch was performed for this verification; only non-UI unit/contract tests were run locally.
+- macOS Intel native-process follow-up local verification:
+  - Desktop Package Smoke run `26696478877` for `d861a3a` failed only the macOS Intel DMG `Run packaged meeting-risk smoke` step: the DMG smoke hid Caveman for 15 of 16 scenarios, including all four new active share/recording indicators, but `Microsoft Teams native process` stayed visible.
+  - Follow-up fix adds macOS `libproc` enumeration for watched native meeting/capture process names before shell fallback, so `MSTeams`-style native process names are caught earlier by the native privacy shield and startup visibility gate.
+  - `cargo test --manifest-path src-tauri/Cargo.toml screen_share --lib` passed 63 tests.
+  - `node --test scripts/windows-meeting-risk-smoke.test.mjs scripts/macos-meeting-risk-smoke.test.mjs scripts/macos-dmg-meeting-risk-smoke.test.mjs scripts/verify-privacy-shield-package.test.mjs` passed 36 tests.
+  - `npm run test:release` passed 156 tests.
+  - No local app launch was performed for this follow-up; verification used non-UI tests locally and the failing evidence came from GitHub Actions.
 - Push Desktop Package Smoke run `26694632145` for `011fb25` passed all lanes:
   - Windows installers: native privacy tests, release contracts, package build, bundled sidecar verification, packaged privacy shield, packaged Windows meeting-risk smoke, and artifact upload passed.
   - Windows smoke output: `READY`; initial `caveman.exe` window was `1044x788` and protected with `WDA_EXCLUDEFROMCAPTURE`; Caveman hid during simulated Google Meet browser, Teams browser share, Teams native process, Zoom meeting, Webex meeting, browser presenting indicator, and screen-recording indicator windows.

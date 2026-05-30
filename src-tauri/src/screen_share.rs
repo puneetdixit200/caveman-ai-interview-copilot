@@ -56,6 +56,9 @@ pub const NATIVE_PRIVACY_SHIELD_MACOS_PGREP_FAIL_CLOSED_MARKER: &str =
 pub const NATIVE_PRIVACY_SHIELD_MACOS_LIBPROC_CAPTURE_MARKER: &str =
     "Native privacy shield enumerates macOS capture processes through libproc before shell fallbacks.";
 #[cfg(target_os = "macos")]
+pub const NATIVE_PRIVACY_SHIELD_MACOS_LIBPROC_SCREEN_SHARE_PROCESS_MARKER: &str =
+    "Native privacy shield enumerates macOS meeting and capture processes through libproc before shell fallbacks.";
+#[cfg(target_os = "macos")]
 pub const NATIVE_PRIVACY_SHIELD_MACOS_WINDOW_TITLE_BACKGROUND_SCAN_MARKER: &str =
     "Native privacy shield scans macOS window titles on a bounded background worker for browser Meet and Teams risk.";
 #[cfg(target_os = "macos")]
@@ -385,6 +388,8 @@ const PACKAGE_PRIVACY_SHIELD_WEBVIEW_MARKERS: &[&str] = &[
     MACOS_WINDOW_TITLE_TIMEOUT_FALLBACK_MARKER,
     #[cfg(target_os = "macos")]
     MACOS_WINDOW_TITLE_SHORT_TIMEOUT_MARKER,
+    #[cfg(target_os = "macos")]
+    NATIVE_PRIVACY_SHIELD_MACOS_LIBPROC_SCREEN_SHARE_PROCESS_MARKER,
     #[cfg(target_os = "macos")]
     NATIVE_PRIVACY_SHIELD_MACOS_CORE_GRAPHICS_TITLE_GATE_MARKER,
     #[cfg(target_os = "macos")]
@@ -825,6 +830,10 @@ pub fn detect_screen_share_status() -> anyhow::Result<ScreenShareStatus> {
 
     #[cfg(target_os = "macos")]
     {
+        if let Some(status) = detect_macos_libproc_screen_share_process_status() {
+            return Ok(status);
+        }
+
         let output = run_screen_share_guard_command("ps", &["-axo", "pid=,comm="])?;
 
         if !output.status.success() {
@@ -1140,6 +1149,10 @@ pub fn detect_screen_share_status_for_native_privacy_shield() -> anyhow::Result<
 
     #[cfg(target_os = "macos")]
     {
+        if let Some(status) = detect_macos_libproc_screen_share_process_status() {
+            return Ok(status);
+        }
+
         if let Some(status) = detect_macos_direct_capture_process_status()? {
             return Ok(status);
         }
@@ -1200,6 +1213,10 @@ pub fn detect_screen_share_status_for_native_visibility_gate() -> anyhow::Result
 #[cfg(target_os = "macos")]
 fn detect_macos_visibility_gate_process_status() -> anyhow::Result<ScreenShareStatus> {
     std::hint::black_box(NATIVE_PRIVACY_SHIELD_MACOS_CORE_GRAPHICS_TITLE_GATE_MARKER);
+
+    if let Some(status) = detect_macos_libproc_screen_share_process_status() {
+        return Ok(status);
+    }
 
     if let Some(status) = detect_macos_direct_capture_process_status()? {
         return Ok(status);
@@ -1347,6 +1364,18 @@ fn detect_macos_direct_capture_process_status() -> anyhow::Result<Option<ScreenS
             matched_processes,
             message: Some("Known screen-sharing or recording process is running.".to_string()),
         }))
+    }
+}
+
+#[cfg(target_os = "macos")]
+fn detect_macos_libproc_screen_share_process_status() -> Option<ScreenShareStatus> {
+    std::hint::black_box(NATIVE_PRIVACY_SHIELD_MACOS_LIBPROC_SCREEN_SHARE_PROCESS_MARKER);
+
+    let status = screen_share_status_for_processes(macos_libproc_processes()?);
+    if status.active {
+        Some(status)
+    } else {
+        None
     }
 }
 
@@ -2743,6 +2772,8 @@ mod tests {
                 #[cfg(target_os = "macos")]
                 MACOS_WINDOW_TITLE_SHORT_TIMEOUT_MARKER,
                 #[cfg(target_os = "macos")]
+                NATIVE_PRIVACY_SHIELD_MACOS_LIBPROC_SCREEN_SHARE_PROCESS_MARKER,
+                #[cfg(target_os = "macos")]
                 NATIVE_PRIVACY_SHIELD_MACOS_CORE_GRAPHICS_TITLE_GATE_MARKER,
                 #[cfg(target_os = "macos")]
                 NATIVE_PRIVACY_SHIELD_MACOS_CORE_GRAPHICS_TITLE_FAST_SCAN_MARKER,
@@ -3010,12 +3041,41 @@ mod tests {
         );
     }
 
+    #[test]
+    fn detects_macos_native_meeting_app_paths_from_process_lists() {
+        let processes = parse_unix_process_list(
+            " 610 /private/tmp/caveman-meeting-risk-smoke/MSTeams\n 611 /Applications/Microsoft Teams.app/Contents/Helpers/Microsoft Teams Helper\n 612 /Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+        );
+
+        let status = screen_share_status_for_processes(processes);
+
+        assert!(status.active);
+        assert_eq!(
+            status
+                .matched_processes
+                .iter()
+                .map(|process| (process.pid, process.name.as_str()))
+                .collect::<Vec<_>>(),
+            vec![
+                (Some(610), "/private/tmp/caveman-meeting-risk-smoke/MSTeams"),
+                (
+                    Some(611),
+                    "/Applications/Microsoft Teams.app/Contents/Helpers/Microsoft Teams Helper"
+                ),
+            ]
+        );
+    }
+
     #[cfg(target_os = "macos")]
     #[test]
     fn parses_macos_direct_capture_process_rows_from_pgrep() {
         assert!(NATIVE_PRIVACY_SHIELD_MACOS_PGREP_CAPTURE_MARKER.contains("pgrep"));
         assert!(NATIVE_PRIVACY_SHIELD_MACOS_PGREP_FAIL_CLOSED_MARKER.contains("fail-closed"));
         assert!(NATIVE_PRIVACY_SHIELD_MACOS_LIBPROC_CAPTURE_MARKER.contains("libproc"));
+        assert!(
+            NATIVE_PRIVACY_SHIELD_MACOS_LIBPROC_SCREEN_SHARE_PROCESS_MARKER
+                .contains("meeting and capture processes")
+        );
 
         assert_eq!(
             parse_pgrep_process_rows(MACOS_SCREEN_CAPTURE_CLI_PROCESS, "123\n456\n"),

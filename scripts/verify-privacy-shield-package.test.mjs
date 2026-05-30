@@ -20,6 +20,8 @@ import {
 const DESKTOP_PROCESS_TARGETS = ["windows-x64", "macos-x64", "macos-arm64"];
 const MACOS_LIBPROC_CAPTURE_MARKER =
   "Native privacy shield enumerates macOS capture processes through libproc before shell fallbacks.";
+const MACOS_LIBPROC_SCREEN_SHARE_PROCESS_MARKER =
+  "Native privacy shield enumerates macOS meeting and capture processes through libproc before shell fallbacks.";
 const MACOS_PGREP_FAIL_CLOSED_MARKER =
   "Native privacy shield treats unexpected macOS pgrep errors as fail-closed before slower process parsing.";
 const WINDOWS_ENUMWINDOWS_TITLE_MARKER =
@@ -489,10 +491,15 @@ test("requires packaged protection refresh fail-closed marker", () => {
     )
   );
   assert.ok(MACOS_NATIVE_PRIVACY_SHIELD_MARKERS.includes(MACOS_LIBPROC_CAPTURE_MARKER));
+  assert.ok(MACOS_NATIVE_PRIVACY_SHIELD_MARKERS.includes(MACOS_LIBPROC_SCREEN_SHARE_PROCESS_MARKER));
   assert.ok(TARGET_PRIVACY_SHIELD_MARKERS["macos-arm64"].includes(MACOS_LIBPROC_CAPTURE_MARKER));
   assert.ok(TARGET_PRIVACY_SHIELD_MARKERS["macos-x64"].includes(MACOS_LIBPROC_CAPTURE_MARKER));
   assert.ok(!TARGET_PRIVACY_SHIELD_MARKERS["windows-x64"].includes(MACOS_LIBPROC_CAPTURE_MARKER));
   assert.ok(!TARGET_PRIVACY_SHIELD_MARKERS["linux-x64"].includes(MACOS_LIBPROC_CAPTURE_MARKER));
+  assert.ok(TARGET_PRIVACY_SHIELD_MARKERS["macos-arm64"].includes(MACOS_LIBPROC_SCREEN_SHARE_PROCESS_MARKER));
+  assert.ok(TARGET_PRIVACY_SHIELD_MARKERS["macos-x64"].includes(MACOS_LIBPROC_SCREEN_SHARE_PROCESS_MARKER));
+  assert.ok(!TARGET_PRIVACY_SHIELD_MARKERS["windows-x64"].includes(MACOS_LIBPROC_SCREEN_SHARE_PROCESS_MARKER));
+  assert.ok(!TARGET_PRIVACY_SHIELD_MARKERS["linux-x64"].includes(MACOS_LIBPROC_SCREEN_SHARE_PROCESS_MARKER));
   assert.ok(WINDOWS_NATIVE_PRIVACY_SHIELD_MARKERS.includes(WINDOWS_ENUMWINDOWS_TITLE_MARKER));
   assert.ok(TARGET_PRIVACY_SHIELD_MARKERS["windows-x64"].includes(WINDOWS_ENUMWINDOWS_TITLE_MARKER));
   assert.ok(!TARGET_PRIVACY_SHIELD_MARKERS["macos-arm64"].includes(WINDOWS_ENUMWINDOWS_TITLE_MARKER));

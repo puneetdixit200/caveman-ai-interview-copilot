@@ -282,6 +282,7 @@ export const MACOS_NATIVE_PRIVACY_SHIELD_MARKERS = [
   "macOS process screen-share guard skips window-title scan after direct capture-process match.",
   "macOS window-title guard uses a short timeout so native privacy polling cannot stall.",
   "Native privacy shield enumerates macOS capture processes through libproc before shell fallbacks.",
+  "Native privacy shield enumerates macOS meeting and capture processes through libproc before shell fallbacks.",
   "Native privacy shield treats unexpected macOS pgrep errors as fail-closed before slower process parsing.",
   "Native privacy shield scans macOS window titles on a bounded background worker for browser Meet and Teams risk.",
   "Native privacy shield checks macOS CoreGraphics visible window titles before app windows can show.",
