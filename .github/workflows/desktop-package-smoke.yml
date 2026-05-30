@@ -30,6 +30,9 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Run native privacy shield tests
+        run: cargo test --manifest-path src-tauri/Cargo.toml screen_share --lib
+
       - name: Verify release packaging contracts
         run: npm run test:release
 
@@ -69,6 +72,9 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
+
+      - name: Run native privacy shield tests
+        run: cargo test --manifest-path src-tauri/Cargo.toml screen_share --lib
 
       - name: Verify release packaging contracts
         run: npm run test:release
@@ -112,6 +118,9 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
+
+      - name: Run native privacy shield tests
+        run: cargo test --manifest-path src-tauri/Cargo.toml screen_share --lib
 
       - name: Verify release packaging contracts
         run: npm run test:release
@@ -160,6 +169,9 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
+
+      - name: Run native privacy shield tests
+        run: cargo test --manifest-path src-tauri/Cargo.toml screen_share --lib
 
       - name: Verify release packaging contracts
         run: npm run test:release

@@ -141,6 +141,36 @@ test("desktop package smoke verifies macOS DMG privacy shield on every push", as
   assert.match(macosArm64Job, /npm run dmg-meeting-risk:smoke:mac/);
 });
 
+test("desktop package smoke runs native privacy tests on every package lane", async () => {
+  const workflow = await readFile(desktopSmokeWorkflowPath, "utf8");
+  const windowsStart = workflow.indexOf("build-windows:");
+  const macosIntelStart = workflow.indexOf("build-macos-intel:");
+  const macosArm64Start = workflow.indexOf("build-macos-arm64:");
+  const linuxStart = workflow.indexOf("build-linux:");
+  const windowsJob = workflow.slice(windowsStart, macosIntelStart);
+  const macosIntelJob = workflow.slice(macosIntelStart, macosArm64Start);
+  const macosArm64Job = workflow.slice(macosArm64Start, linuxStart);
+  const linuxJob = workflow.slice(linuxStart);
+
+  for (const [label, job] of [
+    ["Windows", windowsJob],
+    ["macOS Intel", macosIntelJob],
+    ["macOS Apple Silicon", macosArm64Job],
+    ["Linux", linuxJob]
+  ]) {
+    assert.match(
+      job,
+      /cargo test --manifest-path src-tauri\/Cargo\.toml screen_share --lib/,
+      `${label} package smoke must compile and run native screen-share detector tests`
+    );
+    assert.ok(
+      job.indexOf("cargo test --manifest-path src-tauri/Cargo.toml screen_share --lib") <
+        job.indexOf("npm run test:release"),
+      `${label} native privacy tests must run before packaging contract checks`
+    );
+  }
+});
+
 test("macOS bundle declares privacy usage descriptions for audio capture", async () => {
   const tauriConfig = JSON.parse(await readFile("src-tauri/tauri.conf.json", "utf8"));
   const infoPlist = await readFile("src-tauri/Info.plist", "utf8");

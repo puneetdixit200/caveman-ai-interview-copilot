@@ -54,6 +54,7 @@ Make Caveman harder to expose during Google Meet, Microsoft Teams, and screen-sh
 - Windows screen-share detection now uses supported ToolHelp process enumeration before `tasklist`, so known meeting, recorder, and remote-support processes can trigger hide without waiting for shell process listing.
 - Release-contract tests normalize Windows CRLF checkouts before asserting detector ordering, including the native shield contract test that checks ToolHelp before `tasklist`.
 - The detector catalog was expanded for more supported "all screen share" coverage: additional web meeting/capture origins, desktop meeting apps, screen recorders, and remote-support clients are now anchored in source and package privacy-shield attestations.
+- The package smoke workflow now runs `cargo test --manifest-path src-tauri/Cargo.toml screen_share --lib` in every Windows, macOS, and Linux package lane before packaging contract checks, so EXE/DMG package smoke also compiles and exercises the native detector unit tests.
 
 ## Verification already run locally
 
@@ -66,6 +67,11 @@ Make Caveman harder to expose during Google Meet, Microsoft Teams, and screen-sh
   - macOS Intel app/DMG package privacy shield verification
   - macOS Apple Silicon app/DMG package privacy shield verification
   - Linux package privacy shield verification
+- Push Desktop Package Smoke run `26687955041` for `5483c78` passed all lanes:
+  - Windows installers built, passed bundled sidecar verification, packaged privacy shield verification, and artifact upload.
+  - macOS Intel app/DMG built, passed bundled sidecar verification, packaged privacy shield verification, packaged meeting-risk smoke, and artifact upload.
+  - macOS Apple Silicon app/DMG built, passed bundled sidecar verification, packaged privacy shield verification, packaged meeting-risk smoke, and artifact upload.
+  - Linux AppImage/DEB built, passed bundled sidecar verification, packaged privacy shield verification, and artifact upload.
 
 Local meeting-risk smoke result:
 
@@ -80,6 +86,12 @@ READY
 
 `npm run test:release` passed 144 tests after the Intel DMG timing fix. `npm run meeting-risk:smoke:mac` also passed earlier after restarting the local app from clean saved state.
 
+Follow-up CI hardening verification:
+
+- `node --test scripts/release-workflow.test.mjs` passed 39 tests after adding the package-lane native detector test assertion.
+- `cargo test --manifest-path src-tauri/Cargo.toml screen_share --lib` passed 59 tests locally without opening the app.
+- `npm run test:release` passed 145 tests after adding the workflow hardening contract.
+
 ## CI to check next
 
 List recent runs with:
@@ -88,11 +100,13 @@ List recent runs with:
 gh run list --repo puneetdixit200/caveman-ai-interview-copilot --branch main --limit 5 --json databaseId,workflowName,headSha,status,conclusion,createdAt,url
 ```
 
+After the workflow hardening commit lands, verify its Desktop Package Smoke run passes with the new `Run native privacy shield tests` step in every package lane.
+
 ## Suggested next steps
 
 1. Recheck the worktree with `git status --short --branch`.
-2. Verify the next pushed Desktop Package Smoke run includes and passes both macOS DMG `Run packaged meeting-risk smoke` steps.
-3. Verify the installed app window is visible, non-zero-sized, and protected with CoreGraphics window inspection.
+2. Verify the next pushed Desktop Package Smoke run includes and passes `Run native privacy shield tests` in all four package lanes and both macOS DMG `Run packaged meeting-risk smoke` steps.
+3. Only verify the installed app window is visible, non-zero-sized, and protected with CoreGraphics window inspection when the user allows opening the app.
 4. If the app is collapsed to `0x0`, restart it after clearing saved state:
 
 ```sh
