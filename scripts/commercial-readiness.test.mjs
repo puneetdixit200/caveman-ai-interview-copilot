@@ -27,6 +27,35 @@ const completeSecrets = [
   "APPLE_API_PRIVATE_KEY_BASE64"
 ];
 
+function completePrivacyShieldAttestation(target, overrides = {}) {
+  return {
+    status: "ready",
+    target,
+    checked: [`/tmp/run/extracted/${target}/caveman${target === "windows-x64" ? ".exe" : ""}`],
+    installersChecked: installersCheckedForTarget(target),
+    markers: TARGET_PRIVACY_SHIELD_MARKERS[target],
+    frontendMarkers: FRONTEND_PRIVACY_SHIELD_MARKERS,
+    frontendChecked: ["/tmp/run/dist/assets/index.js"],
+    ...overrides
+  };
+}
+
+function installersCheckedForTarget(target) {
+  switch (target) {
+    case "windows-x64":
+      return [
+        "/tmp/run/caveman-windows-package-smoke/msi/Caveman_0.1.1_x64_en-US.msi",
+        "/tmp/run/caveman-windows-package-smoke/nsis/Caveman_0.1.1_x64-setup.exe"
+      ];
+    case "macos-arm64":
+      return ["/tmp/run/caveman-macos-arm64-package-smoke/dmg/Caveman_0.1.1_aarch64.dmg"];
+    case "macos-x64":
+      return ["/tmp/run/caveman-macos-intel-package-smoke/dmg/Caveman_0.1.1_x64.dmg"];
+    default:
+      return [];
+  }
+}
+
 test("accepts a complete commercial signing secret set with Apple API notarization", () => {
   const result = evaluateSecretReadiness(completeSecrets);
 
@@ -90,22 +119,13 @@ test("blocks privacy shield attestations that lack required packaged detector ma
       const artifact = REQUIRED_ARTIFACTS.find((candidate) => candidate.id === artifactId);
       return [
         `/tmp/run/${artifact.examplePath}`,
-        {
-          status: "ready",
-          target,
-          markers: TARGET_PRIVACY_SHIELD_MARKERS[target],
-          frontendMarkers: FRONTEND_PRIVACY_SHIELD_MARKERS,
-          frontendChecked: ["/tmp/run/dist/assets/index.js"]
-        }
+        completePrivacyShieldAttestation(target)
       ];
     })
   );
   privacyShieldAttestations.set("/tmp/run/caveman-windows-package-smoke/privacy-shield-windows-x64.json", {
-    status: "ready",
-    target: "windows-x64",
-    markers: ["Screen-share guard failed closed:"],
-    frontendMarkers: FRONTEND_PRIVACY_SHIELD_MARKERS,
-    frontendChecked: ["/tmp/run/dist/assets/index.js"]
+    ...completePrivacyShieldAttestation("windows-x64"),
+    markers: ["Screen-share guard failed closed:"]
   });
 
   const result = evaluateArtifactReadiness(files, { privacyShieldAttestations });
@@ -136,20 +156,12 @@ test("blocks privacy shield attestations that lack built frontend restore-gate m
       const artifact = REQUIRED_ARTIFACTS.find((candidate) => candidate.id === artifactId);
       return [
         `/tmp/run/${artifact.examplePath}`,
-        {
-          status: "ready",
-          target,
-          markers: TARGET_PRIVACY_SHIELD_MARKERS[target],
-          frontendMarkers: FRONTEND_PRIVACY_SHIELD_MARKERS,
-          frontendChecked: ["/tmp/run/dist/assets/index.js"]
-        }
+        completePrivacyShieldAttestation(target)
       ];
     })
   );
   privacyShieldAttestations.set("/tmp/run/caveman-macos-arm64-package-smoke/privacy-shield-macos-arm64.json", {
-    status: "ready",
-    target: "macos-arm64",
-    markers: TARGET_PRIVACY_SHIELD_MARKERS["macos-arm64"],
+    ...completePrivacyShieldAttestation("macos-arm64"),
     frontendMarkers: [],
     frontendChecked: []
   });
@@ -160,6 +172,37 @@ test("blocks privacy shield attestations that lack built frontend restore-gate m
   assert.match(
     result.checks.find((check) => check.id === "privacy-shield-macos-arm64").detail,
     /Overlay kept hidden until screen-share guard stays clear/
+  );
+});
+
+test("blocks Windows privacy shield attestations that do not prove NSIS setup EXE inspection", () => {
+  const files = REQUIRED_ARTIFACTS.map((artifact) => `/tmp/run/${artifact.examplePath}`);
+  const privacyShieldAttestations = new Map(
+    [
+      ["privacy-shield-windows-x64", "windows-x64"],
+      ["privacy-shield-macos-arm64", "macos-arm64"],
+      ["privacy-shield-macos-x64", "macos-x64"],
+      ["privacy-shield-linux-x64", "linux-x64"]
+    ].map(([artifactId, target]) => {
+      const artifact = REQUIRED_ARTIFACTS.find((candidate) => candidate.id === artifactId);
+      return [
+        `/tmp/run/${artifact.examplePath}`,
+        completePrivacyShieldAttestation(target, {
+          installersChecked:
+            target === "windows-x64"
+              ? ["/tmp/run/caveman-windows-package-smoke/msi/Caveman_0.1.1_x64_en-US.msi"]
+              : installersCheckedForTarget(target)
+        })
+      ];
+    })
+  );
+
+  const result = evaluateArtifactReadiness(files, { privacyShieldAttestations });
+
+  assert.equal(result.status, "blocked");
+  assert.match(
+    result.checks.find((check) => check.id === "privacy-shield-windows-x64").detail,
+    /every shipped installer was inspected/
   );
 });
 

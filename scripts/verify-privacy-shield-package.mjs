@@ -303,6 +303,7 @@ export async function verifyPrivacyShieldPackage({
   const markers = TARGET_PRIVACY_SHIELD_MARKERS[target];
   const checked = [];
   const cleanup = [];
+  const cleanupCommands = [];
 
   try {
     const packageScope = await resolvePackageInspectionScope({
@@ -310,23 +311,34 @@ export async function verifyPrivacyShieldPackage({
       releaseDir,
       appName,
       commandRunner,
-      cleanup
+      cleanup,
+      cleanupCommands
     });
-    const { binaryPath, packageRoot } = packageScope;
-    checked.push(binaryPath);
-    const binary = await readFile(binaryPath);
-    const markerResult = evaluateBinaryPrivacyMarkers(binary, markers);
-    if (markerResult.status !== "ready") {
-      throw new Error(
-        `Packaged ${target} binary is missing native privacy shield markers: ${markerResult.missingMarkers.join(", ")}`
-      );
+    const binaryPaths = packageScope.binaryPaths ?? [packageScope.binaryPath];
+    const packageRoots = packageScope.packageRoots ?? [packageScope.packageRoot];
+    checked.push(...binaryPaths);
+
+    for (const binaryPath of binaryPaths) {
+      const binary = await readFile(binaryPath);
+      const markerResult = evaluateBinaryPrivacyMarkers(binary, markers);
+      if (markerResult.status !== "ready") {
+        throw new Error(
+          `Packaged ${target} binary ${binaryPath} is missing native privacy shield markers: ${markerResult.missingMarkers.join(
+            ", "
+          )}`
+        );
+      }
     }
 
-    const frontendRoot = (await exists(frontendDist)) ? frontendDist : packageRoot;
-    const frontendArtifacts = await readPrivacyMarkerArtifacts(
-      frontendRoot,
-      frontendRoot === packageRoot ? [binaryPath] : []
-    );
+    const frontendDistExists = await exists(frontendDist);
+    const frontendRoots = frontendDistExists ? [frontendDist] : packageRoots;
+    const frontendArtifacts = (
+      await Promise.all(
+        frontendRoots.map((frontendRoot) =>
+          readPrivacyMarkerArtifacts(frontendRoot, frontendDistExists ? [] : binaryPaths)
+        )
+      )
+    ).flat();
     const frontendMarkerResult = evaluatePackagePrivacyMarkers(
       frontendArtifacts.map((artifact) => artifact.content),
       FRONTEND_PRIVACY_SHIELD_MARKERS
@@ -344,7 +356,9 @@ export async function verifyPrivacyShieldPackage({
       status: "ready",
       checked,
       markers,
-      frontendRoot,
+      installersChecked: packageScope.installersChecked ?? [],
+      frontendRoot: frontendRoots[0],
+      frontendRoots,
       frontendChecked: frontendArtifacts.map((artifact) => artifact.path),
       frontendMarkers: FRONTEND_PRIVACY_SHIELD_MARKERS
     };
@@ -353,11 +367,14 @@ export async function verifyPrivacyShieldPackage({
     }
     return result;
   } finally {
+    for (const cleanupCommand of cleanupCommands) {
+      await cleanupCommand().catch(() => undefined);
+    }
     await Promise.all(cleanup.map((candidate) => rm(candidate, { recursive: true, force: true })));
   }
 }
 
-async function resolvePackageInspectionScope({ target, releaseDir, appName, commandRunner, cleanup }) {
+async function resolvePackageInspectionScope({ target, releaseDir, appName, commandRunner, cleanup, cleanupCommands }) {
   if (target.startsWith("macos-")) {
     const appBundlePath = await firstExistingDirectory(
       [
@@ -373,7 +390,35 @@ async function resolvePackageInspectionScope({ target, releaseDir, appName, comm
       `${target} app binary`
     );
     await assertNonEmptyFile(binaryPath, `${target} app binary`);
-    return { binaryPath, packageRoot: appBundlePath };
+
+    const dmgFiles = [
+      ...(await findFiles(path.join(releaseDir, "bundle", "dmg"), (file) => file.endsWith(".dmg"))),
+      ...(await findFiles(path.join(releaseDir, "dmg"), (file) => file.endsWith(".dmg")))
+    ];
+    assertAny(dmgFiles, `${target} DMG installer`);
+    const dmgMountDir = await mkdtemp(path.join(tmpdir(), "caveman-privacy-dmg-"));
+    cleanup.push(dmgMountDir);
+    await mountMacosDmg({
+      dmgPath: dmgFiles[0],
+      mountDir: dmgMountDir,
+      commandRunner,
+      cleanupCommands
+    });
+    const dmgAppBundlePath = await firstExistingDirectory(
+      [path.join(dmgMountDir, `${appName}.app`)],
+      `${target} mounted DMG app bundle`
+    );
+    const dmgBinaryPath = await firstExistingFile(
+      [path.join(dmgAppBundlePath, "Contents", "MacOS", "caveman")],
+      `${target} mounted DMG app binary`
+    );
+    await assertNonEmptyFile(dmgBinaryPath, `${target} mounted DMG app binary`);
+
+    return {
+      binaryPaths: [binaryPath, dmgBinaryPath],
+      packageRoots: [appBundlePath, dmgMountDir],
+      installersChecked: [dmgFiles[0]]
+    };
   }
 
   if (target === "windows-x64") {
@@ -381,14 +426,34 @@ async function resolvePackageInspectionScope({ target, releaseDir, appName, comm
       ...(await findFiles(path.join(releaseDir, "bundle", "msi"), (file) => file.endsWith(".msi"))),
       ...(await findFiles(path.join(releaseDir, "msi"), (file) => file.endsWith(".msi")))
     ];
+    const nsisFiles = [
+      ...(await findFiles(path.join(releaseDir, "bundle", "nsis"), (file) => file.endsWith(".exe"))),
+      ...(await findFiles(path.join(releaseDir, "nsis"), (file) => file.endsWith(".exe")))
+    ];
     assertAny(msiFiles, "Windows MSI installer");
+    assertAny(nsisFiles, "Windows NSIS setup EXE installer");
+
     const extractDir = await mkdtemp(path.join(tmpdir(), "caveman-privacy-msi-"));
     cleanup.push(extractDir);
     await commandRunner("msiexec.exe", ["/a", msiFiles[0], "/qn", `TARGETDIR=${extractDir}`], {
       maxBuffer: COMMAND_MAX_BUFFER
     });
-    const binaryPath = await findFirstFileNamed(extractDir, PACKAGE_TARGETS[target].binaryName);
-    return { binaryPath, packageRoot: extractDir };
+    const msiBinaryPath = await findFirstFileNamed(extractDir, PACKAGE_TARGETS[target].binaryName);
+
+    const nsisExtractDir = await mkdtemp(path.join(tmpdir(), "caveman-privacy-nsis-"));
+    cleanup.push(nsisExtractDir);
+    await extractWindowsNsisInstaller({
+      installerPath: nsisFiles[0],
+      extractDir: nsisExtractDir,
+      commandRunner
+    });
+    const nsisBinaryPath = await findFirstFileNamed(nsisExtractDir, PACKAGE_TARGETS[target].binaryName);
+
+    return {
+      binaryPaths: [msiBinaryPath, nsisBinaryPath],
+      packageRoots: [extractDir, nsisExtractDir],
+      installersChecked: [msiFiles[0], nsisFiles[0]]
+    };
   }
 
   if (target === "linux-x64") {
@@ -410,6 +475,50 @@ async function resolvePackageInspectionScope({ target, releaseDir, appName, comm
   }
 
   throw new Error(`Unsupported package target: ${target}`);
+}
+
+async function mountMacosDmg({ dmgPath, mountDir, commandRunner, cleanupCommands }) {
+  await commandRunner("hdiutil", ["attach", dmgPath, "-mountpoint", mountDir, "-nobrowse", "-readonly", "-quiet"], {
+    maxBuffer: COMMAND_MAX_BUFFER
+  });
+  cleanupCommands.push(async () => {
+    try {
+      await commandRunner("hdiutil", ["detach", mountDir, "-quiet"], {
+        maxBuffer: COMMAND_MAX_BUFFER
+      });
+    } catch {
+      await commandRunner("hdiutil", ["detach", mountDir, "-force", "-quiet"], {
+        maxBuffer: COMMAND_MAX_BUFFER
+      }).catch(() => undefined);
+    }
+  });
+}
+
+async function extractWindowsNsisInstaller({ installerPath, extractDir, commandRunner }) {
+  const attempts = [];
+  for (const extractor of windowsNsisExtractorCandidates()) {
+    try {
+      await commandRunner(extractor, ["x", installerPath, `-o${extractDir}`, "-y"], {
+        maxBuffer: COMMAND_MAX_BUFFER
+      });
+      return;
+    } catch (error) {
+      attempts.push(`${extractor}: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
+  throw new Error(
+    `Could not extract Windows NSIS setup EXE for privacy shield verification. Tried: ${attempts.join("; ")}`
+  );
+}
+
+function windowsNsisExtractorCandidates() {
+  return [
+    "7z",
+    "7zz",
+    process.env.ProgramFiles ? path.join(process.env.ProgramFiles, "7-Zip", "7z.exe") : null,
+    process.env["ProgramFiles(x86)"] ? path.join(process.env["ProgramFiles(x86)"], "7-Zip", "7z.exe") : null
+  ].filter(Boolean);
 }
 
 async function firstExistingFile(candidates, label) {
@@ -436,7 +545,9 @@ export async function writePrivacyShieldAttestation({
   target,
   checked,
   markers,
+  installersChecked = [],
   frontendRoot = null,
+  frontendRoots = frontendRoot ? [frontendRoot] : [],
   frontendChecked = [],
   frontendMarkers = []
 }) {
@@ -449,7 +560,9 @@ export async function writePrivacyShieldAttestation({
         target,
         checked,
         markers,
+        installersChecked,
         frontendRoot,
+        frontendRoots,
         frontendChecked,
         frontendMarkers
       },

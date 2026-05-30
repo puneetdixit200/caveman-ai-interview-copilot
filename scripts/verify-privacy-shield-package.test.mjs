@@ -507,30 +507,51 @@ test("verifies downloaded macOS package-smoke artifact layout", async () => {
   const dir = await mkdtemp(path.join(tmpdir(), "caveman-privacy-downloaded-macos-"));
   try {
     const binaryPath = path.join(dir, "macos", "Caveman.app", "Contents", "MacOS", "caveman");
+    const dmgPath = path.join(dir, "dmg", "Caveman_0.1.1_aarch64.dmg");
     const frontendDist = path.join(dir, "dist");
     const assetPath = path.join(frontendDist, "assets", "index.js");
     await mkdir(path.dirname(binaryPath), { recursive: true });
+    await mkdir(path.dirname(dmgPath), { recursive: true });
     await mkdir(path.dirname(assetPath), { recursive: true });
     await writeFile(binaryPath, TARGET_PRIVACY_SHIELD_MARKERS["macos-arm64"].join("\n"));
+    await writeFile(dmgPath, "fake dmg");
     await writeFile(assetPath, FRONTEND_PRIVACY_SHIELD_MARKERS.join("\n"));
 
     const result = await verifyPrivacyShieldPackage({
       targetSelector: "macos-arm64",
       releaseDir: dir,
-      frontendDist
+      frontendDist,
+      commandRunner: async (command, args) => {
+        if (command !== "hdiutil") {
+          throw new Error(`unexpected command: ${command}`);
+        }
+
+        if (args[0] === "attach") {
+          const mountDir = args[args.indexOf("-mountpoint") + 1];
+          const dmgBinaryPath = path.join(mountDir, "Caveman.app", "Contents", "MacOS", "caveman");
+          await mkdir(path.dirname(dmgBinaryPath), { recursive: true });
+          await writeFile(dmgBinaryPath, TARGET_PRIVACY_SHIELD_MARKERS["macos-arm64"].join("\n"));
+        }
+
+        return { stdout: "", stderr: "" };
+      }
     });
 
     assert.equal(result.status, "ready");
-    assert.deepEqual(result.checked, [binaryPath]);
+    assert.equal(result.checked.length, 2);
+    assert.equal(result.checked[0], binaryPath);
+    assert.ok(result.checked[1].includes("caveman-privacy-dmg-"));
+    assert.deepEqual(result.installersChecked, [dmgPath]);
     assert.equal(result.frontendRoot, frontendDist);
+    assert.deepEqual(result.frontendRoots, [frontendDist]);
     assert.ok(result.frontendChecked.includes(assetPath));
   } finally {
     await rm(dir, { recursive: true, force: true });
   }
 });
 
-test("fails downloaded package verification when frontend restore gate marker is missing", async () => {
-  const dir = await mkdtemp(path.join(tmpdir(), "caveman-privacy-missing-frontend-"));
+test("fails macOS package verification when the DMG installer is missing", async () => {
+  const dir = await mkdtemp(path.join(tmpdir(), "caveman-privacy-missing-dmg-"));
   try {
     const binaryPath = path.join(dir, "macos", "Caveman.app", "Contents", "MacOS", "caveman");
     await mkdir(path.dirname(binaryPath), { recursive: true });
@@ -541,7 +562,173 @@ test("fails downloaded package verification when frontend restore gate marker is
         verifyPrivacyShieldPackage({
           targetSelector: "macos-arm64",
           releaseDir: dir,
-          frontendDist: path.join(dir, "missing-dist")
+          frontendDist: path.join(dir, "missing-dist"),
+          commandRunner: async () => {
+            throw new Error("should not mount before the DMG is present");
+          }
+        }),
+      /Missing macos-arm64 DMG installer/
+    );
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test("verifies Windows MSI and NSIS setup EXE extracted app binaries before attesting", async () => {
+  const dir = await mkdtemp(path.join(tmpdir(), "caveman-privacy-downloaded-windows-"));
+  try {
+    const msiPath = path.join(dir, "bundle", "msi", "Caveman_0.1.1_x64_en-US.msi");
+    const nsisPath = path.join(dir, "bundle", "nsis", "Caveman_0.1.1_x64-setup.exe");
+    const frontendDist = path.join(dir, "dist");
+    const assetPath = path.join(frontendDist, "assets", "index.js");
+    await mkdir(path.dirname(msiPath), { recursive: true });
+    await mkdir(path.dirname(nsisPath), { recursive: true });
+    await mkdir(path.dirname(assetPath), { recursive: true });
+    await writeFile(msiPath, "fake msi installer");
+    await writeFile(nsisPath, "fake nsis setup exe");
+    await writeFile(assetPath, FRONTEND_PRIVACY_SHIELD_MARKERS.join("\n"));
+
+    const result = await verifyPrivacyShieldPackage({
+      targetSelector: "windows-x64",
+      releaseDir: dir,
+      frontendDist,
+      commandRunner: async (command, args) => {
+        if (command === "msiexec.exe") {
+          const extractDir = args.find((arg) => arg.startsWith("TARGETDIR=")).slice("TARGETDIR=".length);
+          const binaryPath = path.join(extractDir, "Program Files", "Caveman", "caveman.exe");
+          await mkdir(path.dirname(binaryPath), { recursive: true });
+          await writeFile(binaryPath, TARGET_PRIVACY_SHIELD_MARKERS["windows-x64"].join("\n"));
+          return { stdout: "", stderr: "" };
+        }
+
+        if (command === "7z") {
+          const outputArg = args.find((arg) => arg.startsWith("-o"));
+          const extractDir = outputArg.slice(2);
+          const binaryPath = path.join(extractDir, "$PLUGINSDIR", "app", "caveman.exe");
+          await mkdir(path.dirname(binaryPath), { recursive: true });
+          await writeFile(binaryPath, TARGET_PRIVACY_SHIELD_MARKERS["windows-x64"].join("\n"));
+          return { stdout: "", stderr: "" };
+        }
+
+        throw new Error(`unexpected command: ${command}`);
+      }
+    });
+
+    assert.equal(result.status, "ready");
+    assert.deepEqual(result.installersChecked, [msiPath, nsisPath]);
+    assert.equal(result.checked.length, 2);
+    assert.ok(result.checked.some((candidate) => candidate.includes("caveman-privacy-msi-")));
+    assert.ok(result.checked.some((candidate) => candidate.includes("caveman-privacy-nsis-")));
+    assert.equal(result.frontendRoot, frontendDist);
+    assert.deepEqual(result.frontendRoots, [frontendDist]);
+    assert.ok(result.frontendChecked.includes(assetPath));
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test("fails Windows package verification when the NSIS setup EXE app binary lacks privacy markers", async () => {
+  const dir = await mkdtemp(path.join(tmpdir(), "caveman-privacy-nsis-missing-markers-"));
+  try {
+    const msiPath = path.join(dir, "bundle", "msi", "Caveman_0.1.1_x64_en-US.msi");
+    const nsisPath = path.join(dir, "bundle", "nsis", "Caveman_0.1.1_x64-setup.exe");
+    const frontendDist = path.join(dir, "dist");
+    const assetPath = path.join(frontendDist, "assets", "index.js");
+    await mkdir(path.dirname(msiPath), { recursive: true });
+    await mkdir(path.dirname(nsisPath), { recursive: true });
+    await mkdir(path.dirname(assetPath), { recursive: true });
+    await writeFile(msiPath, "fake msi installer");
+    await writeFile(nsisPath, "fake nsis setup exe");
+    await writeFile(assetPath, FRONTEND_PRIVACY_SHIELD_MARKERS.join("\n"));
+
+    await assert.rejects(
+      () =>
+        verifyPrivacyShieldPackage({
+          targetSelector: "windows-x64",
+          releaseDir: dir,
+          frontendDist,
+          commandRunner: async (command, args) => {
+            if (command === "msiexec.exe") {
+              const extractDir = args.find((arg) => arg.startsWith("TARGETDIR=")).slice("TARGETDIR=".length);
+              const binaryPath = path.join(extractDir, "Program Files", "Caveman", "caveman.exe");
+              await mkdir(path.dirname(binaryPath), { recursive: true });
+              await writeFile(binaryPath, TARGET_PRIVACY_SHIELD_MARKERS["windows-x64"].join("\n"));
+              return { stdout: "", stderr: "" };
+            }
+
+            if (command === "7z") {
+              const outputArg = args.find((arg) => arg.startsWith("-o"));
+              const extractDir = outputArg.slice(2);
+              const binaryPath = path.join(extractDir, "$PLUGINSDIR", "app", "caveman.exe");
+              await mkdir(path.dirname(binaryPath), { recursive: true });
+              await writeFile(binaryPath, "SetWindowDisplayAffinity only");
+              return { stdout: "", stderr: "" };
+            }
+
+            throw new Error(`unexpected command: ${command}`);
+          }
+        }),
+      /caveman-privacy-nsis-.+caveman\.exe is missing native privacy shield markers/
+    );
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test("fails Windows package verification when the NSIS setup EXE is missing", async () => {
+  const dir = await mkdtemp(path.join(tmpdir(), "caveman-privacy-missing-nsis-"));
+  try {
+    const msiPath = path.join(dir, "bundle", "msi", "Caveman_0.1.1_x64_en-US.msi");
+    await mkdir(path.dirname(msiPath), { recursive: true });
+    await writeFile(msiPath, "fake msi installer");
+
+    await assert.rejects(
+      () =>
+        verifyPrivacyShieldPackage({
+          targetSelector: "windows-x64",
+          releaseDir: dir,
+          frontendDist: path.join(dir, "missing-dist"),
+          commandRunner: async () => {
+            throw new Error("should not extract before all Windows installers are present");
+          }
+        }),
+      /Missing Windows NSIS setup EXE installer/
+    );
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test("fails downloaded package verification when frontend restore gate marker is missing", async () => {
+  const dir = await mkdtemp(path.join(tmpdir(), "caveman-privacy-missing-frontend-"));
+  try {
+    const binaryPath = path.join(dir, "macos", "Caveman.app", "Contents", "MacOS", "caveman");
+    const dmgPath = path.join(dir, "dmg", "Caveman_0.1.1_aarch64.dmg");
+    await mkdir(path.dirname(binaryPath), { recursive: true });
+    await mkdir(path.dirname(dmgPath), { recursive: true });
+    await writeFile(binaryPath, TARGET_PRIVACY_SHIELD_MARKERS["macos-arm64"].join("\n"));
+    await writeFile(dmgPath, "fake dmg");
+
+    await assert.rejects(
+      () =>
+        verifyPrivacyShieldPackage({
+          targetSelector: "macos-arm64",
+          releaseDir: dir,
+          frontendDist: path.join(dir, "missing-dist"),
+          commandRunner: async (command, args) => {
+            if (command !== "hdiutil") {
+              throw new Error(`unexpected command: ${command}`);
+            }
+
+            if (args[0] === "attach") {
+              const mountDir = args[args.indexOf("-mountpoint") + 1];
+              const dmgBinaryPath = path.join(mountDir, "Caveman.app", "Contents", "MacOS", "caveman");
+              await mkdir(path.dirname(dmgBinaryPath), { recursive: true });
+              await writeFile(dmgBinaryPath, TARGET_PRIVACY_SHIELD_MARKERS["macos-arm64"].join("\n"));
+            }
+
+            return { stdout: "", stderr: "" };
+          }
         }),
       /missing frontend privacy shield markers/
     );

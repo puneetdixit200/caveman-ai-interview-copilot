@@ -132,6 +132,12 @@ const PRIVACY_SHIELD_TARGET_BY_ARTIFACT_ID = new Map([
   ["privacy-shield-linux-x64", "linux-x64"]
 ]);
 
+const PRIVACY_SHIELD_INSTALLER_PATTERNS_BY_TARGET = new Map([
+  ["windows-x64", [/\/msi\/Caveman_.+_x64_en-US\.msi$/, /\/nsis\/Caveman_.+_x64-setup\.exe$/]],
+  ["macos-arm64", [/\/dmg\/Caveman_.+_aarch64\.dmg$/]],
+  ["macos-x64", [/\/dmg\/Caveman_.+_x64\.dmg$/]]
+]);
+
 export function parseGhSecretList(output) {
   return String(output)
     .split(/\r?\n/)
@@ -263,6 +269,29 @@ export function validatePrivacyShieldAttestationPayload(target, payload) {
       status: "blocked",
       detail: `Privacy shield attestation target mismatch: expected ${target}, got ${payload.target ?? "unknown"}.`
     };
+  }
+
+  if (!Array.isArray(payload.checked) || payload.checked.length === 0) {
+    return {
+      status: "blocked",
+      detail: `Privacy shield attestation for ${target} does not list checked packaged app binaries.`
+    };
+  }
+
+  const requiredInstallerPatterns = PRIVACY_SHIELD_INSTALLER_PATTERNS_BY_TARGET.get(target) ?? [];
+  if (requiredInstallerPatterns.length > 0) {
+    const installersChecked = Array.isArray(payload.installersChecked)
+      ? payload.installersChecked.map((candidate) => String(candidate).replace(/\\/g, "/"))
+      : [];
+    const missingInstallerPatterns = requiredInstallerPatterns.filter(
+      (pattern) => !installersChecked.some((candidate) => pattern.test(candidate))
+    );
+    if (missingInstallerPatterns.length > 0) {
+      return {
+        status: "blocked",
+        detail: `Privacy shield attestation for ${target} does not prove every shipped installer was inspected.`
+      };
+    }
   }
 
   if (!Array.isArray(payload.markers)) {
