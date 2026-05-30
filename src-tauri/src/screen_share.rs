@@ -2053,6 +2053,7 @@ mod tests {
             &[
                 EDGE_WEBVIEW_HOST_PROCESS,
                 EDGE_PWA_HOST_PROCESS,
+                APPLICATION_FRAME_HOST_PROCESS,
                 CHROME_PWA_HOST_PROCESS,
                 BRAVE_PWA_HOST_PROCESS,
                 OPERA_PWA_HOST_PROCESS,
