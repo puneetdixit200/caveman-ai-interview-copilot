@@ -1,4 +1,6 @@
 use serde::{Deserialize, Serialize};
+use std::sync::{Mutex, OnceLock};
+use std::time::{Duration, Instant};
 use tauri::{LogicalPosition, LogicalSize, PhysicalPosition, PhysicalSize};
 
 #[derive(Debug, Clone, Serialize, PartialEq)]
@@ -63,6 +65,8 @@ pub const COMPANION_WINDOW_RESTORE_NATIVE_SHOW_GATE_MARKER: &str =
     "Companion app window restore paths use the native show privacy gate before raising windows.";
 pub const COMPANION_WINDOW_FOCUS_PRIVACY_RECHECK_MARKER: &str =
     "Companion app window focus repair rechecks privacy before raising windows.";
+pub const COMPANION_WINDOW_RESTORE_PRIVACY_PAUSE_MARKER: &str =
+    "Companion app window restore stays paused after a native privacy denial.";
 const COMPANION_WINDOW_MIN_WIDTH: u32 = 1024;
 const COMPANION_WINDOW_MIN_HEIGHT: u32 = 720;
 const COMPANION_WINDOW_DEFAULT_WIDTH: u32 = 1280;
@@ -73,6 +77,9 @@ pub const STARTUP_COMPANION_WINDOW_REPAIR_DELAYS_MS: [u64; 3] = [150, 600, 1_500
 pub const COMPANION_WINDOW_BOUNDS_WATCHDOG_INTERVAL_MS: u64 = 500;
 #[cfg(target_os = "macos")]
 const COMPANION_WINDOW_APP_ACTIVATION_REPAIR_INTERVAL_MS: u64 = 2_000;
+const COMPANION_WINDOW_RESTORE_PRIVACY_PAUSE_MS: u64 = 1_500;
+
+static COMPANION_WINDOW_RESTORE_PAUSED_UNTIL: OnceLock<Mutex<Option<Instant>>> = OnceLock::new();
 
 #[cfg(target_os = "macos")]
 static COMPANION_WINDOW_LAST_APP_ACTIVATION_REPAIR: std::sync::OnceLock<
@@ -614,10 +621,45 @@ pub fn companion_restore_privacy_gate_status(
     ))
 }
 
+pub fn pause_companion_window_restore_after_privacy_denial() {
+    std::hint::black_box(COMPANION_WINDOW_RESTORE_PRIVACY_PAUSE_MARKER);
+
+    if let Ok(mut paused_until) = companion_window_restore_pause_lock().lock() {
+        *paused_until =
+            Some(Instant::now() + Duration::from_millis(COMPANION_WINDOW_RESTORE_PRIVACY_PAUSE_MS));
+    }
+}
+
+fn companion_window_restore_pause_lock() -> &'static Mutex<Option<Instant>> {
+    COMPANION_WINDOW_RESTORE_PAUSED_UNTIL.get_or_init(|| Mutex::new(None))
+}
+
+fn companion_window_restore_privacy_pause_active() -> bool {
+    let Ok(mut paused_until) = companion_window_restore_pause_lock().lock() else {
+        return true;
+    };
+
+    let Some(until) = *paused_until else {
+        return false;
+    };
+
+    if Instant::now() < until {
+        return true;
+    }
+
+    *paused_until = None;
+    false
+}
+
 fn restore_companion_windows_with_native_show_gate(
     app: &tauri::AppHandle,
     focus_after_restore: bool,
 ) -> OverlayProtectionStatus {
+    if companion_window_restore_privacy_pause_active() {
+        let _ = set_overlay_window_visible(app, false, true);
+        return set_companion_windows_visible(app, false, true);
+    }
+
     let protection_status = protect_overlay_window(app, true);
     let gated_status = companion_restore_privacy_gate_status(
         protection_status,
@@ -627,6 +669,7 @@ fn restore_companion_windows_with_native_show_gate(
     );
 
     if native_show_was_denied(&gated_status) {
+        pause_companion_window_restore_after_privacy_denial();
         let _ = set_overlay_window_visible(app, false, true);
         let _ = set_companion_windows_visible(app, false, true);
         return gated_status;
@@ -653,6 +696,7 @@ fn companion_focus_privacy_gate_denied(app: &tauri::AppHandle) -> bool {
     );
 
     if native_show_was_denied(&gated_status) {
+        pause_companion_window_restore_after_privacy_denial();
         let _ = set_overlay_window_visible(app, false, true);
         let _ = set_companion_windows_visible(app, false, true);
         return true;

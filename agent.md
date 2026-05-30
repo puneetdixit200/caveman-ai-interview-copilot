@@ -58,6 +58,7 @@ Make Caveman harder to expose during Google Meet, Microsoft Teams, and screen-sh
 - macOS package-smoke artifacts upload the generated DMG and privacy-shield attestation instead of the raw `.app` directory; the DMG smoke still mounts and verifies the app inside the installer before upload.
 - Signed release publishing now mirrors the package-smoke privacy gates: every Windows, macOS, and Linux signed-release lane runs native screen-share detector tests and release contracts before building, and both signed macOS DMG lanes run packaged meeting-risk smoke before uploading release artifacts.
 - Companion-window restore and focus-repair paths now re-enter the native show privacy gate before raising the dashboard after a clear check, share-risk clear, reopen, or bounds repair. This keeps repair logic from bypassing the same capture-exclusion and screen-share checks used by manual overlay show.
+- Companion-window restore now also pauses briefly after any native privacy denial or share-risk hide, so the fast repair loop cannot immediately re-show the dashboard between macOS title-scan detections.
 
 ## Verification already run locally
 
@@ -113,6 +114,12 @@ Follow-up CI hardening verification:
   - `cargo test --manifest-path src-tauri/Cargo.toml screen_share --lib` passed 59 tests.
   - `node --test scripts/verify-privacy-shield-package.test.mjs` passed 22 tests and requires the restore/focus privacy-gate markers in packaged binaries.
   - `node --test scripts/release-workflow.test.mjs` passed 40 tests.
+  - `npm run test:release` passed 147 tests.
+- Push Desktop Package Smoke run `26690740593` for `0dfa413` exposed a macOS Intel DMG meeting-risk failure: the Google Meet browser simulation stayed visible while Teams browser/native hid. The follow-up fix adds a native restore pause after privacy denial/share-risk hide.
+- Restore-pause follow-up local verification:
+  - `cargo test --manifest-path src-tauri/Cargo.toml overlay:: --lib` passed 31 tests.
+  - `cargo test --manifest-path src-tauri/Cargo.toml screen_share --lib` passed 59 tests.
+  - `node --test scripts/verify-privacy-shield-package.test.mjs scripts/release-workflow.test.mjs` passed 62 tests.
   - `npm run test:release` passed 147 tests.
 
 ## CI to check next

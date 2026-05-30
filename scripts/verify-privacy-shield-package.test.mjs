@@ -76,6 +76,11 @@ test("requires packaged companion restore privacy gate markers", () => {
       "Companion app window focus repair rechecks privacy before raising windows."
     )
   );
+  assert.ok(
+    COMMON_PRIVACY_SHIELD_MARKERS.includes(
+      "Companion app window restore stays paused after a native privacy denial."
+    )
+  );
 });
 
 test("requires packaged Teams and Google Meet WebView detector markers", () => {

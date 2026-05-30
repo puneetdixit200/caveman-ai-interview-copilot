@@ -1716,6 +1716,7 @@ fn apply_native_privacy_shield_window_update(
         }
         NativePrivacyShieldDecision::Hide { .. } => {
             std::hint::black_box(NATIVE_PRIVACY_SHIELD_REFRESHES_CAPTURE_BEFORE_SHARE_HIDE_MARKER);
+            crate::overlay::pause_companion_window_restore_after_privacy_denial();
             let _ = crate::overlay::protect_overlay_window(app, true);
             hide_app_windows_for_native_privacy_shield(app);
         }
