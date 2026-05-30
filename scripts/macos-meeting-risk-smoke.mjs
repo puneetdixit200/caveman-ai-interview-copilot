@@ -126,6 +126,30 @@ export const MACOS_PACKAGED_MEETING_RISK_SCENARIOS = [
     label: "Screen recorder window",
     executableName: "ScreenRecorderIndicator",
     windowTitle: "Screen Recorder - Active"
+  },
+  {
+    id: "window-sharing-indicator",
+    label: "Window sharing indicator",
+    executableName: "WindowSharingIndicator",
+    windowTitle: "You're sharing a window"
+  },
+  {
+    id: "screen-shared-indicator",
+    label: "Screen shared indicator",
+    executableName: "ScreenSharedIndicator",
+    windowTitle: "Your screen is being shared"
+  },
+  {
+    id: "meeting-recorded-indicator",
+    label: "Meeting recording indicator",
+    executableName: "MeetingRecordingIndicator",
+    windowTitle: "Meeting is being recorded"
+  },
+  {
+    id: "recording-progress-indicator",
+    label: "Recording in progress indicator",
+    executableName: "RecordingProgressIndicator",
+    windowTitle: "Recording in progress"
   }
 ];
 

@@ -239,6 +239,26 @@ export const WINDOWS_MEETING_RISK_SCENARIOS = [
     id: "screen-recorder",
     label: "Screen recorder window",
     windowTitle: "Screen Recorder - Active"
+  },
+  {
+    id: "window-sharing-indicator",
+    label: "Window sharing indicator",
+    windowTitle: "You're sharing a window"
+  },
+  {
+    id: "screen-shared-indicator",
+    label: "Screen shared indicator",
+    windowTitle: "Your screen is being shared"
+  },
+  {
+    id: "meeting-recorded-indicator",
+    label: "Meeting recording indicator",
+    windowTitle: "Meeting is being recorded"
+  },
+  {
+    id: "recording-progress-indicator",
+    label: "Recording in progress indicator",
+    windowTitle: "Recording in progress"
   }
 ];
 

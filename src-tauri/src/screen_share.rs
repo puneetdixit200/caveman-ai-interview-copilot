@@ -151,9 +151,15 @@ const KALTURA_WEB_CAPTURE_ORIGIN: &str = "kaltura.com";
 const SCREENITY_WEB_CAPTURE_TITLE: &str = "screenity";
 const BROWSER_YOU_ARE_SHARING_TITLE: &str = "you are sharing";
 const BROWSER_YOURE_SHARING_TITLE: &str = "you're sharing";
+const BROWSER_YOU_ARE_SHARING_A_WINDOW_TITLE: &str = "you are sharing a window";
+const BROWSER_YOU_ARE_SHARING_THIS_TAB_TITLE: &str = "you are sharing this tab";
+const BROWSER_YOURE_SHARING_A_WINDOW_TITLE: &str = "you're sharing a window";
+const BROWSER_YOURE_SHARING_YOUR_SCREEN_TITLE: &str = "you're sharing your screen";
 const BROWSER_SHARING_YOUR_SCREEN_TITLE: &str = "sharing your screen";
 const BROWSER_SHARING_YOUR_ENTIRE_SCREEN_TITLE: &str = "sharing your entire screen";
 const BROWSER_SHARING_ENTIRE_SCREEN_TITLE: &str = "sharing entire screen";
+const BROWSER_SHARING_IS_ACTIVE_TITLE: &str = "sharing is active";
+const BROWSER_SHARING_IS_PAUSED_TITLE: &str = "sharing is paused";
 const BROWSER_SHARING_THIS_TAB_TITLE: &str = "sharing this tab";
 const BROWSER_SHARING_A_BROWSER_TAB_TITLE: &str = "sharing a browser tab";
 const BROWSER_SHARING_A_CHROME_TAB_TITLE: &str = "sharing a chrome tab";
@@ -163,6 +169,9 @@ const BROWSER_THIS_TAB_IS_BEING_SHARED_TITLE: &str = "this tab is being shared";
 const BROWSER_THIS_WINDOW_IS_BEING_SHARED_TITLE: &str = "this window is being shared";
 const BROWSER_APPLICATION_WINDOW_IS_BEING_SHARED_TITLE: &str = "application window is being shared";
 const BROWSER_THIS_SCREEN_IS_BEING_SHARED_TITLE: &str = "this screen is being shared";
+const BROWSER_YOUR_SCREEN_IS_BEING_SHARED_TITLE: &str = "your screen is being shared";
+const BROWSER_YOUR_WINDOW_IS_BEING_SHARED_TITLE: &str = "your window is being shared";
+const BROWSER_YOUR_TAB_IS_BEING_SHARED_TITLE: &str = "your tab is being shared";
 const BROWSER_SCREEN_IS_BEING_SHARED_TITLE: &str = "screen is being shared";
 const BROWSER_STOP_SHARING_TITLE: &str = "stop sharing";
 const BROWSER_YOU_ARE_PRESENTING_TITLE: &str = "you are presenting";
@@ -177,6 +186,9 @@ const BROWSER_RECORDING_YOUR_SCREEN_TITLE: &str = "recording your screen";
 const BROWSER_RECORDING_SCREEN_TITLE: &str = "recording screen";
 const BROWSER_SCREEN_IS_BEING_RECORDED_TITLE: &str = "screen is being recorded";
 const BROWSER_BEING_RECORDED_TITLE: &str = "being recorded";
+const BROWSER_MEETING_IS_BEING_RECORDED_TITLE: &str = "meeting is being recorded";
+const BROWSER_CALL_IS_BEING_RECORDED_TITLE: &str = "call is being recorded";
+const BROWSER_RECORDING_IN_PROGRESS_TITLE: &str = "recording in progress";
 const BROWSER_SCREEN_SHARING_TITLE: &str = "screen sharing";
 const BROWSER_SCREEN_SHARE_TITLE: &str = "screen share";
 const BROWSER_SCREEN_RECORDER_TITLE: &str = "screen recorder";
@@ -313,9 +325,15 @@ const PACKAGE_PRIVACY_SHIELD_WEBVIEW_MARKERS: &[&str] = &[
     "clipchamp.exe",
     BROWSER_YOU_ARE_SHARING_TITLE,
     BROWSER_YOURE_SHARING_TITLE,
+    BROWSER_YOU_ARE_SHARING_A_WINDOW_TITLE,
+    BROWSER_YOU_ARE_SHARING_THIS_TAB_TITLE,
+    BROWSER_YOURE_SHARING_A_WINDOW_TITLE,
+    BROWSER_YOURE_SHARING_YOUR_SCREEN_TITLE,
     BROWSER_SHARING_YOUR_SCREEN_TITLE,
     BROWSER_SHARING_YOUR_ENTIRE_SCREEN_TITLE,
     BROWSER_SHARING_ENTIRE_SCREEN_TITLE,
+    BROWSER_SHARING_IS_ACTIVE_TITLE,
+    BROWSER_SHARING_IS_PAUSED_TITLE,
     BROWSER_SHARING_THIS_TAB_TITLE,
     BROWSER_SHARING_A_BROWSER_TAB_TITLE,
     BROWSER_SHARING_A_CHROME_TAB_TITLE,
@@ -325,6 +343,9 @@ const PACKAGE_PRIVACY_SHIELD_WEBVIEW_MARKERS: &[&str] = &[
     BROWSER_THIS_WINDOW_IS_BEING_SHARED_TITLE,
     BROWSER_APPLICATION_WINDOW_IS_BEING_SHARED_TITLE,
     BROWSER_THIS_SCREEN_IS_BEING_SHARED_TITLE,
+    BROWSER_YOUR_SCREEN_IS_BEING_SHARED_TITLE,
+    BROWSER_YOUR_WINDOW_IS_BEING_SHARED_TITLE,
+    BROWSER_YOUR_TAB_IS_BEING_SHARED_TITLE,
     BROWSER_SCREEN_IS_BEING_SHARED_TITLE,
     BROWSER_STOP_SHARING_TITLE,
     BROWSER_YOU_ARE_PRESENTING_TITLE,
@@ -339,6 +360,9 @@ const PACKAGE_PRIVACY_SHIELD_WEBVIEW_MARKERS: &[&str] = &[
     BROWSER_RECORDING_SCREEN_TITLE,
     BROWSER_SCREEN_IS_BEING_RECORDED_TITLE,
     BROWSER_BEING_RECORDED_TITLE,
+    BROWSER_MEETING_IS_BEING_RECORDED_TITLE,
+    BROWSER_CALL_IS_BEING_RECORDED_TITLE,
+    BROWSER_RECORDING_IN_PROGRESS_TITLE,
     BROWSER_SCREEN_SHARING_TITLE,
     BROWSER_SCREEN_SHARE_TITLE,
     BROWSER_SCREEN_RECORDER_TITLE,
@@ -710,9 +734,15 @@ const WATCHED_SCREEN_SHARE_TITLES: &[&str] = &[
     "screen share",
     BROWSER_YOU_ARE_SHARING_TITLE,
     BROWSER_YOURE_SHARING_TITLE,
+    BROWSER_YOU_ARE_SHARING_A_WINDOW_TITLE,
+    BROWSER_YOU_ARE_SHARING_THIS_TAB_TITLE,
+    BROWSER_YOURE_SHARING_A_WINDOW_TITLE,
+    BROWSER_YOURE_SHARING_YOUR_SCREEN_TITLE,
     BROWSER_SHARING_YOUR_SCREEN_TITLE,
     BROWSER_SHARING_YOUR_ENTIRE_SCREEN_TITLE,
     BROWSER_SHARING_ENTIRE_SCREEN_TITLE,
+    BROWSER_SHARING_IS_ACTIVE_TITLE,
+    BROWSER_SHARING_IS_PAUSED_TITLE,
     BROWSER_SHARING_THIS_TAB_TITLE,
     BROWSER_SHARING_A_BROWSER_TAB_TITLE,
     BROWSER_SHARING_A_CHROME_TAB_TITLE,
@@ -722,6 +752,9 @@ const WATCHED_SCREEN_SHARE_TITLES: &[&str] = &[
     BROWSER_THIS_WINDOW_IS_BEING_SHARED_TITLE,
     BROWSER_APPLICATION_WINDOW_IS_BEING_SHARED_TITLE,
     BROWSER_THIS_SCREEN_IS_BEING_SHARED_TITLE,
+    BROWSER_YOUR_SCREEN_IS_BEING_SHARED_TITLE,
+    BROWSER_YOUR_WINDOW_IS_BEING_SHARED_TITLE,
+    BROWSER_YOUR_TAB_IS_BEING_SHARED_TITLE,
     BROWSER_SCREEN_IS_BEING_SHARED_TITLE,
     BROWSER_STOP_SHARING_TITLE,
     BROWSER_YOU_ARE_PRESENTING_TITLE,
@@ -736,6 +769,9 @@ const WATCHED_SCREEN_SHARE_TITLES: &[&str] = &[
     BROWSER_RECORDING_SCREEN_TITLE,
     BROWSER_SCREEN_IS_BEING_RECORDED_TITLE,
     BROWSER_BEING_RECORDED_TITLE,
+    BROWSER_MEETING_IS_BEING_RECORDED_TITLE,
+    BROWSER_CALL_IS_BEING_RECORDED_TITLE,
+    BROWSER_RECORDING_IN_PROGRESS_TITLE,
     BROWSER_SCREEN_SHARING_TITLE,
     BROWSER_SCREEN_SHARE_TITLE,
     BROWSER_SCREEN_RECORDER_TITLE,
@@ -1843,9 +1879,15 @@ fn is_strong_screen_share_window_title(title: Option<&str>) -> bool {
     let active_share_titles = [
         BROWSER_YOU_ARE_SHARING_TITLE,
         BROWSER_YOURE_SHARING_TITLE,
+        BROWSER_YOU_ARE_SHARING_A_WINDOW_TITLE,
+        BROWSER_YOU_ARE_SHARING_THIS_TAB_TITLE,
+        BROWSER_YOURE_SHARING_A_WINDOW_TITLE,
+        BROWSER_YOURE_SHARING_YOUR_SCREEN_TITLE,
         BROWSER_SHARING_YOUR_SCREEN_TITLE,
         BROWSER_SHARING_YOUR_ENTIRE_SCREEN_TITLE,
         BROWSER_SHARING_ENTIRE_SCREEN_TITLE,
+        BROWSER_SHARING_IS_ACTIVE_TITLE,
+        BROWSER_SHARING_IS_PAUSED_TITLE,
         BROWSER_SHARING_THIS_TAB_TITLE,
         BROWSER_SHARING_A_BROWSER_TAB_TITLE,
         BROWSER_SHARING_A_CHROME_TAB_TITLE,
@@ -1855,6 +1897,9 @@ fn is_strong_screen_share_window_title(title: Option<&str>) -> bool {
         BROWSER_THIS_WINDOW_IS_BEING_SHARED_TITLE,
         BROWSER_APPLICATION_WINDOW_IS_BEING_SHARED_TITLE,
         BROWSER_THIS_SCREEN_IS_BEING_SHARED_TITLE,
+        BROWSER_YOUR_SCREEN_IS_BEING_SHARED_TITLE,
+        BROWSER_YOUR_WINDOW_IS_BEING_SHARED_TITLE,
+        BROWSER_YOUR_TAB_IS_BEING_SHARED_TITLE,
         BROWSER_SCREEN_IS_BEING_SHARED_TITLE,
         BROWSER_STOP_SHARING_TITLE,
         BROWSER_YOU_ARE_PRESENTING_TITLE,
@@ -1869,6 +1914,9 @@ fn is_strong_screen_share_window_title(title: Option<&str>) -> bool {
         BROWSER_RECORDING_SCREEN_TITLE,
         BROWSER_SCREEN_IS_BEING_RECORDED_TITLE,
         BROWSER_BEING_RECORDED_TITLE,
+        BROWSER_MEETING_IS_BEING_RECORDED_TITLE,
+        BROWSER_CALL_IS_BEING_RECORDED_TITLE,
+        BROWSER_RECORDING_IN_PROGRESS_TITLE,
         BROWSER_SCREEN_SHARING_TITLE,
         BROWSER_SCREEN_SHARE_TITLE,
         BROWSER_SCREEN_RECORDER_TITLE,
@@ -2467,10 +2515,15 @@ mod tests {
     fn recognizes_browser_sharing_state_titles() {
         for title in [
             "You are sharing your screen",
+            "You are sharing a window",
+            "You are sharing this tab",
             "You're sharing a window",
+            "You're sharing your screen",
             "Sharing your screen",
             "Sharing your entire screen",
             "Sharing entire screen",
+            "Sharing is active",
+            "Sharing is paused",
             "Sharing this tab",
             "Sharing a browser tab",
             "Sharing a Chrome tab",
@@ -2481,6 +2534,8 @@ mod tests {
             "Application window is being shared",
             "This screen is being shared",
             "Your screen is being shared",
+            "Your window is being shared",
+            "Your tab is being shared",
             "Stop sharing - Google Meet",
             "You are presenting your screen",
             "You're presenting a window",
@@ -2495,6 +2550,8 @@ mod tests {
             "Recording screen",
             "Your screen is being recorded",
             "Meeting is being recorded",
+            "Call is being recorded",
+            "Recording in progress",
             "Screen sharing - Browser",
             "Screen share: active session",
             "Screen recorder - active",
@@ -2625,9 +2682,15 @@ mod tests {
                 "clipchamp.exe",
                 BROWSER_YOU_ARE_SHARING_TITLE,
                 BROWSER_YOURE_SHARING_TITLE,
+                BROWSER_YOU_ARE_SHARING_A_WINDOW_TITLE,
+                BROWSER_YOU_ARE_SHARING_THIS_TAB_TITLE,
+                BROWSER_YOURE_SHARING_A_WINDOW_TITLE,
+                BROWSER_YOURE_SHARING_YOUR_SCREEN_TITLE,
                 BROWSER_SHARING_YOUR_SCREEN_TITLE,
                 BROWSER_SHARING_YOUR_ENTIRE_SCREEN_TITLE,
                 BROWSER_SHARING_ENTIRE_SCREEN_TITLE,
+                BROWSER_SHARING_IS_ACTIVE_TITLE,
+                BROWSER_SHARING_IS_PAUSED_TITLE,
                 BROWSER_SHARING_THIS_TAB_TITLE,
                 BROWSER_SHARING_A_BROWSER_TAB_TITLE,
                 BROWSER_SHARING_A_CHROME_TAB_TITLE,
@@ -2637,6 +2700,9 @@ mod tests {
                 BROWSER_THIS_WINDOW_IS_BEING_SHARED_TITLE,
                 BROWSER_APPLICATION_WINDOW_IS_BEING_SHARED_TITLE,
                 BROWSER_THIS_SCREEN_IS_BEING_SHARED_TITLE,
+                BROWSER_YOUR_SCREEN_IS_BEING_SHARED_TITLE,
+                BROWSER_YOUR_WINDOW_IS_BEING_SHARED_TITLE,
+                BROWSER_YOUR_TAB_IS_BEING_SHARED_TITLE,
                 BROWSER_SCREEN_IS_BEING_SHARED_TITLE,
                 BROWSER_STOP_SHARING_TITLE,
                 BROWSER_YOU_ARE_PRESENTING_TITLE,
@@ -2651,6 +2717,9 @@ mod tests {
                 BROWSER_RECORDING_SCREEN_TITLE,
                 BROWSER_SCREEN_IS_BEING_RECORDED_TITLE,
                 BROWSER_BEING_RECORDED_TITLE,
+                BROWSER_MEETING_IS_BEING_RECORDED_TITLE,
+                BROWSER_CALL_IS_BEING_RECORDED_TITLE,
+                BROWSER_RECORDING_IN_PROGRESS_TITLE,
                 BROWSER_SCREEN_SHARING_TITLE,
                 BROWSER_SCREEN_SHARE_TITLE,
                 BROWSER_SCREEN_RECORDER_TITLE,
@@ -2846,6 +2915,55 @@ mod tests {
                 ("slack-huddle", Some("Slack Huddle - Candidate")),
                 ("discord-call", Some("Discord Voice - Candidate")),
                 ("remote-session", Some("Remote Desktop - Session")),
+            ]
+        );
+    }
+
+    #[test]
+    fn detects_strong_active_share_indicator_variants_from_unclassified_visible_apps() {
+        let status = screen_share_status_for_processes(vec![
+            ScreenShareProcess {
+                name: "window-share-indicator".to_string(),
+                pid: Some(791),
+                window_title: Some("You're sharing a window".to_string()),
+            },
+            ScreenShareProcess {
+                name: "screen-share-indicator".to_string(),
+                pid: Some(792),
+                window_title: Some("Your screen is being shared".to_string()),
+            },
+            ScreenShareProcess {
+                name: "recording-indicator".to_string(),
+                pid: Some(793),
+                window_title: Some("Meeting is being recorded".to_string()),
+            },
+            ScreenShareProcess {
+                name: "call-recording-indicator".to_string(),
+                pid: Some(794),
+                window_title: Some("Recording in progress".to_string()),
+            },
+            ScreenShareProcess {
+                name: "notes".to_string(),
+                pid: Some(795),
+                window_title: Some("You're sharing window layout notes".to_string()),
+            },
+        ]);
+
+        assert!(status.active);
+        assert_eq!(
+            status
+                .matched_processes
+                .iter()
+                .map(|process| (process.name.as_str(), process.window_title.as_deref()))
+                .collect::<Vec<_>>(),
+            vec![
+                ("window-share-indicator", Some("You're sharing a window")),
+                (
+                    "screen-share-indicator",
+                    Some("Your screen is being shared")
+                ),
+                ("recording-indicator", Some("Meeting is being recorded")),
+                ("call-recording-indicator", Some("Recording in progress")),
             ]
         );
     }

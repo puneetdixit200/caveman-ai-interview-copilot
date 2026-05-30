@@ -46,7 +46,11 @@ test("summarizes simulated meeting risk hide and restore states", () => {
         { label: "Discord voice window", hiddenDuringRisk: true },
         { label: "WhatsApp video call window", hiddenDuringRisk: true },
         { label: "Remote desktop window", hiddenDuringRisk: true },
-        { label: "Screen recorder window", hiddenDuringRisk: true }
+        { label: "Screen recorder window", hiddenDuringRisk: true },
+        { label: "Window sharing indicator", hiddenDuringRisk: true },
+        { label: "Screen shared indicator", hiddenDuringRisk: true },
+        { label: "Meeting recording indicator", hiddenDuringRisk: true },
+        { label: "Recording in progress indicator", hiddenDuringRisk: true }
       ],
       restoredWindow: WINDOW
     }).status,
@@ -82,7 +86,11 @@ test("summarizes simulated meeting risk hide and restore states", () => {
         { label: "Discord voice window", hiddenDuringRisk: true },
         { label: "WhatsApp video call window", hiddenDuringRisk: true },
         { label: "Remote desktop window", hiddenDuringRisk: true },
-        { label: "Screen recorder window", hiddenDuringRisk: true }
+        { label: "Screen recorder window", hiddenDuringRisk: true },
+        { label: "Window sharing indicator", hiddenDuringRisk: true },
+        { label: "Screen shared indicator", hiddenDuringRisk: true },
+        { label: "Meeting recording indicator", hiddenDuringRisk: true },
+        { label: "Recording in progress indicator", hiddenDuringRisk: true }
       ],
       restoredWindow: null,
       requireRestore: false
@@ -128,7 +136,11 @@ test("keeps simulated meeting windows alive long enough for macOS title scans", 
       "Discord Voice - Candidate",
       "WhatsApp Video Call - Candidate",
       "Remote Desktop - Session",
-      "Screen Recorder - Active"
+      "Screen Recorder - Active",
+      "You're sharing a window",
+      "Your screen is being shared",
+      "Meeting is being recorded",
+      "Recording in progress"
     ]
   );
 });
