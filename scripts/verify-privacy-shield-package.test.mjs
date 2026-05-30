@@ -59,6 +59,7 @@ test("requires packaged WebView privacy command timeout marker", () => {
 test("requires packaged Teams and Google Meet WebView detector markers", () => {
   assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("msedgewebview2.exe"));
   assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("msedge_proxy.exe"));
+  assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("applicationframehost.exe"));
   assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("chrome_proxy.exe"));
   assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("brave_proxy.exe"));
   assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("opera_proxy.exe"));

@@ -8,10 +8,13 @@ Make Caveman harder to expose during Google Meet, Microsoft Teams, and screen-sh
 
 - Branch: `main`
 - Remote: `origin/main`
-- Latest pushed implementation commit before this handoff refresh: `c7569f5 ci: verify macos privacy shield on push`
+- Latest pushed implementation commit before this handoff refresh: `99d33cc test: let meeting smoke clear naturally`
 - This handoff file is being kept current as the screen-share hardening work continues.
 - Previous relevant commits:
   - `c7569f5 ci: verify macos privacy shield on push`
+  - `99d33cc test: let meeting smoke clear naturally`
+  - `3c8f89b test: allow slower macos meeting restore`
+  - `1a5b4bf test: run meeting risk smoke from dmg`
   - `9567b34 test: verify privacy shield installers`
   - `766e838 docs: add next agent handoff`
   - `85fb051 test: add macos meeting risk smoke`
@@ -33,6 +36,7 @@ Make Caveman harder to expose during Google Meet, Microsoft Teams, and screen-sh
 - It verifies Caveman starts protected, hides while simulated meeting/share-risk windows are visible, then restores as a protected onscreen window after risk clears.
 - The package smoke workflow now runs both macOS DMG privacy-shield verifier lanes on every push to `main`, not only on manual workflow dispatch, so normal pushes exercise EXE and DMG privacy shield packaging.
 - The macOS meeting-risk smoke can launch a specific `Caveman.app` path. Package smoke mounts the generated DMG and verifies the app inside the mounted installer is protected and hidden during simulated Google Meet/Teams windows; the installed-app smoke still verifies hide and restore.
+- The package privacy-shield attestation now also requires the Windows `applicationframehost.exe` marker, matching the runtime detector path for Store/WebView-hosted Google Meet and Teams windows.
 
 ## Verification already run locally
 

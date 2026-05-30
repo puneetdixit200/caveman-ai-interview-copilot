@@ -55,6 +55,7 @@ export const COMMON_PRIVACY_SHIELD_MARKERS = [
   "Native privacy shield denied active-window typing because capture exclusion was not proven.",
   "msedgewebview2.exe",
   "msedge_proxy.exe",
+  "applicationframehost.exe",
   "chrome_proxy.exe",
   "brave_proxy.exe",
   "opera_proxy.exe",

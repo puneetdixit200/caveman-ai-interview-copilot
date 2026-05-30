@@ -70,6 +70,7 @@ pub const SCREEN_SHARE_GUARD_COMMAND_TIMEOUT_MARKER: &str =
     "Screen-share guard command timeout failed closed before privacy polling could stall.";
 const EDGE_WEBVIEW_HOST_PROCESS: &str = "msedgewebview2.exe";
 const EDGE_PWA_HOST_PROCESS: &str = "msedge_proxy.exe";
+const APPLICATION_FRAME_HOST_PROCESS: &str = "applicationframehost.exe";
 const CHROME_PWA_HOST_PROCESS: &str = "chrome_proxy.exe";
 const BRAVE_PWA_HOST_PROCESS: &str = "brave_proxy.exe";
 const OPERA_PWA_HOST_PROCESS: &str = "opera_proxy.exe";
@@ -205,6 +206,7 @@ return serializedRows
 const PACKAGE_PRIVACY_SHIELD_WEBVIEW_MARKERS: &[&str] = &[
     EDGE_WEBVIEW_HOST_PROCESS,
     EDGE_PWA_HOST_PROCESS,
+    APPLICATION_FRAME_HOST_PROCESS,
     CHROME_PWA_HOST_PROCESS,
     BRAVE_PWA_HOST_PROCESS,
     OPERA_PWA_HOST_PROCESS,
@@ -615,7 +617,7 @@ const WATCHED_SCREEN_SHARE_TITLES: &[&str] = &[
 const SCREEN_SHARE_TITLE_HOST_PROCESSES: &[&str] = &[
     EDGE_WEBVIEW_HOST_PROCESS,
     EDGE_PWA_HOST_PROCESS,
-    "applicationframehost.exe",
+    APPLICATION_FRAME_HOST_PROCESS,
     CHROME_PWA_HOST_PROCESS,
     BRAVE_PWA_HOST_PROCESS,
     OPERA_PWA_HOST_PROCESS,
