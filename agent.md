@@ -102,6 +102,11 @@ Follow-up CI hardening verification:
 - Signed-release privacy gate follow-up verification:
   - `node --test scripts/release-workflow.test.mjs` passed 40 tests after adding native detector tests and signed macOS DMG meeting-risk smoke gates to `.github/workflows/release.yml`.
   - `npm run test:release` passed 146 tests with the signed-release privacy gates.
+- Push Desktop Package Smoke run `26689860308` for `fd56ed8` passed all lanes after the signed-release privacy gate hardening:
+  - Windows installers: native privacy tests, release contracts, package build, sidecar verification, packaged privacy shield, and artifact upload passed.
+  - macOS Intel app/DMG: native privacy tests, release contracts, package build, sidecar verification, packaged privacy shield, packaged meeting-risk smoke, and DMG artifact upload passed.
+  - macOS Apple Silicon app/DMG: native privacy tests, release contracts, package build, sidecar verification, packaged privacy shield, packaged meeting-risk smoke, and DMG artifact upload passed.
+  - Linux AppImage/DEB: native privacy tests, release contracts, package build, sidecar verification, packaged privacy shield, and artifact upload passed.
 
 ## CI to check next
 
@@ -111,7 +116,7 @@ List recent runs with:
 gh run list --repo puneetdixit200/caveman-ai-interview-copilot --branch main --limit 5 --json databaseId,workflowName,headSha,status,conclusion,createdAt,url
 ```
 
-Latest verified package-smoke run before this handoff refresh: `26689263325` for `3c1245b`, green in all lanes. If the signed-release workflow gate commit has just been pushed, verify the next Desktop Package Smoke run because package smoke executes the release workflow contract tests.
+Latest verified package-smoke run before this handoff refresh: `26689860308` for `fd56ed8`, green in all lanes. This run verified that package smoke executes the release workflow contract tests after signed-release gate hardening.
 
 ## Suggested next steps
 
