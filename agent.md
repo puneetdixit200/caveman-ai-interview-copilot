@@ -121,6 +121,11 @@ Follow-up CI hardening verification:
   - `cargo test --manifest-path src-tauri/Cargo.toml screen_share --lib` passed 59 tests.
   - `node --test scripts/verify-privacy-shield-package.test.mjs scripts/release-workflow.test.mjs` passed 62 tests.
   - `npm run test:release` passed 147 tests.
+- Push Desktop Package Smoke run `26691306277` for `578be59` passed all lanes after the restore-pause fix:
+  - macOS Intel app/DMG: native privacy tests, release contracts, package build, sidecar verification, packaged privacy shield, packaged meeting-risk smoke, and DMG artifact upload passed.
+  - macOS Apple Silicon app/DMG: native privacy tests, release contracts, package build, sidecar verification, packaged privacy shield, packaged meeting-risk smoke, and DMG artifact upload passed.
+  - Windows installers: native privacy tests, release contracts, package build, sidecar verification, packaged privacy shield, and artifact upload passed.
+  - Linux AppImage/DEB: native privacy tests, release contracts, package build, sidecar verification, packaged privacy shield, and artifact upload passed.
 
 ## CI to check next
 
@@ -130,7 +135,7 @@ List recent runs with:
 gh run list --repo puneetdixit200/caveman-ai-interview-copilot --branch main --limit 5 --json databaseId,workflowName,headSha,status,conclusion,createdAt,url
 ```
 
-Latest verified package-smoke run before this handoff refresh: `26689860308` for `fd56ed8`, green in all lanes. This run verified that package smoke executes the release workflow contract tests after signed-release gate hardening.
+Latest verified package-smoke run before this handoff refresh: `26691306277` for `578be59`, green in all lanes. This run verified the restore/focus native show gate and restore-pause fix, including the macOS Intel DMG meeting-risk smoke.
 
 ## Suggested next steps
 
