@@ -200,6 +200,14 @@ describe("Dashboard collaboration helper", () => {
     );
   });
 
+  it("does not enumerate audio devices on dashboard startup before explicit audio action", async () => {
+    render(<Dashboard />);
+
+    expect(await screen.findByText("Live Interview Session")).toBeInTheDocument();
+    expect(tauri.getCaptureStatus).toHaveBeenCalled();
+    expect(tauri.listAudioDevices).not.toHaveBeenCalled();
+  });
+
   it("starts a new live session with real interview metadata", async () => {
     vi.mocked(tauri.createSession).mockResolvedValueOnce({
       id: "s2",

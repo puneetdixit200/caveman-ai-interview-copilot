@@ -188,6 +188,14 @@ test("dashboard waits for repeated clear checks before restoring after share ris
   assert.match(dashboardTsx, /const PRIVACY_SHIELD_INTERVAL_MS = 500;/);
   assert.match(privacyShieldTimeoutTs, /Native privacy shield WebView command timeout failed closed before overlay visibility could drift\./);
   assert.match(dashboardTsx, /Overlay kept hidden until screen-share guard stays clear for repeated checks\./);
+  assert.match(
+    dashboardTsx,
+    /Startup privacy shield defers macOS microphone device enumeration until explicit user audio action\./
+  );
+  assert.ok(
+    !dashboardTsx.includes("listAudioDevices"),
+    "dashboard startup must not enumerate microphone devices before explicit user audio action"
+  );
   assert.match(overlaySafetyTs, /PRIVACY_SHIELD_RESTORE_CLEAR_CHECKS\s*=\s*2/);
   assert.notEqual(riskIndex, -1, "screen-share risk path must remember recent privacy risk");
   assert.notEqual(clearIncrementIndex, -1, "clear path must count consecutive clear checks");

@@ -453,6 +453,11 @@ test("requires packaged protection refresh fail-closed marker", () => {
       "Overlay kept hidden until screen-share guard stays clear for repeated checks."
     )
   );
+  assert.ok(
+    FRONTEND_PRIVACY_SHIELD_MARKERS.includes(
+      "Startup privacy shield defers macOS microphone device enumeration until explicit user audio action."
+    )
+  );
 });
 
 test("reports missing packaged native privacy markers", () => {

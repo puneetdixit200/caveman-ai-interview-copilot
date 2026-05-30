@@ -46,7 +46,6 @@ import {
   getCollaborationStatus,
   getSetting,
   isRunningInTauri,
-  listAudioDevices,
   listAiResponses,
   listCollaborationHints,
   listSessions,
@@ -119,6 +118,8 @@ const INTERVIEW_TYPE_OPTIONS: Array<{ id: InterviewType; label: string }> = [
 const PRIVACY_SHIELD_INTERVAL_MS = 500;
 const PRIVACY_SHIELD_WAIT_FOR_STABLE_CLEAR_MESSAGE =
   "Overlay kept hidden until screen-share guard stays clear for repeated checks.";
+export const STARTUP_AUDIO_DEVICE_ENUMERATION_PRIVACY_MARKER =
+  "Startup privacy shield defers macOS microphone device enumeration until explicit user audio action.";
 
 export function Dashboard() {
   const [running, setRunning] = useState(false);
@@ -276,9 +277,8 @@ export function Dashboard() {
         ]);
         const storedConfig = parseAppConfig(rawConfig);
         const hydratedConfig = await hydrateProviderApiKeys(storedConfig);
-        const [sessions, devices, status, collaboration] = await Promise.all([
+        const [sessions, status, collaboration] = await Promise.all([
           listSessions(),
-          listAudioDevices(),
           getCaptureStatus(),
           getCollaborationStatus()
         ]);
@@ -304,7 +304,6 @@ export function Dashboard() {
         await setOverlayWindowBounds(hydratedConfig.overlay.bounds, hydratedConfig.security.captureExclusionEnabled);
         setKnowledgeBase(parseKnowledgeBase(rawKnowledgeBase));
         setPluginCatalog(parsePluginCatalog(rawPluginCatalog));
-        setAudioDevices(devices);
         setCaptureStatus(status);
         setCollaborationStatus(collaboration);
         setRunning(status.running);
@@ -1278,7 +1277,7 @@ export function Dashboard() {
   };
 
   return (
-    <main className="dashboard-grid">
+    <main className="dashboard-grid" data-privacy-marker={STARTUP_AUDIO_DEVICE_ENUMERATION_PRIVACY_MARKER}>
       <section className="panel command-panel">
         <div className="session-title">
           <p className="eyebrow">Active Session</p>

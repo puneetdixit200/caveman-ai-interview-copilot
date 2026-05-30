@@ -151,7 +151,8 @@ export const COMMON_PRIVACY_SHIELD_MARKERS = [
 
 export const FRONTEND_PRIVACY_SHIELD_MARKERS = [
   "Native privacy shield WebView command timeout failed closed before overlay visibility could drift.",
-  "Overlay kept hidden until screen-share guard stays clear for repeated checks."
+  "Overlay kept hidden until screen-share guard stays clear for repeated checks.",
+  "Startup privacy shield defers macOS microphone device enumeration until explicit user audio action."
 ];
 
 export const DESKTOP_PROCESS_PRIVACY_SHIELD_MARKERS = [
