@@ -255,7 +255,7 @@ test("startup setup hides app windows when native privacy cannot be proven", asy
 
 test("startup refuses to run when the native privacy shield thread cannot start", async () => {
   const libRs = await readFile("src-tauri/src/lib.rs", "utf8");
-  const screenShareRs = await readFile("src-tauri/src/screen_share.rs", "utf8");
+  const screenShareRs = normalizeLineEndings(await readFile("src-tauri/src/screen_share.rs", "utf8"));
   const setupStart = libRs.indexOf(".setup(|app|");
   const setupEnd = libRs.indexOf(".invoke_handler", setupStart);
   const setupBody = libRs.slice(setupStart, setupEnd);
