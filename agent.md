@@ -52,7 +52,7 @@ Make Caveman harder to expose during Google Meet, Microsoft Teams, and screen-sh
 - Windows visible browser/PWA windows now fail closed when the native title cannot be read, matching the existing macOS redacted-title behavior for supported OS-level detection.
 - Windows native privacy polling now checks visible browser/PWA titles with `EnumWindows` before falling back to slower `tasklist`, so already-visible Meet/Teams/share UI can hide Caveman sooner.
 - Windows screen-share detection now uses supported ToolHelp process enumeration before `tasklist`, so known meeting, recorder, and remote-support processes can trigger hide without waiting for shell process listing.
-- Release-contract tests normalize Windows CRLF checkouts before asserting detector ordering, so package-smoke Windows jobs can validate the ToolHelp-before-`tasklist` contract.
+- Release-contract tests normalize Windows CRLF checkouts before asserting detector ordering, including the native shield contract test that checks ToolHelp before `tasklist`.
 
 ## Verification already run locally
 

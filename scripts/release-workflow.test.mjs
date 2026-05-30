@@ -277,7 +277,7 @@ test("startup refuses to run when the native privacy shield thread cannot start"
 });
 
 test("native privacy shield refreshes capture protection before share-risk hide", async () => {
-  const screenShareRs = await readFile("src-tauri/src/screen_share.rs", "utf8");
+  const screenShareRs = normalizeLineEndings(await readFile("src-tauri/src/screen_share.rs", "utf8"));
   const shieldStart = screenShareRs.indexOf("pub fn start_native_privacy_shield(app: tauri::AppHandle)");
   const shieldEnd = screenShareRs.indexOf("pub fn native_privacy_shield_thread_start_error_message", shieldStart);
   const shieldBody = screenShareRs.slice(shieldStart, shieldEnd);
