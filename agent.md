@@ -143,6 +143,11 @@ Follow-up CI hardening verification:
   - `cargo test --manifest-path src-tauri/Cargo.toml overlay:: --lib` passed 33 tests.
   - `node --test scripts/verify-privacy-shield-package.test.mjs scripts/release-workflow.test.mjs` passed 63 tests and requires the strong-title marker in packaged binaries.
   - `npm run test:release` passed 148 tests.
+- Push Desktop Package Smoke run `26692539422` for `7b3bd8b` passed all lanes after the strong-title fallback:
+  - Windows installers: native privacy tests, release contracts, package build, sidecar verification, packaged privacy shield, and artifact upload passed.
+  - macOS Intel app/DMG: native privacy tests, release contracts, package build, sidecar verification, packaged privacy shield, packaged meeting-risk smoke, and DMG artifact upload passed.
+  - macOS Apple Silicon app/DMG: native privacy tests, release contracts, package build, sidecar verification, packaged privacy shield, packaged meeting-risk smoke, and DMG artifact upload passed.
+  - Linux AppImage/DEB: native privacy tests, release contracts, package build, sidecar verification, packaged privacy shield, and artifact upload passed.
 
 ## CI to check next
 
@@ -152,7 +157,7 @@ List recent runs with:
 gh run list --repo puneetdixit200/caveman-ai-interview-copilot --branch main --limit 5 --json databaseId,workflowName,headSha,status,conclusion,createdAt,url
 ```
 
-Latest verified package-smoke run before this handoff refresh: `26691306277` for `578be59`, green in all lanes. This run verified the restore/focus native show gate and restore-pause fix, including the macOS Intel DMG meeting-risk smoke.
+Latest verified package-smoke run before this handoff refresh: `26692539422` for `7b3bd8b`, green in all lanes. This run verified the focus-repair post-show recheck and strong native Teams title fallback, including the macOS Intel DMG meeting-risk smoke.
 
 ## Suggested next steps
 
