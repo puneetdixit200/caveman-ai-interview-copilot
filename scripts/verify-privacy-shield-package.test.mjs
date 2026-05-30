@@ -372,6 +372,11 @@ test("requires packaged protection refresh fail-closed marker", () => {
   );
   assert.ok(
     MACOS_NATIVE_PRIVACY_SHIELD_MARKERS.includes(
+      "Native privacy shield scans macOS CoreGraphics visible window titles every 250ms for browser Meet and Teams risk."
+    )
+  );
+  assert.ok(
+    MACOS_NATIVE_PRIVACY_SHIELD_MARKERS.includes(
       "macOS CoreGraphics title guard hides when a visible browser window title is unavailable."
     )
   );

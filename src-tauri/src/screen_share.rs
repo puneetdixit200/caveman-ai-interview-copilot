@@ -32,9 +32,13 @@ const SCREEN_SHARE_GUARD_COMMAND_TIMEOUT: Duration = Duration::from_millis(1_500
 const MACOS_WINDOW_TITLE_GUARD_COMMAND_TIMEOUT: Duration = Duration::from_millis(750);
 #[cfg(target_os = "macos")]
 const MACOS_WINDOW_TITLE_PRIVACY_SCAN_INTERVAL: Duration = Duration::from_millis(5_000);
+#[cfg(target_os = "macos")]
+const MACOS_CORE_GRAPHICS_TITLE_PRIVACY_SCAN_INTERVAL: Duration = Duration::from_millis(250);
 static NATIVE_PRIVACY_SHIELD_SHARE_RISK_ACTIVE: AtomicBool = AtomicBool::new(false);
 #[cfg(target_os = "macos")]
 static MACOS_WINDOW_TITLE_PRIVACY_RISK_ACTIVE: AtomicBool = AtomicBool::new(false);
+#[cfg(target_os = "macos")]
+static MACOS_CORE_GRAPHICS_TITLE_PRIVACY_RISK_ACTIVE: AtomicBool = AtomicBool::new(false);
 pub const NATIVE_PRIVACY_SHIELD_THREAD_START_FAILED_MARKER: &str =
     "Native privacy shield thread failed to start; refusing to run without fail-closed screen-share guard.";
 pub const NATIVE_PRIVACY_SHIELD_STARTS_BEFORE_INITIAL_SHOW_MARKER: &str =
@@ -57,6 +61,9 @@ pub const NATIVE_PRIVACY_SHIELD_MACOS_WINDOW_TITLE_BACKGROUND_SCAN_MARKER: &str 
 #[cfg(target_os = "macos")]
 pub const NATIVE_PRIVACY_SHIELD_MACOS_CORE_GRAPHICS_TITLE_GATE_MARKER: &str =
     "Native privacy shield checks macOS CoreGraphics visible window titles before app windows can show.";
+#[cfg(target_os = "macos")]
+pub const NATIVE_PRIVACY_SHIELD_MACOS_CORE_GRAPHICS_TITLE_FAST_SCAN_MARKER: &str =
+    "Native privacy shield scans macOS CoreGraphics visible window titles every 250ms for browser Meet and Teams risk.";
 #[cfg(target_os = "macos")]
 pub const NATIVE_PRIVACY_SHIELD_MACOS_REDACTED_BROWSER_TITLE_MARKER: &str =
     "macOS CoreGraphics title guard hides when a visible browser window title is unavailable.";
@@ -303,6 +310,8 @@ const PACKAGE_PRIVACY_SHIELD_WEBVIEW_MARKERS: &[&str] = &[
     MACOS_WINDOW_TITLE_SHORT_TIMEOUT_MARKER,
     #[cfg(target_os = "macos")]
     NATIVE_PRIVACY_SHIELD_MACOS_CORE_GRAPHICS_TITLE_GATE_MARKER,
+    #[cfg(target_os = "macos")]
+    NATIVE_PRIVACY_SHIELD_MACOS_CORE_GRAPHICS_TITLE_FAST_SCAN_MARKER,
     #[cfg(target_os = "macos")]
     NATIVE_PRIVACY_SHIELD_MACOS_REDACTED_BROWSER_TITLE_MARKER,
 ];
@@ -915,6 +924,8 @@ pub fn start_native_privacy_shield(app: tauri::AppHandle) -> anyhow::Result<()> 
 
     #[cfg(target_os = "macos")]
     start_macos_window_title_privacy_scan_thread()?;
+    #[cfg(target_os = "macos")]
+    start_macos_core_graphics_title_privacy_scan_thread()?;
 
     thread::Builder::new()
         .name("screen-share-privacy-shield".to_string())
@@ -1059,6 +1070,24 @@ fn start_macos_window_title_privacy_scan_thread() -> anyhow::Result<()> {
 }
 
 #[cfg(target_os = "macos")]
+fn start_macos_core_graphics_title_privacy_scan_thread() -> anyhow::Result<()> {
+    std::hint::black_box(NATIVE_PRIVACY_SHIELD_MACOS_CORE_GRAPHICS_TITLE_FAST_SCAN_MARKER);
+
+    thread::Builder::new()
+        .name("macos-coregraphics-title-privacy-shield".to_string())
+        .spawn(move || loop {
+            thread::sleep(MACOS_CORE_GRAPHICS_TITLE_PRIVACY_SCAN_INTERVAL);
+            let active = screen_share_status_for_processes(
+                detect_macos_core_graphics_visible_window_title_processes(),
+            )
+            .active;
+            MACOS_CORE_GRAPHICS_TITLE_PRIVACY_RISK_ACTIVE.store(active, Ordering::Relaxed);
+        })
+        .map(|_| ())
+        .map_err(|error| anyhow::anyhow!("{error}"))
+}
+
+#[cfg(target_os = "macos")]
 fn detect_macos_window_title_privacy_risk() -> anyhow::Result<bool> {
     let processes = detect_macos_core_graphics_visible_window_title_processes();
     if screen_share_status_for_processes(processes).active {
@@ -1071,15 +1100,27 @@ fn detect_macos_window_title_privacy_risk() -> anyhow::Result<bool> {
 
 #[cfg(target_os = "macos")]
 fn macos_window_title_privacy_risk_status() -> Option<ScreenShareStatus> {
-    if !MACOS_WINDOW_TITLE_PRIVACY_RISK_ACTIVE.load(Ordering::Relaxed) {
+    let core_graphics_risk_active =
+        MACOS_CORE_GRAPHICS_TITLE_PRIVACY_RISK_ACTIVE.load(Ordering::Relaxed);
+    let window_title_risk_active = MACOS_WINDOW_TITLE_PRIVACY_RISK_ACTIVE.load(Ordering::Relaxed);
+    if !core_graphics_risk_active && !window_title_risk_active {
         return None;
     }
 
-    std::hint::black_box(NATIVE_PRIVACY_SHIELD_MACOS_WINDOW_TITLE_BACKGROUND_SCAN_MARKER);
+    if core_graphics_risk_active {
+        std::hint::black_box(NATIVE_PRIVACY_SHIELD_MACOS_CORE_GRAPHICS_TITLE_FAST_SCAN_MARKER);
+    }
+    if window_title_risk_active {
+        std::hint::black_box(NATIVE_PRIVACY_SHIELD_MACOS_WINDOW_TITLE_BACKGROUND_SCAN_MARKER);
+    }
     Some(ScreenShareStatus {
         active: true,
         matched_processes: vec![ScreenShareProcess {
-            name: "macOS window-title privacy scan".to_string(),
+            name: if core_graphics_risk_active {
+                "macOS CoreGraphics title privacy scan".to_string()
+            } else {
+                "macOS window-title privacy scan".to_string()
+            },
             pid: None,
             window_title: Some("Browser meeting or sharing title detected".to_string()),
         }],
@@ -2148,6 +2189,7 @@ mod tests {
                 MACOS_WINDOW_TITLE_TIMEOUT_FALLBACK_MARKER,
                 MACOS_WINDOW_TITLE_SHORT_TIMEOUT_MARKER,
                 NATIVE_PRIVACY_SHIELD_MACOS_CORE_GRAPHICS_TITLE_GATE_MARKER,
+                NATIVE_PRIVACY_SHIELD_MACOS_CORE_GRAPHICS_TITLE_FAST_SCAN_MARKER,
                 NATIVE_PRIVACY_SHIELD_MACOS_REDACTED_BROWSER_TITLE_MARKER
             ]
         );
@@ -2942,6 +2984,10 @@ mod tests {
                 MACOS_WINDOW_TITLE_PRIVACY_SCAN_INTERVAL,
                 Duration::from_millis(5_000)
             );
+            assert_eq!(
+                MACOS_CORE_GRAPHICS_TITLE_PRIVACY_SCAN_INTERVAL,
+                Duration::from_millis(250)
+            );
             assert!(MACOS_WINDOW_TITLE_SHORT_TIMEOUT_MARKER.contains("short timeout"));
             assert!(
                 NATIVE_PRIVACY_SHIELD_MACOS_WINDOW_TITLE_BACKGROUND_SCAN_MARKER
@@ -2949,6 +2995,8 @@ mod tests {
             );
             assert!(NATIVE_PRIVACY_SHIELD_MACOS_CORE_GRAPHICS_TITLE_GATE_MARKER
                 .contains("CoreGraphics"));
+            assert!(NATIVE_PRIVACY_SHIELD_MACOS_CORE_GRAPHICS_TITLE_FAST_SCAN_MARKER
+                .contains("250ms"));
             assert!(
                 NATIVE_PRIVACY_SHIELD_MACOS_REDACTED_BROWSER_TITLE_MARKER.contains("unavailable")
             );
@@ -2957,8 +3005,9 @@ mod tests {
 
     #[cfg(target_os = "macos")]
     #[test]
-    fn native_privacy_shield_uses_background_window_title_risk_without_fast_scan() {
+    fn native_privacy_shield_uses_window_title_risk_latches() {
         MACOS_WINDOW_TITLE_PRIVACY_RISK_ACTIVE.store(false, Ordering::Relaxed);
+        MACOS_CORE_GRAPHICS_TITLE_PRIVACY_RISK_ACTIVE.store(false, Ordering::Relaxed);
         assert_eq!(macos_window_title_privacy_risk_status(), None);
 
         MACOS_WINDOW_TITLE_PRIVACY_RISK_ACTIVE.store(true, Ordering::Relaxed);
@@ -2976,6 +3025,21 @@ mod tests {
         );
 
         MACOS_WINDOW_TITLE_PRIVACY_RISK_ACTIVE.store(false, Ordering::Relaxed);
+        MACOS_CORE_GRAPHICS_TITLE_PRIVACY_RISK_ACTIVE.store(true, Ordering::Relaxed);
+        let status = macos_window_title_privacy_risk_status()
+            .expect("active CoreGraphics title risk should synthesize a fast shield status");
+
+        assert!(status.active);
+        assert_eq!(
+            status.matched_processes,
+            vec![ScreenShareProcess {
+                name: "macOS CoreGraphics title privacy scan".to_string(),
+                pid: None,
+                window_title: Some("Browser meeting or sharing title detected".to_string()),
+            }]
+        );
+
+        MACOS_CORE_GRAPHICS_TITLE_PRIVACY_RISK_ACTIVE.store(false, Ordering::Relaxed);
     }
 
     #[test]

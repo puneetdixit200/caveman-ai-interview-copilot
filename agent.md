@@ -8,10 +8,12 @@ Make Caveman harder to expose during Google Meet, Microsoft Teams, and screen-sh
 
 - Branch: `main`
 - Remote: `origin/main`
-- Latest pushed implementation commit before this handoff refresh: `a8cd8f9 test: sync app frame host marker anchor`
+- Latest pushed implementation commit before this handoff refresh: `dd69b09 docs: refresh privacy handoff`
 - This handoff file is being kept current as the screen-share hardening work continues.
 - Previous relevant commits:
   - `c7569f5 ci: verify macos privacy shield on push`
+  - `dd69b09 docs: refresh privacy handoff`
+  - `509efc2 test: give macos meeting smoke room to settle`
   - `a8cd8f9 test: sync app frame host marker anchor`
   - `1512358 test: require windows app frame host marker`
   - `99d33cc test: let meeting smoke clear naturally`
@@ -40,6 +42,7 @@ Make Caveman harder to expose during Google Meet, Microsoft Teams, and screen-sh
 - The macOS meeting-risk smoke can launch a specific `Caveman.app` path. Package smoke mounts the generated DMG and verifies the app inside the mounted installer is protected and hidden during simulated Google Meet/Teams windows; the installed-app smoke still verifies hide and restore.
 - The package privacy-shield attestation now also requires the Windows `applicationframehost.exe` marker, matching the runtime detector path for Store/WebView-hosted Google Meet and Teams windows.
 - The packaged DMG meeting-risk smoke keeps simulated browser meeting windows alive longer and gives macOS title-scan detection more time on slower Intel runners, while still requiring Caveman to hide during Google Meet and Teams risk.
+- macOS now has a separate fast CoreGraphics title-risk latch that scans visible browser titles every 250ms, so already-visible Caveman windows hide faster when Google Meet, Teams, or browser sharing UI appears. The slower System Events title scan remains bounded and off the 50ms direct-capture poll.
 
 ## Verification already run locally
 
