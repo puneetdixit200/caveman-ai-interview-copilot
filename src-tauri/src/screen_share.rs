@@ -2536,9 +2536,13 @@ mod tests {
                 MACOS_WINDOW_TITLE_PERMISSION_FALLBACK_MARKER,
                 MACOS_WINDOW_TITLE_TRANSIENT_ROW_MARKER,
                 MACOS_WINDOW_TITLE_TIMEOUT_FALLBACK_MARKER,
+                #[cfg(target_os = "macos")]
                 MACOS_WINDOW_TITLE_SHORT_TIMEOUT_MARKER,
+                #[cfg(target_os = "macos")]
                 NATIVE_PRIVACY_SHIELD_MACOS_CORE_GRAPHICS_TITLE_GATE_MARKER,
+                #[cfg(target_os = "macos")]
                 NATIVE_PRIVACY_SHIELD_MACOS_CORE_GRAPHICS_TITLE_FAST_SCAN_MARKER,
+                #[cfg(target_os = "macos")]
                 NATIVE_PRIVACY_SHIELD_MACOS_REDACTED_BROWSER_TITLE_MARKER,
                 #[cfg(target_os = "windows")]
                 NATIVE_PRIVACY_SHIELD_WINDOWS_ENUMWINDOWS_TITLE_MARKER,
