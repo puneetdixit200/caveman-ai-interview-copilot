@@ -8,10 +8,11 @@ Make Caveman harder to expose during Google Meet, Microsoft Teams, and screen-sh
 
 - Branch: `main`
 - Remote: `origin/main`
-- Latest pushed implementation commit before this handoff refresh: `3d58c23 fix: scan macos browser share titles faster`
+- Latest pushed implementation commit before this handoff refresh: `21b87e9 fix: scan windows visible share titles`
 - This handoff file is being kept current as the screen-share hardening work continues.
 - Previous relevant commits:
   - `c7569f5 ci: verify macos privacy shield on push`
+  - `21b87e9 fix: scan windows visible share titles`
   - `3d58c23 fix: scan macos browser share titles faster`
   - `dd69b09 docs: refresh privacy handoff`
   - `509efc2 test: give macos meeting smoke room to settle`
@@ -45,6 +46,7 @@ Make Caveman harder to expose during Google Meet, Microsoft Teams, and screen-sh
 - The packaged DMG meeting-risk smoke keeps simulated browser meeting windows alive longer and gives macOS title-scan detection more time on slower Intel runners, while still requiring Caveman to hide during Google Meet and Teams risk.
 - macOS now has a separate fast CoreGraphics title-risk latch that scans visible browser titles every 250ms, so already-visible Caveman windows hide faster when Google Meet, Teams, or browser sharing UI appears. The slower System Events title scan remains bounded and off the 50ms direct-capture poll.
 - Windows now has a supported `EnumWindows` visible-title scan layered on top of `tasklist /V`, so the shipped EXE can detect browser/PWA Google Meet, Teams, and sharing titles even when process-list window-title rows are incomplete.
+- Windows visible browser/PWA windows now fail closed when the native title cannot be read, matching the existing macOS redacted-title behavior for supported OS-level detection.
 
 ## Verification already run locally
 

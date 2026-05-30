@@ -70,6 +70,9 @@ pub const NATIVE_PRIVACY_SHIELD_MACOS_REDACTED_BROWSER_TITLE_MARKER: &str =
 #[cfg(target_os = "windows")]
 pub const NATIVE_PRIVACY_SHIELD_WINDOWS_ENUMWINDOWS_TITLE_MARKER: &str =
     "Native privacy shield enumerates Windows visible window titles with EnumWindows for browser Meet and Teams risk.";
+#[cfg(target_os = "windows")]
+pub const NATIVE_PRIVACY_SHIELD_WINDOWS_UNAVAILABLE_BROWSER_TITLE_MARKER: &str =
+    "Windows visible browser title guard hides when a visible browser window title is unavailable.";
 pub const NATIVE_PRIVACY_SHIELD_REFRESHES_CAPTURE_BEFORE_SHARE_HIDE_MARKER: &str =
     "Native privacy shield refreshes capture exclusion before hiding for screen-share risk.";
 pub const NATIVE_PRIVACY_SHIELD_MAIN_THREAD_WINDOW_UPDATE_MARKER: &str =
@@ -319,6 +322,8 @@ const PACKAGE_PRIVACY_SHIELD_WEBVIEW_MARKERS: &[&str] = &[
     NATIVE_PRIVACY_SHIELD_MACOS_REDACTED_BROWSER_TITLE_MARKER,
     #[cfg(target_os = "windows")]
     NATIVE_PRIVACY_SHIELD_WINDOWS_ENUMWINDOWS_TITLE_MARKER,
+    #[cfg(target_os = "windows")]
+    NATIVE_PRIVACY_SHIELD_WINDOWS_UNAVAILABLE_BROWSER_TITLE_MARKER,
 ];
 
 #[derive(Debug, Clone, PartialEq)]
@@ -622,6 +627,8 @@ const WATCHED_SCREEN_SHARE_TITLES: &[&str] = &[
     BROWSER_BEING_RECORDED_TITLE,
     #[cfg(target_os = "macos")]
     NATIVE_PRIVACY_SHIELD_MACOS_REDACTED_BROWSER_TITLE_MARKER,
+    #[cfg(target_os = "windows")]
+    NATIVE_PRIVACY_SHIELD_WINDOWS_UNAVAILABLE_BROWSER_TITLE_MARKER,
     "presenting",
     "hackerrank interview",
     "interview - google meet",
@@ -1368,11 +1375,6 @@ fn detect_windows_visible_window_title_processes() -> Vec<ScreenShareProcess> {
             return TRUE;
         }
 
-        let window_title = read_windows_window_title(hwnd);
-        if window_title.is_empty() {
-            return TRUE;
-        }
-
         let mut process_id = 0_u32;
         unsafe {
             GetWindowThreadProcessId(hwnd, Some(&mut process_id));
@@ -1382,11 +1384,21 @@ fn detect_windows_visible_window_title_processes() -> Vec<ScreenShareProcess> {
         }
 
         let name = read_windows_process_name(process_id).unwrap_or_else(|| process_id.to_string());
+        let window_title = match read_windows_window_title(hwnd) {
+            title if !title.is_empty() => Some(title),
+            _ if is_screen_share_window_title_host_process(&name) => {
+                std::hint::black_box(
+                    NATIVE_PRIVACY_SHIELD_WINDOWS_UNAVAILABLE_BROWSER_TITLE_MARKER,
+                );
+                Some(NATIVE_PRIVACY_SHIELD_WINDOWS_UNAVAILABLE_BROWSER_TITLE_MARKER.to_string())
+            }
+            _ => return TRUE,
+        };
         let processes = unsafe { &mut *(lparam.0 as *mut Vec<ScreenShareProcess>) };
         processes.push(ScreenShareProcess {
             name,
             pid: Some(process_id),
-            window_title: Some(window_title),
+            window_title,
         });
         TRUE
     }
@@ -2198,6 +2210,21 @@ mod tests {
         )));
     }
 
+    #[cfg(target_os = "windows")]
+    #[test]
+    fn treats_unavailable_windows_browser_titles_as_share_risk() {
+        let status = screen_share_status_for_processes(vec![ScreenShareProcess {
+            name: "chrome.exe".to_string(),
+            pid: Some(8201),
+            window_title: Some(
+                NATIVE_PRIVACY_SHIELD_WINDOWS_UNAVAILABLE_BROWSER_TITLE_MARKER.to_string(),
+            ),
+        }]);
+
+        assert!(status.active);
+        assert_eq!(status.matched_processes.len(), 1);
+    }
+
     #[test]
     fn anchors_webview_markers_for_packaged_privacy_attestation() {
         assert_eq!(
@@ -2303,7 +2330,9 @@ mod tests {
                 NATIVE_PRIVACY_SHIELD_MACOS_CORE_GRAPHICS_TITLE_FAST_SCAN_MARKER,
                 NATIVE_PRIVACY_SHIELD_MACOS_REDACTED_BROWSER_TITLE_MARKER,
                 #[cfg(target_os = "windows")]
-                NATIVE_PRIVACY_SHIELD_WINDOWS_ENUMWINDOWS_TITLE_MARKER
+                NATIVE_PRIVACY_SHIELD_WINDOWS_ENUMWINDOWS_TITLE_MARKER,
+                #[cfg(target_os = "windows")]
+                NATIVE_PRIVACY_SHIELD_WINDOWS_UNAVAILABLE_BROWSER_TITLE_MARKER
             ]
         );
     }
