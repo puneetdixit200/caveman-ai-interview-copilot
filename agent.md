@@ -8,9 +8,10 @@ Make Caveman harder to expose during Google Meet, Microsoft Teams, and screen-sh
 
 - Branch: `main`
 - Remote: `origin/main`
-- Latest pushed implementation commit before this handoff refresh: `9567b34 test: verify privacy shield installers`
+- Latest pushed implementation commit before this handoff refresh: `c7569f5 ci: verify macos privacy shield on push`
 - This handoff file is being kept current as the screen-share hardening work continues.
 - Previous relevant commits:
+  - `c7569f5 ci: verify macos privacy shield on push`
   - `9567b34 test: verify privacy shield installers`
   - `766e838 docs: add next agent handoff`
   - `85fb051 test: add macos meeting risk smoke`
@@ -31,12 +32,14 @@ Make Caveman harder to expose during Google Meet, Microsoft Teams, and screen-sh
   - Microsoft Teams native process window
 - It verifies Caveman starts protected, hides while simulated meeting/share-risk windows are visible, then restores as a protected onscreen window after risk clears.
 - The package smoke workflow now runs both macOS DMG privacy-shield verifier lanes on every push to `main`, not only on manual workflow dispatch, so normal pushes exercise EXE and DMG privacy shield packaging.
+- The macOS meeting-risk smoke can launch a specific `Caveman.app` path, and package smoke is being extended to mount the generated DMG and run the Google Meet/Teams simulation against the app inside the mounted installer.
 
 ## Verification already run locally
 
 - `node --test scripts/macos-meeting-risk-smoke.test.mjs`
 - `npm run meeting-risk:smoke:mac`
 - `npm run test:release`
+- `node --test scripts/macos-meeting-risk-smoke.test.mjs scripts/macos-dmg-meeting-risk-smoke.test.mjs`
 - Manual full Desktop Package Smoke run `26680849312` passed all lanes, including:
   - Windows MSI/NSIS package privacy shield verification
   - macOS Intel app/DMG package privacy shield verification
@@ -54,7 +57,7 @@ READY
 - Caveman restored protected onscreen window 12215 at 1249x820.
 ```
 
-`npm run test:release` passed 137 tests after the CI hardening change.
+`npm run test:release` passed 141 tests after the DMG runtime-smoke wiring edits. `npm run meeting-risk:smoke:mac` also passed after the app-path launch change.
 
 ## CI to check next
 
@@ -67,7 +70,7 @@ gh run list --repo puneetdixit200/caveman-ai-interview-copilot --branch main --l
 ## Suggested next steps
 
 1. Recheck the worktree with `git status --short --branch`.
-2. Verify the next pushed Desktop Package Smoke run now includes and passes both macOS jobs on the push event.
+2. Verify the next pushed Desktop Package Smoke run includes and passes both macOS DMG `Run packaged meeting-risk smoke` steps.
 3. Verify the installed app window is visible, non-zero-sized, and protected with CoreGraphics window inspection.
 4. If the app is collapsed to `0x0`, restart it after clearing saved state:
 

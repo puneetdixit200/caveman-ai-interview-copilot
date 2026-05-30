@@ -3,6 +3,7 @@ import test from "node:test";
 
 import {
   MACOS_MEETING_RISK_SMOKE_MARKER,
+  cavemanActivationArgs,
   summarizeMacosMeetingRiskSmoke
 } from "./macos-meeting-risk-smoke.mjs";
 
@@ -56,4 +57,14 @@ test("summarizes simulated meeting risk hide and restore states", () => {
     }).status,
     "skipped"
   );
+});
+
+test("can launch a specific packaged Caveman app bundle for meeting-risk smoke", () => {
+  assert.deepEqual(cavemanActivationArgs({ appPath: "/Volumes/Caveman/Caveman.app" }), [
+    "/Volumes/Caveman/Caveman.app"
+  ]);
+  assert.deepEqual(cavemanActivationArgs({ bundleId: "com.example.caveman" }), [
+    "-b",
+    "com.example.caveman"
+  ]);
 });

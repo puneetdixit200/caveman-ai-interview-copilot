@@ -133,6 +133,8 @@ test("desktop package smoke verifies macOS DMG privacy shield on every push", as
   assert.doesNotMatch(macosArm64Job, /github\.event_name\s*==\s*'workflow_dispatch'/);
   assert.match(macosIntelJob, /node scripts\/verify-privacy-shield-package\.mjs --target macos-x64/);
   assert.match(macosArm64Job, /node scripts\/verify-privacy-shield-package\.mjs --target macos-arm64/);
+  assert.match(macosIntelJob, /npm run dmg-meeting-risk:smoke:mac/);
+  assert.match(macosArm64Job, /npm run dmg-meeting-risk:smoke:mac/);
 });
 
 test("macOS bundle declares privacy usage descriptions for audio capture", async () => {
@@ -817,6 +819,7 @@ test("release workflow contract is part of the release test suite", async () => 
   assert.match(packageJson.scripts["test:release"], /dispatch-signed-release\.test\.mjs/);
   assert.match(packageJson.scripts["test:release"], /notarize-macos-dmg\.test\.mjs/);
   assert.match(packageJson.scripts["test:release"], /obs-stealth-smoke\.test\.mjs/);
+  assert.match(packageJson.scripts["test:release"], /macos-dmg-meeting-risk-smoke\.test\.mjs/);
   assert.match(packageJson.scripts["test:release"], /audio-environment-smoke\.test\.mjs/);
   assert.match(packageJson.scripts["test:release"], /commercial-readiness\.test\.mjs/);
   assert.equal(packageJson.scripts["sidecars:prepare"], "node scripts/prepare-whisper-sidecars.mjs --target current --output-config src-tauri/target/tauri.sidecars.generated.conf.json");
@@ -826,6 +829,7 @@ test("release workflow contract is part of the release test suite", async () => 
   assert.equal(packageJson.scripts["ai:smoke"], "node scripts/ollama-smoke.mjs");
   assert.equal(packageJson.scripts["ai:smoke:openrouter"], "node scripts/openrouter-smoke.mjs");
   assert.equal(packageJson.scripts["obs:smoke"], "node scripts/obs-stealth-smoke.mjs");
+  assert.equal(packageJson.scripts["dmg-meeting-risk:smoke:mac"], "node scripts/macos-dmg-meeting-risk-smoke.mjs");
   assert.equal(packageJson.scripts["audio:smoke"], "node scripts/audio-environment-smoke.mjs");
   assert.equal(packageJson.scripts["commercial:check"], "node scripts/commercial-readiness.mjs");
   assert.equal(packageJson.scripts["commercial:secrets"], "node scripts/configure-commercial-secrets.mjs");
@@ -855,7 +859,9 @@ test("package scripts expose repeatable macOS and Windows installer builds", asy
   assert.match(readme, /npm run sidecars:prepare/);
   assert.match(readme, /npm run release:dispatch -- --tag v0\.1\.1/);
   assert.match(workflow, /npm run tauri:build:windows/);
+  assert.match(workflow, /npm run tauri:build:mac/);
   assert.match(workflow, /npm run tauri:build:linux/);
+  assert.match(workflow, /npm run dmg-meeting-risk:smoke:mac/);
 });
 
 test("desktop release version is aligned for v0.1.1", async () => {
@@ -904,6 +910,7 @@ test("desktop package smoke workflow builds macOS and Windows installers without
   assert.match(workflow, /npm run tauri:build:mac/);
   assert.match(workflow, /npm run tauri:build:linux/);
   assert.match(workflow, /npm run package:verify-sidecar/);
+  assert.match(workflow, /npm run dmg-meeting-risk:smoke:mac/);
   assert.match(workflow, /actions\/upload-artifact@v7\.0\.1/);
   assert.doesNotMatch(workflow, /actions\/(?:checkout|setup-node|upload-artifact)@v4/);
   assert.doesNotMatch(workflow, /softprops\/action-gh-release/);

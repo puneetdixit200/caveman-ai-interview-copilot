@@ -84,6 +84,9 @@ jobs:
       - name: Verify packaged privacy shield
         run: node scripts/verify-privacy-shield-package.mjs --target macos-x64 --write-attestation src-tauri/target/release/bundle/privacy-shield-macos-x64.json
 
+      - name: Run packaged meeting-risk smoke
+        run: npm run dmg-meeting-risk:smoke:mac
+
       - name: Upload macOS package artifact
         uses: actions/upload-artifact@v7.0.1
         with:
@@ -124,6 +127,9 @@ jobs:
 
       - name: Verify packaged privacy shield
         run: node scripts/verify-privacy-shield-package.mjs --target macos-arm64 --write-attestation src-tauri/target/release/bundle/privacy-shield-macos-arm64.json
+
+      - name: Run packaged meeting-risk smoke
+        run: npm run dmg-meeting-risk:smoke:mac
 
       - name: Upload macOS package artifact
         uses: actions/upload-artifact@v7.0.1

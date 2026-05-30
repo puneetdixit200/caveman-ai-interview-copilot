@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { execFile, spawn } from "node:child_process";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import { tmpdir } from "node:os";
 import { promisify } from "node:util";
 import { pathToFileURL } from "node:url";
@@ -127,6 +127,7 @@ export async function runMacosMeetingRiskSmoke({
   commandRunner = execFileAsync,
   processSpawner = spawn,
   bundleId = process.env.CAVEMAN_BUNDLE_ID || DEFAULT_BUNDLE_ID,
+  appPath = process.env.CAVEMAN_APP_PATH || null,
   scenarios = DEFAULT_SCENARIOS
 } = {}) {
   if (platform !== "darwin") {
@@ -134,7 +135,7 @@ export async function runMacosMeetingRiskSmoke({
   }
 
   keepMarkerReachable();
-  await activateCaveman(commandRunner, bundleId);
+  await activateCaveman(commandRunner, { appPath, bundleId });
   const initialWindow = await waitForVisibleUsableWindow({ commandRunner, timeoutMs: INITIAL_WAIT_MS });
   if (!initialWindow) {
     return summarizeMacosMeetingRiskSmoke({
@@ -208,9 +209,17 @@ async function runMeetingRiskScenario({ tempDir, scenario, commandRunner, proces
   }
 }
 
-async function activateCaveman(commandRunner, bundleId) {
+export function cavemanActivationArgs({ appPath = null, bundleId = DEFAULT_BUNDLE_ID } = {}) {
+  if (appPath) {
+    return [appPath];
+  }
+
+  return ["-b", bundleId || DEFAULT_BUNDLE_ID];
+}
+
+async function activateCaveman(commandRunner, options) {
   try {
-    await commandRunner("open", ["-b", bundleId], { maxBuffer: QUERY_MAX_BUFFER });
+    await commandRunner("open", cavemanActivationArgs(options), { maxBuffer: QUERY_MAX_BUFFER });
   } catch {
     // The wait below will produce the actionable failure if Caveman cannot be launched.
   }
@@ -296,7 +305,12 @@ function keepMarkerReachable() {
 }
 
 export async function main() {
-  const result = await runMacosMeetingRiskSmoke();
+  const options = parseArgs(process.argv.slice(2));
+  if (options.help) {
+    console.log(usage());
+    return;
+  }
+  const result = await runMacosMeetingRiskSmoke(options);
   console.log(result.status.toUpperCase());
   for (const message of result.messages) {
     console.log(`- ${message}`);
@@ -304,6 +318,44 @@ export async function main() {
   if (result.status === "blocked") {
     process.exitCode = 1;
   }
+}
+
+function parseArgs(argv) {
+  const options = {};
+  for (let index = 0; index < argv.length; index += 1) {
+    const arg = argv[index];
+    const next = () => {
+      index += 1;
+      if (index >= argv.length) {
+        throw new Error(`Missing value for ${arg}`);
+      }
+      return argv[index];
+    };
+
+    switch (arg) {
+      case "--app-path":
+        options.appPath = resolve(next());
+        break;
+      case "--bundle-id":
+        options.bundleId = next();
+        break;
+      case "--help":
+        options.help = true;
+        break;
+      default:
+        throw new Error(`Unknown argument: ${arg}`);
+    }
+  }
+  return options;
+}
+
+function usage() {
+  return `Usage: node scripts/macos-meeting-risk-smoke.mjs [options]
+
+Options:
+  --app-path <path>       Launch this Caveman.app bundle instead of resolving by bundle id.
+  --bundle-id <bundle>    Launch this bundle id when --app-path is not supplied. Defaults to ${DEFAULT_BUNDLE_ID}.
+`;
 }
 
 if (import.meta.url === pathToFileURL(process.argv[1]).href) {
