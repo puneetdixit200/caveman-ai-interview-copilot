@@ -15,7 +15,7 @@ import { selectVisibleUsableCavemanWindow } from "./macos-share-risk-smoke.mjs";
 const execFileAsync = promisify(execFile);
 
 export const MACOS_MEETING_RISK_SMOKE_MARKER =
-  "macOS meeting-risk smoke verifies Caveman hides during simulated Google Meet and Teams windows and restores after risk clears.";
+  "macOS meeting-risk smoke verifies Caveman hides during simulated Google Meet, Teams, Zoom, Webex, presenting, and recording windows and restores after risk clears.";
 
 const DEFAULT_BUNDLE_ID = "com.caveman.desktop";
 const QUERY_MAX_BUFFER = 1024 * 1024;
@@ -68,6 +68,34 @@ const DEFAULT_SCENARIOS = [
     label: "Microsoft Teams native process",
     executableName: "MSTeams",
     windowTitle: "Microsoft Teams - Interview"
+  }
+];
+
+export const MACOS_PACKAGED_MEETING_RISK_SCENARIOS = [
+  ...DEFAULT_SCENARIOS,
+  {
+    id: "zoom-meeting",
+    label: "Zoom meeting window",
+    executableName: "Zoom",
+    windowTitle: "Zoom Meeting - Candidate"
+  },
+  {
+    id: "webex-meeting",
+    label: "Webex meeting window",
+    executableName: "Webex",
+    windowTitle: "Webex Meeting - Candidate"
+  },
+  {
+    id: "browser-presenting",
+    label: "Browser presenting indicator",
+    executableName: "ScreenShareIndicator",
+    windowTitle: "You are presenting"
+  },
+  {
+    id: "screen-recording",
+    label: "Screen recording indicator",
+    executableName: "ScreenRecordingIndicator",
+    windowTitle: "Screen recording"
   }
 ];
 

@@ -5,6 +5,7 @@ import test from "node:test";
 import {
   MACOS_MEETING_RISK_ACTIVE_WAIT_MS,
   MACOS_MEETING_RISK_FAKE_MEETING_DURATION_MS,
+  MACOS_PACKAGED_MEETING_RISK_SCENARIOS,
   MACOS_MEETING_RISK_SMOKE_MARKER,
   cavemanActivationArgs,
   runMacosMeetingRiskSmoke,
@@ -24,6 +25,8 @@ const WINDOW = {
 test("summarizes simulated meeting risk hide and restore states", () => {
   assert.ok(MACOS_MEETING_RISK_SMOKE_MARKER.includes("Google Meet"));
   assert.ok(MACOS_MEETING_RISK_SMOKE_MARKER.includes("Teams"));
+  assert.ok(MACOS_MEETING_RISK_SMOKE_MARKER.includes("Zoom"));
+  assert.ok(MACOS_MEETING_RISK_SMOKE_MARKER.includes("Webex"));
 
   assert.equal(
     summarizeMacosMeetingRiskSmoke({
@@ -32,7 +35,11 @@ test("summarizes simulated meeting risk hide and restore states", () => {
       scenarioResults: [
         { label: "Google Meet browser window", hiddenDuringRisk: true },
         { label: "Microsoft Teams browser window", hiddenDuringRisk: true },
-        { label: "Microsoft Teams native process", hiddenDuringRisk: true }
+        { label: "Microsoft Teams native process", hiddenDuringRisk: true },
+        { label: "Zoom meeting window", hiddenDuringRisk: true },
+        { label: "Webex meeting window", hiddenDuringRisk: true },
+        { label: "Browser presenting indicator", hiddenDuringRisk: true },
+        { label: "Screen recording indicator", hiddenDuringRisk: true }
       ],
       restoredWindow: WINDOW
     }).status,
@@ -59,7 +66,11 @@ test("summarizes simulated meeting risk hide and restore states", () => {
       scenarioResults: [
         { label: "Google Meet browser window", hiddenDuringRisk: true },
         { label: "Microsoft Teams browser window", hiddenDuringRisk: true },
-        { label: "Microsoft Teams native process", hiddenDuringRisk: true }
+        { label: "Microsoft Teams native process", hiddenDuringRisk: true },
+        { label: "Zoom meeting window", hiddenDuringRisk: true },
+        { label: "Webex meeting window", hiddenDuringRisk: true },
+        { label: "Browser presenting indicator", hiddenDuringRisk: true },
+        { label: "Screen recording indicator", hiddenDuringRisk: true }
       ],
       restoredWindow: null,
       requireRestore: false
@@ -91,6 +102,18 @@ test("can launch a specific packaged Caveman app bundle for meeting-risk smoke",
 test("keeps simulated meeting windows alive long enough for macOS title scans", () => {
   assert.ok(MACOS_MEETING_RISK_ACTIVE_WAIT_MS >= 15_000);
   assert.ok(MACOS_MEETING_RISK_FAKE_MEETING_DURATION_MS > MACOS_MEETING_RISK_ACTIVE_WAIT_MS);
+  assert.deepEqual(
+    MACOS_PACKAGED_MEETING_RISK_SCENARIOS.map((scenario) => scenario.windowTitle),
+    [
+      "Google Meet - Candidate Screen",
+      "teams.microsoft.com - Interview",
+      "Microsoft Teams - Interview",
+      "Zoom Meeting - Candidate",
+      "Webex Meeting - Candidate",
+      "You are presenting",
+      "Screen recording"
+    ]
+  );
 });
 
 test("lets simulated meeting apps exit before checking Caveman restoration", async () => {

@@ -21,7 +21,7 @@ export const WINDOWS_MEETING_RISK_ACTIVE_WAIT_MS = 18_000;
 export const WINDOWS_MEETING_RISK_FAKE_MEETING_DURATION_MS = 24_000;
 export const WINDOWS_MEETING_RISK_INITIAL_WAIT_MS = 30_000;
 export const WINDOWS_MEETING_RISK_SMOKE_MARKER =
-  "Windows EXE meeting-risk smoke launches the built app and verifies Caveman hides during simulated Google Meet and Teams windows.";
+  "Windows EXE meeting-risk smoke launches the built app and verifies Caveman hides during simulated Google Meet, Teams, Zoom, Webex, presenting, and recording windows.";
 
 export const WINDOWS_CAVEMAN_WINDOW_QUERY_POWERSHELL = `
 $ErrorActionPreference = "Stop"
@@ -179,7 +179,7 @@ $timer.Start()
 [void]$form.ShowDialog()
 `;
 
-const DEFAULT_SCENARIOS = [
+export const WINDOWS_MEETING_RISK_SCENARIOS = [
   {
     id: "google-meet-browser",
     label: "Google Meet browser window",
@@ -194,6 +194,26 @@ const DEFAULT_SCENARIOS = [
     id: "teams-native",
     label: "Microsoft Teams native process window",
     windowTitle: "Microsoft Teams - Interview"
+  },
+  {
+    id: "zoom-meeting",
+    label: "Zoom meeting window",
+    windowTitle: "Zoom Meeting - Candidate"
+  },
+  {
+    id: "webex-meeting",
+    label: "Webex meeting window",
+    windowTitle: "Webex Meeting - Candidate"
+  },
+  {
+    id: "browser-presenting",
+    label: "Browser presenting indicator",
+    windowTitle: "You are presenting"
+  },
+  {
+    id: "screen-recording",
+    label: "Screen recording indicator",
+    windowTitle: "Screen recording"
   }
 ];
 
@@ -313,7 +333,7 @@ export async function runWindowsMeetingRiskSmoke({
   restoreWaitMs = RESTORE_WAIT_MS,
   activeRiskWaitMs = WINDOWS_MEETING_RISK_ACTIVE_WAIT_MS,
   fakeMeetingDurationMs = WINDOWS_MEETING_RISK_FAKE_MEETING_DURATION_MS,
-  scenarios = DEFAULT_SCENARIOS
+  scenarios = WINDOWS_MEETING_RISK_SCENARIOS
 } = {}) {
   if (platform !== "win32") {
     return summarizeWindowsMeetingRiskSmoke({ platform });

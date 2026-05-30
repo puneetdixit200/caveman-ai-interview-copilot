@@ -54,13 +54,17 @@ test("runs meeting-risk smoke against the mounted DMG app bundle", async () => {
         requireRestore,
         restoreWaitMs,
         activeRiskWaitMs,
-        fakeMeetingDurationMs
+        fakeMeetingDurationMs,
+        scenarios
       }) => {
         assert.match(appPath, /Caveman\.app$/);
         assert.equal(requireRestore, false);
         assert.equal(restoreWaitMs, 5_000);
         assert.equal(activeRiskWaitMs, PACKAGED_DMG_ACTIVE_RISK_WAIT_MS);
         assert.equal(fakeMeetingDurationMs, PACKAGED_DMG_FAKE_MEETING_DURATION_MS);
+        assert.ok(scenarios.some((scenario) => scenario.windowTitle === "Zoom Meeting - Candidate"));
+        assert.ok(scenarios.some((scenario) => scenario.windowTitle === "Webex Meeting - Candidate"));
+        assert.ok(scenarios.some((scenario) => scenario.windowTitle === "Screen recording"));
         return {
           status: "ready",
           messages: [`ran against ${appPath}`]

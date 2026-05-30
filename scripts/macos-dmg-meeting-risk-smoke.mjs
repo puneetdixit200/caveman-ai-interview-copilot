@@ -6,7 +6,10 @@ import { tmpdir } from "node:os";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { promisify } from "node:util";
 
-import { runMacosMeetingRiskSmoke } from "./macos-meeting-risk-smoke.mjs";
+import {
+  MACOS_PACKAGED_MEETING_RISK_SCENARIOS,
+  runMacosMeetingRiskSmoke
+} from "./macos-meeting-risk-smoke.mjs";
 
 const execFileAsync = promisify(execFile);
 const __dirname = fileURLToPath(new URL(".", import.meta.url));
@@ -57,7 +60,8 @@ export async function runMacosDmgMeetingRiskSmoke({
       requireRestore: false,
       restoreWaitMs: 5_000,
       activeRiskWaitMs: PACKAGED_DMG_ACTIVE_RISK_WAIT_MS,
-      fakeMeetingDurationMs: PACKAGED_DMG_FAKE_MEETING_DURATION_MS
+      fakeMeetingDurationMs: PACKAGED_DMG_FAKE_MEETING_DURATION_MS,
+      scenarios: MACOS_PACKAGED_MEETING_RISK_SCENARIOS
     });
 
     return {

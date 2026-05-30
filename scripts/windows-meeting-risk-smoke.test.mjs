@@ -9,6 +9,7 @@ import {
   WINDOWS_MEETING_RISK_ACTIVE_WAIT_MS,
   WINDOWS_MEETING_RISK_FAKE_MEETING_DURATION_MS,
   WINDOWS_MEETING_RISK_INITIAL_WAIT_MS,
+  WINDOWS_MEETING_RISK_SCENARIOS,
   WINDOWS_MEETING_RISK_SMOKE_MARKER,
   parseWindowsWindowRows,
   runWindowsMeetingRiskSmoke,
@@ -33,6 +34,8 @@ test("selects only visible usable protected Caveman windows", () => {
   assert.ok(WINDOWS_MEETING_RISK_SMOKE_MARKER.includes("Windows EXE"));
   assert.ok(WINDOWS_MEETING_RISK_SMOKE_MARKER.includes("Google Meet"));
   assert.ok(WINDOWS_MEETING_RISK_SMOKE_MARKER.includes("Teams"));
+  assert.ok(WINDOWS_MEETING_RISK_SMOKE_MARKER.includes("Zoom"));
+  assert.ok(WINDOWS_MEETING_RISK_SMOKE_MARKER.includes("Webex"));
 
   const rows = parseWindowsWindowRows(
     JSON.stringify([
@@ -56,7 +59,11 @@ test("summarizes Windows meeting risk hide states", () => {
       scenarioResults: [
         { label: "Google Meet browser window", hiddenDuringRisk: true },
         { label: "Microsoft Teams browser share window", hiddenDuringRisk: true },
-        { label: "Microsoft Teams native process window", hiddenDuringRisk: true }
+        { label: "Microsoft Teams native process window", hiddenDuringRisk: true },
+        { label: "Zoom meeting window", hiddenDuringRisk: true },
+        { label: "Webex meeting window", hiddenDuringRisk: true },
+        { label: "Browser presenting indicator", hiddenDuringRisk: true },
+        { label: "Screen recording indicator", hiddenDuringRisk: true }
       ],
       restoredWindow: null,
       requireRestore: false
@@ -101,9 +108,21 @@ test("keeps simulated meeting windows alive long enough for Windows title scans"
   assert.ok(WINDOWS_MEETING_RISK_INITIAL_WAIT_MS >= 30_000);
   assert.ok(WINDOWS_MEETING_RISK_ACTIVE_WAIT_MS >= 18_000);
   assert.ok(WINDOWS_MEETING_RISK_FAKE_MEETING_DURATION_MS > WINDOWS_MEETING_RISK_ACTIVE_WAIT_MS);
+  assert.deepEqual(
+    WINDOWS_MEETING_RISK_SCENARIOS.map((scenario) => scenario.windowTitle),
+    [
+      "Google Meet - Candidate Screen",
+      "This window is being shared",
+      "Microsoft Teams - Interview",
+      "Zoom Meeting - Candidate",
+      "Webex Meeting - Candidate",
+      "You are presenting",
+      "Screen recording"
+    ]
+  );
 });
 
-test("runs the Windows EXE against simulated Google Meet and Teams windows", async () => {
+test("runs the Windows EXE against simulated meeting and recording windows", async () => {
   const dir = await mkdtemp(join(tmpdir(), "caveman-windows-risk-run-"));
   const appExePath = join(dir, "caveman.exe");
   const spawned = [];
@@ -111,7 +130,7 @@ test("runs the Windows EXE against simulated Google Meet and Teams windows", asy
   const commands = [];
   const visibleRows = JSON.stringify([PROTECTED_WINDOW]);
   const hiddenRows = "[]";
-  const queryOutputs = [visibleRows, hiddenRows, hiddenRows, hiddenRows];
+  const queryOutputs = [visibleRows, ...WINDOWS_MEETING_RISK_SCENARIOS.map(() => hiddenRows)];
 
   try {
     await mkdir(dir, { recursive: true });
@@ -148,10 +167,10 @@ test("runs the Windows EXE against simulated Google Meet and Teams windows", asy
 
     assert.equal(result.status, "ready");
     assert.equal(spawned[0][0], appExePath);
-    assert.equal(spawned.filter(([, args]) => args.includes("-File")).length, 3);
-    assert.ok(spawned.some(([, args]) => args.includes("Google Meet - Candidate Screen")));
-    assert.ok(spawned.some(([, args]) => args.includes("This window is being shared")));
-    assert.ok(spawned.some(([, args]) => args.includes("Microsoft Teams - Interview")));
+    assert.equal(spawned.filter(([, args]) => args.includes("-File")).length, WINDOWS_MEETING_RISK_SCENARIOS.length);
+    for (const scenario of WINDOWS_MEETING_RISK_SCENARIOS) {
+      assert.ok(spawned.some(([, args]) => args.includes(scenario.windowTitle)), scenario.windowTitle);
+    }
     assert.ok(commands.some(([command, args]) => command === "taskkill" && args.includes("caveman.exe")));
     assert.ok(killSignals.some(([command]) => command === appExePath));
   } finally {
