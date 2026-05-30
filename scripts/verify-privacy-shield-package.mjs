@@ -154,6 +154,7 @@ export const COMMON_PRIVACY_SHIELD_MARKERS = [
   "being recorded",
   "Screen-share guard command timeout failed closed before privacy polling could stall.",
   "Screen-share window title guard normalizes UI punctuation before matching.",
+  "Screen-share window title guard treats strong meeting/share titles from any visible app as risk.",
   "screencaptureui",
   "screencapture",
   "replayd",

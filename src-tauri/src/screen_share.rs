@@ -179,6 +179,8 @@ const BROWSER_SCREEN_IS_BEING_RECORDED_TITLE: &str = "screen is being recorded";
 const BROWSER_BEING_RECORDED_TITLE: &str = "being recorded";
 const WINDOW_TITLE_PUNCTUATION_NORMALIZATION_MARKER: &str =
     "Screen-share window title guard normalizes UI punctuation before matching.";
+const STRONG_WINDOW_TITLE_ANY_APP_MARKER: &str =
+    "Screen-share window title guard treats strong meeting/share titles from any visible app as risk.";
 const MACOS_SCREEN_CAPTURE_UI_PROCESS: &str = "screencaptureui";
 const MACOS_SCREEN_CAPTURE_CLI_PROCESS: &str = "screencapture";
 const MACOS_REPLAYD_PROCESS: &str = "replayd";
@@ -330,6 +332,7 @@ const PACKAGE_PRIVACY_SHIELD_WEBVIEW_MARKERS: &[&str] = &[
     BROWSER_BEING_RECORDED_TITLE,
     SCREEN_SHARE_GUARD_COMMAND_TIMEOUT_MARKER,
     WINDOW_TITLE_PUNCTUATION_NORMALIZATION_MARKER,
+    STRONG_WINDOW_TITLE_ANY_APP_MARKER,
     MACOS_SCREEN_CAPTURE_UI_PROCESS,
     MACOS_SCREEN_CAPTURE_CLI_PROCESS,
     MACOS_REPLAYD_PROCESS,
@@ -1735,6 +1738,7 @@ fn screen_share_status_for_processes(processes: Vec<ScreenShareProcess>) -> Scre
             is_watched_screen_share_process(process)
                 || (is_screen_share_window_title_host_process(&process.name)
                     && is_watched_screen_share_window_title(process.window_title.as_deref()))
+                || is_strong_screen_share_window_title(process.window_title.as_deref())
         })
         .collect::<Vec<_>>();
 
@@ -1796,6 +1800,80 @@ fn is_watched_screen_share_window_title(title: Option<&str>) -> bool {
             let candidate = normalize_screen_share_window_title_for_match(candidate);
             !candidate.is_empty() && normalized.contains(&candidate)
         })
+}
+
+fn is_strong_screen_share_window_title(title: Option<&str>) -> bool {
+    std::hint::black_box(STRONG_WINDOW_TITLE_ANY_APP_MARKER);
+
+    let Some(title) = title else {
+        return false;
+    };
+    let normalized = normalize_screen_share_window_title_for_match(title);
+    if normalized.is_empty() || normalized == "n/a" {
+        return false;
+    }
+
+    let active_share_titles = [
+        BROWSER_YOU_ARE_SHARING_TITLE,
+        BROWSER_YOURE_SHARING_TITLE,
+        BROWSER_SHARING_YOUR_SCREEN_TITLE,
+        BROWSER_SHARING_YOUR_ENTIRE_SCREEN_TITLE,
+        BROWSER_SHARING_ENTIRE_SCREEN_TITLE,
+        BROWSER_SHARING_THIS_TAB_TITLE,
+        BROWSER_SHARING_A_BROWSER_TAB_TITLE,
+        BROWSER_SHARING_A_CHROME_TAB_TITLE,
+        BROWSER_SHARING_A_WINDOW_TITLE,
+        BROWSER_SHARING_AN_APPLICATION_WINDOW_TITLE,
+        BROWSER_THIS_TAB_IS_BEING_SHARED_TITLE,
+        BROWSER_THIS_WINDOW_IS_BEING_SHARED_TITLE,
+        BROWSER_APPLICATION_WINDOW_IS_BEING_SHARED_TITLE,
+        BROWSER_THIS_SCREEN_IS_BEING_SHARED_TITLE,
+        BROWSER_SCREEN_IS_BEING_SHARED_TITLE,
+        BROWSER_STOP_SHARING_TITLE,
+        BROWSER_YOU_ARE_PRESENTING_TITLE,
+        BROWSER_YOURE_PRESENTING_TITLE,
+        BROWSER_PRESENTING_YOUR_SCREEN_TITLE,
+        BROWSER_PRESENTING_THIS_TAB_TITLE,
+        BROWSER_PRESENTING_A_WINDOW_TITLE,
+        BROWSER_PRESENTING_TO_EVERYONE_TITLE,
+        BROWSER_STOP_PRESENTING_TITLE,
+        BROWSER_SCREEN_RECORDING_TITLE,
+        BROWSER_RECORDING_YOUR_SCREEN_TITLE,
+        BROWSER_RECORDING_SCREEN_TITLE,
+        BROWSER_SCREEN_IS_BEING_RECORDED_TITLE,
+        BROWSER_BEING_RECORDED_TITLE,
+    ];
+
+    active_share_titles
+        .iter()
+        .any(|candidate| strong_window_title_matches_candidate(&normalized, candidate))
+        || [
+            "google meet -",
+            "microsoft teams -",
+            "teams meeting",
+            "zoom meeting",
+            "webex meeting",
+        ]
+        .iter()
+        .any(|candidate| normalized.starts_with(candidate))
+}
+
+fn strong_window_title_matches_candidate(normalized: &str, candidate: &str) -> bool {
+    let candidate = normalize_screen_share_window_title_for_match(candidate);
+    if candidate.is_empty() {
+        return false;
+    }
+
+    if normalized == candidate {
+        return true;
+    }
+
+    normalized.strip_prefix(&candidate).is_some_and(|suffix| {
+        matches!(
+            suffix.trim_start().as_bytes().first(),
+            Some(b'-' | b':' | b'|' | b'(')
+        )
+    })
 }
 
 fn normalize_screen_share_window_title_for_match(value: &str) -> String {
@@ -2529,6 +2607,7 @@ mod tests {
                 BROWSER_BEING_RECORDED_TITLE,
                 SCREEN_SHARE_GUARD_COMMAND_TIMEOUT_MARKER,
                 WINDOW_TITLE_PUNCTUATION_NORMALIZATION_MARKER,
+                STRONG_WINDOW_TITLE_ANY_APP_MARKER,
                 MACOS_SCREEN_CAPTURE_UI_PROCESS,
                 MACOS_SCREEN_CAPTURE_CLI_PROCESS,
                 MACOS_REPLAYD_PROCESS,
@@ -2614,6 +2693,11 @@ mod tests {
                 window_title: Some("Google Meet prep notes".to_string()),
             },
             ScreenShareProcess {
+                name: "notes".to_string(),
+                pid: Some(773),
+                window_title: Some("Microsoft Teams prep notes".to_string()),
+            },
+            ScreenShareProcess {
                 name: "msedgewebview2.exe".to_string(),
                 pid: Some(772),
                 window_title: Some("N/A".to_string()),
@@ -2622,6 +2706,41 @@ mod tests {
 
         assert!(!status.active);
         assert_eq!(status.matched_processes, Vec::<ScreenShareProcess>::new());
+    }
+
+    #[test]
+    fn detects_strong_meeting_titles_from_unclassified_visible_apps() {
+        let status = screen_share_status_for_processes(vec![
+            ScreenShareProcess {
+                name: "teams-native".to_string(),
+                pid: Some(774),
+                window_title: Some("Microsoft Teams - Interview".to_string()),
+            },
+            ScreenShareProcess {
+                name: "meet-window".to_string(),
+                pid: Some(775),
+                window_title: Some("Google Meet - Candidate Screen".to_string()),
+            },
+            ScreenShareProcess {
+                name: "share-indicator".to_string(),
+                pid: Some(776),
+                window_title: Some("This window is being shared".to_string()),
+            },
+        ]);
+
+        assert!(status.active);
+        assert_eq!(
+            status
+                .matched_processes
+                .iter()
+                .map(|process| (process.name.as_str(), process.window_title.as_deref()))
+                .collect::<Vec<_>>(),
+            vec![
+                ("teams-native", Some("Microsoft Teams - Interview")),
+                ("meet-window", Some("Google Meet - Candidate Screen")),
+                ("share-indicator", Some("This window is being shared"))
+            ]
+        );
     }
 
     #[test]

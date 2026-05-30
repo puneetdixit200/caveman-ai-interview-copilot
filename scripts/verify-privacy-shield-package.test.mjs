@@ -278,6 +278,11 @@ test("requires packaged web meeting and recording title detector markers", () =>
   assert.ok(
     COMMON_PRIVACY_SHIELD_MARKERS.includes("Screen-share window title guard normalizes UI punctuation before matching.")
   );
+  assert.ok(
+    COMMON_PRIVACY_SHIELD_MARKERS.includes(
+      "Screen-share window title guard treats strong meeting/share titles from any visible app as risk."
+    )
+  );
 });
 
 test("requires packaged remote-support service detector markers", () => {

@@ -60,6 +60,7 @@ Make Caveman harder to expose during Google Meet, Microsoft Teams, and screen-sh
 - Companion-window restore and focus-repair paths now re-enter the native show privacy gate before raising the dashboard after a clear check, share-risk clear, reopen, or bounds repair. This keeps repair logic from bypassing the same capture-exclusion and screen-share checks used by manual overlay show.
 - Companion-window restore now also pauses briefly after any native privacy denial or share-risk hide, so the fast repair loop cannot immediately re-show the dashboard between macOS title-scan detections.
 - Companion-window focus repair now performs a second privacy recheck after native `unminimize`/`show`/`set_focus`, then hides the overlay and companion windows again if a Meet/Teams/share-risk window appears during that focus transition.
+- The macOS visible-window title guard now treats strong meeting/share titles from any foreground app as screen-share risk, not only from browser/PWA host processes. This covers native-style Teams windows that surface a title like `Microsoft Teams - Interview` through CoreGraphics while still ignoring ordinary note titles like `Google Meet prep notes`.
 
 ## Verification already run locally
 
@@ -131,6 +132,16 @@ Follow-up CI hardening verification:
   - `cargo test --manifest-path src-tauri/Cargo.toml overlay:: --lib` passed 33 tests after adding the post-focus privacy recheck.
   - `cargo test --manifest-path src-tauri/Cargo.toml screen_share --lib` passed 59 tests.
   - `node --test scripts/verify-privacy-shield-package.test.mjs scripts/release-workflow.test.mjs` passed 63 tests and requires the post-focus privacy marker in packaged binaries.
+  - `npm run test:release` passed 148 tests.
+- Push Desktop Package Smoke run `26691975166` for `ee8a965` failed only the macOS Intel DMG meeting-risk smoke:
+  - Google Meet browser window: hid.
+  - Microsoft Teams browser window: hid.
+  - Microsoft Teams native process: stayed visible.
+  - Windows, Linux, and macOS Apple Silicon package lanes passed, including package privacy-shield verification and Apple Silicon packaged meeting-risk smoke.
+- Native Teams title fallback follow-up local verification:
+  - `cargo test --manifest-path src-tauri/Cargo.toml screen_share --lib` passed 60 tests after adding the strong-title-any-app fallback.
+  - `cargo test --manifest-path src-tauri/Cargo.toml overlay:: --lib` passed 33 tests.
+  - `node --test scripts/verify-privacy-shield-package.test.mjs scripts/release-workflow.test.mjs` passed 63 tests and requires the strong-title marker in packaged binaries.
   - `npm run test:release` passed 148 tests.
 
 ## CI to check next
