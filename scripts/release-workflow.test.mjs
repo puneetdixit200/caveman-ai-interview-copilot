@@ -344,6 +344,11 @@ test("native privacy shield refreshes capture protection before share-risk hide"
   );
   assert.match(
     screenShareRs,
+    /Native privacy shield enumerates Windows visible window titles with EnumWindows for browser Meet and Teams risk\./
+  );
+  assert.match(screenShareRs, /detect_windows_visible_window_title_processes\(\)/);
+  assert.match(
+    screenShareRs,
     /macOS window-title guard uses a short timeout so native privacy polling cannot stall\./
   );
   assert.match(screenShareRs, /detect_screen_share_status_for_native_privacy_shield/);

@@ -67,6 +67,9 @@ pub const NATIVE_PRIVACY_SHIELD_MACOS_CORE_GRAPHICS_TITLE_FAST_SCAN_MARKER: &str
 #[cfg(target_os = "macos")]
 pub const NATIVE_PRIVACY_SHIELD_MACOS_REDACTED_BROWSER_TITLE_MARKER: &str =
     "macOS CoreGraphics title guard hides when a visible browser window title is unavailable.";
+#[cfg(target_os = "windows")]
+pub const NATIVE_PRIVACY_SHIELD_WINDOWS_ENUMWINDOWS_TITLE_MARKER: &str =
+    "Native privacy shield enumerates Windows visible window titles with EnumWindows for browser Meet and Teams risk.";
 pub const NATIVE_PRIVACY_SHIELD_REFRESHES_CAPTURE_BEFORE_SHARE_HIDE_MARKER: &str =
     "Native privacy shield refreshes capture exclusion before hiding for screen-share risk.";
 pub const NATIVE_PRIVACY_SHIELD_MAIN_THREAD_WINDOW_UPDATE_MARKER: &str =
@@ -314,6 +317,8 @@ const PACKAGE_PRIVACY_SHIELD_WEBVIEW_MARKERS: &[&str] = &[
     NATIVE_PRIVACY_SHIELD_MACOS_CORE_GRAPHICS_TITLE_FAST_SCAN_MARKER,
     #[cfg(target_os = "macos")]
     NATIVE_PRIVACY_SHIELD_MACOS_REDACTED_BROWSER_TITLE_MARKER,
+    #[cfg(target_os = "windows")]
+    NATIVE_PRIVACY_SHIELD_WINDOWS_ENUMWINDOWS_TITLE_MARKER,
 ];
 
 #[derive(Debug, Clone, PartialEq)]
@@ -646,9 +651,9 @@ pub fn detect_screen_share_status() -> anyhow::Result<ScreenShareStatus> {
             ));
         }
 
-        return Ok(screen_share_status_for_processes(parse_tasklist_csv(
-            &String::from_utf8_lossy(&output.stdout),
-        )));
+        let mut processes = parse_tasklist_csv(&String::from_utf8_lossy(&output.stdout));
+        processes.extend(detect_windows_visible_window_title_processes());
+        return Ok(screen_share_status_for_processes(processes));
     }
 
     #[cfg(target_os = "macos")]
@@ -1346,6 +1351,112 @@ fn detect_macos_core_graphics_visible_window_title_processes() -> Vec<ScreenShar
     }
 
     processes
+}
+
+#[cfg(target_os = "windows")]
+fn detect_windows_visible_window_title_processes() -> Vec<ScreenShareProcess> {
+    use windows::core::BOOL;
+    use windows::Win32::Foundation::{HWND, LPARAM, TRUE};
+    use windows::Win32::UI::WindowsAndMessaging::{
+        EnumWindows, GetWindowThreadProcessId, IsWindowVisible,
+    };
+
+    std::hint::black_box(NATIVE_PRIVACY_SHIELD_WINDOWS_ENUMWINDOWS_TITLE_MARKER);
+
+    extern "system" fn collect_window(hwnd: HWND, lparam: LPARAM) -> BOOL {
+        if !unsafe { IsWindowVisible(hwnd) }.as_bool() {
+            return TRUE;
+        }
+
+        let window_title = read_windows_window_title(hwnd);
+        if window_title.is_empty() {
+            return TRUE;
+        }
+
+        let mut process_id = 0_u32;
+        unsafe {
+            GetWindowThreadProcessId(hwnd, Some(&mut process_id));
+        }
+        if process_id == 0 {
+            return TRUE;
+        }
+
+        let name = read_windows_process_name(process_id).unwrap_or_else(|| process_id.to_string());
+        let processes = unsafe { &mut *(lparam.0 as *mut Vec<ScreenShareProcess>) };
+        processes.push(ScreenShareProcess {
+            name,
+            pid: Some(process_id),
+            window_title: Some(window_title),
+        });
+        TRUE
+    }
+
+    let mut processes = Vec::new();
+    let lparam = LPARAM((&mut processes as *mut Vec<ScreenShareProcess>) as isize);
+    let _ = unsafe { EnumWindows(Some(collect_window), lparam) };
+    processes
+}
+
+#[cfg(target_os = "windows")]
+fn read_windows_window_title(hwnd: windows::Win32::Foundation::HWND) -> String {
+    use windows::Win32::UI::WindowsAndMessaging::{GetWindowTextLengthW, GetWindowTextW};
+
+    let text_length = unsafe { GetWindowTextLengthW(hwnd) };
+    if text_length <= 0 {
+        return String::new();
+    }
+
+    let mut buffer = vec![0_u16; text_length as usize + 1];
+    let length = unsafe { GetWindowTextW(hwnd, &mut buffer) };
+    if length <= 0 {
+        return String::new();
+    }
+
+    String::from_utf16_lossy(&buffer[..length as usize])
+        .trim()
+        .to_string()
+}
+
+#[cfg(target_os = "windows")]
+fn read_windows_process_name(process_id: u32) -> Option<String> {
+    use windows::core::PWSTR;
+    use windows::Win32::System::Threading::{
+        OpenProcess, QueryFullProcessImageNameW, PROCESS_NAME_WIN32,
+        PROCESS_QUERY_LIMITED_INFORMATION,
+    };
+
+    let handle = unsafe { OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, false, process_id).ok()? };
+    let _handle_guard = WindowsHandleGuard(handle);
+    let mut buffer = vec![0_u16; 32_768];
+    let mut length = buffer.len() as u32;
+    unsafe {
+        QueryFullProcessImageNameW(
+            handle,
+            PROCESS_NAME_WIN32,
+            PWSTR(buffer.as_mut_ptr()),
+            &mut length,
+        )
+        .ok()?;
+    }
+
+    let path = String::from_utf16_lossy(&buffer[..length as usize]);
+    Some(
+        std::path::Path::new(&path)
+            .file_name()
+            .and_then(|name| name.to_str())
+            .unwrap_or(path.as_str())
+            .to_string(),
+    )
+}
+
+#[cfg(target_os = "windows")]
+struct WindowsHandleGuard(windows::Win32::Foundation::HANDLE);
+
+#[cfg(target_os = "windows")]
+impl Drop for WindowsHandleGuard {
+    fn drop(&mut self) {
+        let _ = unsafe { windows::Win32::Foundation::CloseHandle(self.0) };
+    }
 }
 
 #[cfg(target_os = "macos")]
@@ -2190,7 +2301,9 @@ mod tests {
                 MACOS_WINDOW_TITLE_SHORT_TIMEOUT_MARKER,
                 NATIVE_PRIVACY_SHIELD_MACOS_CORE_GRAPHICS_TITLE_GATE_MARKER,
                 NATIVE_PRIVACY_SHIELD_MACOS_CORE_GRAPHICS_TITLE_FAST_SCAN_MARKER,
-                NATIVE_PRIVACY_SHIELD_MACOS_REDACTED_BROWSER_TITLE_MARKER
+                NATIVE_PRIVACY_SHIELD_MACOS_REDACTED_BROWSER_TITLE_MARKER,
+                #[cfg(target_os = "windows")]
+                NATIVE_PRIVACY_SHIELD_WINDOWS_ENUMWINDOWS_TITLE_MARKER
             ]
         );
     }
@@ -2995,8 +3108,9 @@ mod tests {
             );
             assert!(NATIVE_PRIVACY_SHIELD_MACOS_CORE_GRAPHICS_TITLE_GATE_MARKER
                 .contains("CoreGraphics"));
-            assert!(NATIVE_PRIVACY_SHIELD_MACOS_CORE_GRAPHICS_TITLE_FAST_SCAN_MARKER
-                .contains("250ms"));
+            assert!(
+                NATIVE_PRIVACY_SHIELD_MACOS_CORE_GRAPHICS_TITLE_FAST_SCAN_MARKER.contains("250ms")
+            );
             assert!(
                 NATIVE_PRIVACY_SHIELD_MACOS_REDACTED_BROWSER_TITLE_MARKER.contains("unavailable")
             );

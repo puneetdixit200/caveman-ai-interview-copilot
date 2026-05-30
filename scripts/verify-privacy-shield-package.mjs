@@ -219,10 +219,15 @@ export const MACOS_NATIVE_PRIVACY_SHIELD_MARKERS = [
   "Companion app windows use a privacy-gated reopen restore when the bundle is reopened."
 ];
 
+export const WINDOWS_NATIVE_PRIVACY_SHIELD_MARKERS = [
+  "Native privacy shield enumerates Windows visible window titles with EnumWindows for browser Meet and Teams risk."
+];
+
 export const TARGET_PRIVACY_SHIELD_MARKERS = {
   "windows-x64": [
     ...COMMON_PRIVACY_SHIELD_MARKERS,
     ...DESKTOP_PROCESS_PRIVACY_SHIELD_MARKERS,
+    ...WINDOWS_NATIVE_PRIVACY_SHIELD_MARKERS,
     "SetWindowDisplayAffinity",
     "GetWindowDisplayAffinity"
   ],
