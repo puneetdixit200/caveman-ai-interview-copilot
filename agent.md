@@ -53,6 +53,7 @@ Make Caveman harder to expose during Google Meet, Microsoft Teams, and screen-sh
 - Windows native privacy polling now checks visible browser/PWA titles with `EnumWindows` before falling back to slower `tasklist`, so already-visible Meet/Teams/share UI can hide Caveman sooner.
 - Windows screen-share detection now uses supported ToolHelp process enumeration before `tasklist`, so known meeting, recorder, and remote-support processes can trigger hide without waiting for shell process listing.
 - Release-contract tests normalize Windows CRLF checkouts before asserting detector ordering, including the native shield contract test that checks ToolHelp before `tasklist`.
+- The detector catalog was expanded for more supported "all screen share" coverage: additional web meeting/capture origins, desktop meeting apps, screen recorders, and remote-support clients are now anchored in source and package privacy-shield attestations.
 
 ## Verification already run locally
 

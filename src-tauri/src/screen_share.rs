@@ -117,8 +117,10 @@ const TEAMS_WEB_MEETING_ORIGIN: &str = "teams.microsoft.com";
 const TEAMS_CONSUMER_WEB_MEETING_ORIGIN: &str = "teams.live.com";
 const TEAMS_CLOUD_WEB_MEETING_ORIGIN: &str = "teams.cloud.microsoft";
 const MEET_WEB_MEETING_ORIGIN: &str = "meet.google.com";
+const GOOGLE_MEET_CALL_ORIGIN: &str = "call.google.com";
 const GOOGLE_MEET_SHORT_TITLE_PREFIX: &str = "meet - ";
 const ZOOM_WEB_MEETING_ORIGIN: &str = "zoom.us";
+const SKYPE_WEB_MEETING_ORIGIN: &str = "join.skype.com";
 const SLACK_WEB_HUDDLE_ORIGIN: &str = "app.slack.com";
 const DISCORD_WEB_HUDDLE_ORIGIN: &str = "discord.com";
 const WHATSAPP_WEB_CALL_ORIGIN: &str = "web.whatsapp.com";
@@ -127,6 +129,11 @@ const GOTO_WEB_MEETING_ORIGIN: &str = "meet.goto.com";
 const JITSI_WEB_MEETING_ORIGIN: &str = "meet.jit.si";
 const AMAZON_CHIME_WEB_MEETING_ORIGIN: &str = "app.chime.aws";
 const WHEREBY_WEB_MEETING_ORIGIN: &str = "whereby.com";
+const DAILY_WEB_MEETING_ORIGIN: &str = "daily.co";
+const GATHER_WEB_MEETING_ORIGIN: &str = "gather.town";
+const TALKY_WEB_MEETING_ORIGIN: &str = "talky.io";
+const DEMIO_WEB_MEETING_ORIGIN: &str = "demio.com";
+const REMO_WEB_MEETING_ORIGIN: &str = "remo.co";
 const RIVERSIDE_WEB_MEETING_ORIGIN: &str = "riverside.fm";
 const STREAMYARD_WEB_MEETING_ORIGIN: &str = "streamyard.com";
 const LIVESTORM_WEB_MEETING_ORIGIN: &str = "livestorm.co";
@@ -139,6 +146,9 @@ const VIDYARD_WEB_RECORDER_ORIGIN: &str = "vidyard.com";
 const DESCRIPT_WEB_RECORDER_ORIGIN: &str = "descript.com";
 const RESTREAM_WEB_STUDIO_ORIGIN: &str = "studio.restream.io";
 const VDO_NINJA_WEB_CALL_ORIGIN: &str = "vdo.ninja";
+const PANOPTO_WEB_CAPTURE_ORIGIN: &str = "panopto.com";
+const KALTURA_WEB_CAPTURE_ORIGIN: &str = "kaltura.com";
+const SCREENITY_WEB_CAPTURE_TITLE: &str = "screenity";
 const BROWSER_YOU_ARE_SHARING_TITLE: &str = "you are sharing";
 const BROWSER_YOURE_SHARING_TITLE: &str = "you're sharing";
 const BROWSER_SHARING_YOUR_SCREEN_TITLE: &str = "sharing your screen";
@@ -253,8 +263,10 @@ const PACKAGE_PRIVACY_SHIELD_WEBVIEW_MARKERS: &[&str] = &[
     TEAMS_CONSUMER_WEB_MEETING_ORIGIN,
     TEAMS_CLOUD_WEB_MEETING_ORIGIN,
     MEET_WEB_MEETING_ORIGIN,
+    GOOGLE_MEET_CALL_ORIGIN,
     GOOGLE_MEET_SHORT_TITLE_PREFIX,
     ZOOM_WEB_MEETING_ORIGIN,
+    SKYPE_WEB_MEETING_ORIGIN,
     SLACK_WEB_HUDDLE_ORIGIN,
     DISCORD_WEB_HUDDLE_ORIGIN,
     WHATSAPP_WEB_CALL_ORIGIN,
@@ -263,6 +275,11 @@ const PACKAGE_PRIVACY_SHIELD_WEBVIEW_MARKERS: &[&str] = &[
     JITSI_WEB_MEETING_ORIGIN,
     AMAZON_CHIME_WEB_MEETING_ORIGIN,
     WHEREBY_WEB_MEETING_ORIGIN,
+    DAILY_WEB_MEETING_ORIGIN,
+    GATHER_WEB_MEETING_ORIGIN,
+    TALKY_WEB_MEETING_ORIGIN,
+    DEMIO_WEB_MEETING_ORIGIN,
+    REMO_WEB_MEETING_ORIGIN,
     RIVERSIDE_WEB_MEETING_ORIGIN,
     STREAMYARD_WEB_MEETING_ORIGIN,
     LIVESTORM_WEB_MEETING_ORIGIN,
@@ -275,6 +292,9 @@ const PACKAGE_PRIVACY_SHIELD_WEBVIEW_MARKERS: &[&str] = &[
     DESCRIPT_WEB_RECORDER_ORIGIN,
     RESTREAM_WEB_STUDIO_ORIGIN,
     VDO_NINJA_WEB_CALL_ORIGIN,
+    PANOPTO_WEB_CAPTURE_ORIGIN,
+    KALTURA_WEB_CAPTURE_ORIGIN,
+    SCREENITY_WEB_CAPTURE_TITLE,
     "screenpal.exe",
     "screencast-o-matic",
     "descript.exe",
@@ -352,12 +372,16 @@ const WATCHED_SCREEN_SHARE_PROCESSES: &[&str] = &[
     "microsoft teams",
     "microsoft teams helper",
     "msteams",
+    "zoom workplace",
+    "zoom meetings",
     "discord.exe",
     "discord",
     "slack.exe",
     "slack",
     "skype.exe",
     "skype",
+    "skype for business",
+    "lync.exe",
     "webexmta.exe",
     WEBEX_HOST_PROCESS,
     "webex",
@@ -377,6 +401,14 @@ const WATCHED_SCREEN_SHARE_PROCESSES: &[&str] = &[
     "jitsi meet",
     "join.me.exe",
     "join.me",
+    "amazon chime.exe",
+    "amazon chime",
+    "whereby.exe",
+    "whereby",
+    "daily.exe",
+    "daily",
+    "gather.exe",
+    "gather",
     "around.exe",
     "around",
     "mmhmm.exe",
@@ -448,6 +480,23 @@ const WATCHED_SCREEN_SHARE_PROCESSES: &[&str] = &[
     "xsplit",
     "sharex.exe",
     "bandicam.exe",
+    "obs studio",
+    "screenflick",
+    "screenflickhelper",
+    "screenium",
+    "capto",
+    "monosnap",
+    "shottr",
+    "zappy",
+    "recordit",
+    "kaltura capture",
+    "panopto recorder",
+    "bbflashbackrecorder.exe",
+    "flashback recorder",
+    "movavi screen recorder",
+    "icecream screen recorder",
+    "apowersoft screen recorder",
+    "screenity",
     // Remote desktop and support tools also expose the overlay to another viewer.
     "teamviewer.exe",
     "teamviewer",
@@ -488,6 +537,25 @@ const WATCHED_SCREEN_SHARE_PROCESSES: &[&str] = &[
     "nomachine",
     "nxplayer",
     "nxserver",
+    "dwagent.exe",
+    "dwagent",
+    "meshagent.exe",
+    "meshagent",
+    "dwrcc.exe",
+    "dameware mini remote control",
+    "supremo.exe",
+    "supremo",
+    "remotepc.exe",
+    "remotepc",
+    "getscreen.me",
+    "aeroadmin.exe",
+    "aeroadmin",
+    "sunloginclient.exe",
+    "sunloginclient",
+    "todesk.exe",
+    "todesk",
+    "ultraviewer.exe",
+    "ultraviewer",
     "connectwisecontrol.client.exe",
     "screenconnect.clientservice.exe",
     SCREENCONNECT_WINDOWS_CLIENT_PROCESS,
@@ -568,6 +636,7 @@ const TITLE_ONLY_SCREEN_SHARE_PROCESSES: &[&str] = &[
 const WATCHED_SCREEN_SHARE_TITLES: &[&str] = &[
     "google meet",
     MEET_WEB_MEETING_ORIGIN,
+    GOOGLE_MEET_CALL_ORIGIN,
     GOOGLE_MEET_SHORT_TITLE_PREFIX,
     "microsoft teams",
     "teams meeting",
@@ -576,6 +645,7 @@ const WATCHED_SCREEN_SHARE_TITLES: &[&str] = &[
     TEAMS_CLOUD_WEB_MEETING_ORIGIN,
     "zoom meeting",
     ZOOM_WEB_MEETING_ORIGIN,
+    SKYPE_WEB_MEETING_ORIGIN,
     "webex meeting",
     WEBEX_WEB_MEETING_ORIGIN,
     GOTO_WEB_MEETING_ORIGIN,
@@ -583,6 +653,13 @@ const WATCHED_SCREEN_SHARE_TITLES: &[&str] = &[
     AMAZON_CHIME_WEB_MEETING_ORIGIN,
     "whereby",
     WHEREBY_WEB_MEETING_ORIGIN,
+    "daily",
+    DAILY_WEB_MEETING_ORIGIN,
+    "gather",
+    GATHER_WEB_MEETING_ORIGIN,
+    TALKY_WEB_MEETING_ORIGIN,
+    DEMIO_WEB_MEETING_ORIGIN,
+    REMO_WEB_MEETING_ORIGIN,
     "riverside",
     RIVERSIDE_WEB_MEETING_ORIGIN,
     "streamyard",
@@ -600,6 +677,9 @@ const WATCHED_SCREEN_SHARE_TITLES: &[&str] = &[
     DESCRIPT_WEB_RECORDER_ORIGIN,
     RESTREAM_WEB_STUDIO_ORIGIN,
     VDO_NINJA_WEB_CALL_ORIGIN,
+    PANOPTO_WEB_CAPTURE_ORIGIN,
+    KALTURA_WEB_CAPTURE_ORIGIN,
+    SCREENITY_WEB_CAPTURE_TITLE,
     "slack huddle",
     SLACK_WEB_HUDDLE_ORIGIN,
     "discord",
@@ -2153,6 +2233,24 @@ mod tests {
     }
 
     #[test]
+    fn recognizes_expanded_web_meeting_and_capture_origins() {
+        for title in [
+            "call.google.com/candidate-room",
+            "join.skype.com/abc123",
+            "daily.co/interview-room",
+            "gather.town/app/interview",
+            "talky.io/candidate-screen",
+            "demio.com/event/webinar",
+            "remo.co/e/interview",
+            "panopto.com/Panopto/Pages/Recorder.aspx",
+            "kaltura.com/capture",
+            "Screenity - Screen Recorder",
+        ] {
+            assert!(is_watched_screen_share_window_title(Some(title)));
+        }
+    }
+
+    #[test]
     fn detects_browser_sharing_state_titles_from_browser_hosts() {
         let processes = parse_tasklist_csv(
             "\"chrome.exe\",\"661\",\"Console\",\"1\",\"64,000 K\",\"Running\",\"DESKTOP\\\\me\",\"0:00:21\",\"You are sharing your screen\"\n\"msedge.exe\",\"662\",\"Console\",\"1\",\"64,000 K\",\"Running\",\"DESKTOP\\\\me\",\"0:00:22\",\"Stop sharing - Google Meet\"\n\"firefox.exe\",\"663\",\"Console\",\"1\",\"64,000 K\",\"Running\",\"DESKTOP\\\\me\",\"0:00:23\",\"Sharing this tab\"\n\"brave.exe\",\"664\",\"Console\",\"1\",\"64,000 K\",\"Running\",\"DESKTOP\\\\me\",\"0:00:24\",\"This window is being shared\"\n\"RuntimeBroker.exe\",\"665\",\"Console\",\"1\",\"10,000 K\",\"Running\",\"DESKTOP\\\\me\",\"0:00:01\",\"Stop sharing notes\"",
@@ -2363,8 +2461,10 @@ mod tests {
                 TEAMS_CONSUMER_WEB_MEETING_ORIGIN,
                 TEAMS_CLOUD_WEB_MEETING_ORIGIN,
                 MEET_WEB_MEETING_ORIGIN,
+                GOOGLE_MEET_CALL_ORIGIN,
                 GOOGLE_MEET_SHORT_TITLE_PREFIX,
                 ZOOM_WEB_MEETING_ORIGIN,
+                SKYPE_WEB_MEETING_ORIGIN,
                 SLACK_WEB_HUDDLE_ORIGIN,
                 DISCORD_WEB_HUDDLE_ORIGIN,
                 WHATSAPP_WEB_CALL_ORIGIN,
@@ -2373,6 +2473,11 @@ mod tests {
                 JITSI_WEB_MEETING_ORIGIN,
                 AMAZON_CHIME_WEB_MEETING_ORIGIN,
                 WHEREBY_WEB_MEETING_ORIGIN,
+                DAILY_WEB_MEETING_ORIGIN,
+                GATHER_WEB_MEETING_ORIGIN,
+                TALKY_WEB_MEETING_ORIGIN,
+                DEMIO_WEB_MEETING_ORIGIN,
+                REMO_WEB_MEETING_ORIGIN,
                 RIVERSIDE_WEB_MEETING_ORIGIN,
                 STREAMYARD_WEB_MEETING_ORIGIN,
                 LIVESTORM_WEB_MEETING_ORIGIN,
@@ -2385,6 +2490,9 @@ mod tests {
                 DESCRIPT_WEB_RECORDER_ORIGIN,
                 RESTREAM_WEB_STUDIO_ORIGIN,
                 VDO_NINJA_WEB_CALL_ORIGIN,
+                PANOPTO_WEB_CAPTURE_ORIGIN,
+                KALTURA_WEB_CAPTURE_ORIGIN,
+                SCREENITY_WEB_CAPTURE_TITLE,
                 "screenpal.exe",
                 "screencast-o-matic",
                 "descript.exe",
@@ -3110,6 +3218,73 @@ mod tests {
                 Some(3011),
                 Some(3012),
                 Some(3013)
+            ]
+        );
+    }
+
+    #[test]
+    fn detects_expanded_meeting_capture_and_remote_tool_processes() {
+        let processes = vec![
+            ScreenShareProcess {
+                name: "Zoom Workplace".to_string(),
+                pid: Some(4101),
+                window_title: None,
+            },
+            ScreenShareProcess {
+                name: "Amazon Chime.exe".to_string(),
+                pid: Some(4102),
+                window_title: None,
+            },
+            ScreenShareProcess {
+                name: "/Applications/Gather.app/Contents/MacOS/Gather".to_string(),
+                pid: Some(4103),
+                window_title: None,
+            },
+            ScreenShareProcess {
+                name: "ScreenFlickHelper".to_string(),
+                pid: Some(4104),
+                window_title: None,
+            },
+            ScreenShareProcess {
+                name: "Panopto Recorder".to_string(),
+                pid: Some(4105),
+                window_title: None,
+            },
+            ScreenShareProcess {
+                name: "MeshAgent.exe".to_string(),
+                pid: Some(4106),
+                window_title: None,
+            },
+            ScreenShareProcess {
+                name: "DameWare Mini Remote Control".to_string(),
+                pid: Some(4107),
+                window_title: None,
+            },
+            ScreenShareProcess {
+                name: "UltraViewer.exe".to_string(),
+                pid: Some(4108),
+                window_title: None,
+            },
+        ];
+
+        let status = screen_share_status_for_processes(processes);
+
+        assert!(status.active);
+        assert_eq!(
+            status
+                .matched_processes
+                .iter()
+                .map(|process| process.pid)
+                .collect::<Vec<_>>(),
+            vec![
+                Some(4101),
+                Some(4102),
+                Some(4103),
+                Some(4104),
+                Some(4105),
+                Some(4106),
+                Some(4107),
+                Some(4108)
             ]
         );
     }

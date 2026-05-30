@@ -89,6 +89,7 @@ test("requires packaged Teams and Google Meet WebView detector markers", () => {
   assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("mullvad-browser"));
   assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("teams.microsoft.com"));
   assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("meet.google.com"));
+  assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("call.google.com"));
   assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("meet - "));
 });
 
@@ -111,6 +112,17 @@ test("requires packaged remote screen-share detector markers", () => {
   assertDesktopProcessMarker("beyondtrust");
   assertDesktopProcessMarker("jump desktop");
   assertDesktopProcessMarker("nomachine");
+  assertDesktopProcessMarker("dwagent.exe");
+  assertDesktopProcessMarker("meshagent.exe");
+  assertDesktopProcessMarker("dwrcc.exe");
+  assertDesktopProcessMarker("dameware mini remote control");
+  assertDesktopProcessMarker("supremo.exe");
+  assertDesktopProcessMarker("remotepc.exe");
+  assertDesktopProcessMarker("getscreen.me");
+  assertDesktopProcessMarker("aeroadmin.exe");
+  assertDesktopProcessMarker("sunloginclient.exe");
+  assertDesktopProcessMarker("todesk.exe");
+  assertDesktopProcessMarker("ultraviewer.exe");
   assertDesktopProcessMarker("connectwisecontrol.client.exe");
   assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("screenconnect.windowsclient.exe"));
   assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("screenconnect.client.exe"));
@@ -119,15 +131,23 @@ test("requires packaged remote screen-share detector markers", () => {
 
 test("requires packaged desktop meeting app detector markers", () => {
   assertDesktopProcessMarker("skype.exe");
+  assertDesktopProcessMarker("skype for business");
+  assertDesktopProcessMarker("lync.exe");
   assertDesktopProcessMarker("gotomeeting.exe");
   assertDesktopProcessMarker("g2mcomm.exe");
   assertDesktopProcessMarker("g2mstart.exe");
+  assertDesktopProcessMarker("amazon chime.exe");
+  assertDesktopProcessMarker("whereby.exe");
+  assertDesktopProcessMarker("daily.exe");
+  assertDesktopProcessMarker("gather.exe");
   assertDesktopProcessMarker("bluejeans.exe");
   assertDesktopProcessMarker("ringcentral.exe");
   assertDesktopProcessMarker("jitsi meet");
   assertDesktopProcessMarker("join.me");
   assertDesktopProcessMarker("around.exe");
   assertDesktopProcessMarker("mmhmm.exe");
+  assertDesktopProcessMarker("zoom workplace");
+  assertDesktopProcessMarker("zoom meetings");
   assertDesktopProcessMarker("telegram.exe");
   assertDesktopProcessMarker("signal.exe");
   assertDesktopProcessMarker("facetime");
@@ -136,6 +156,7 @@ test("requires packaged desktop meeting app detector markers", () => {
 test("requires packaged web meeting and recording title detector markers", () => {
   assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("whereby.com"));
   assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("zoom.us"));
+  assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("join.skype.com"));
   assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("app.slack.com"));
   assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("teams.live.com"));
   assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("teams.cloud.microsoft"));
@@ -145,6 +166,11 @@ test("requires packaged web meeting and recording title detector markers", () =>
   assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("meet.goto.com"));
   assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("meet.jit.si"));
   assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("app.chime.aws"));
+  assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("daily.co"));
+  assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("gather.town"));
+  assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("talky.io"));
+  assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("demio.com"));
+  assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("remo.co"));
   assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("riverside.fm"));
   assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("streamyard.com"));
   assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("livestorm.co"));
@@ -157,6 +183,9 @@ test("requires packaged web meeting and recording title detector markers", () =>
   assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("descript.com"));
   assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("studio.restream.io"));
   assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("vdo.ninja"));
+  assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("panopto.com"));
+  assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("kaltura.com"));
+  assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("screenity"));
   assertDesktopProcessMarker("obs64.exe");
   assertDesktopProcessMarker("obs32.exe");
   assertDesktopProcessMarker("streamlabs obs");
@@ -169,6 +198,22 @@ test("requires packaged web meeting and recording title detector markers", () =>
   assertDesktopProcessMarker("xsplit.core.exe");
   assertDesktopProcessMarker("sharex.exe");
   assertDesktopProcessMarker("bandicam.exe");
+  assertDesktopProcessMarker("obs studio");
+  assertDesktopProcessMarker("screenflick");
+  assertDesktopProcessMarker("screenflickhelper");
+  assertDesktopProcessMarker("screenium");
+  assertDesktopProcessMarker("capto");
+  assertDesktopProcessMarker("monosnap");
+  assertDesktopProcessMarker("shottr");
+  assertDesktopProcessMarker("zappy");
+  assertDesktopProcessMarker("recordit");
+  assertDesktopProcessMarker("kaltura capture");
+  assertDesktopProcessMarker("panopto recorder");
+  assertDesktopProcessMarker("bbflashbackrecorder.exe");
+  assertDesktopProcessMarker("flashback recorder");
+  assertDesktopProcessMarker("movavi screen recorder");
+  assertDesktopProcessMarker("icecream screen recorder");
+  assertDesktopProcessMarker("apowersoft screen recorder");
   assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("screenpal.exe"));
   assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("screencast-o-matic"));
   assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("descript.exe"));
