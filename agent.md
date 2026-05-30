@@ -67,6 +67,7 @@ Make Caveman harder to expose during Google Meet, Microsoft Teams, and screen-sh
 - Strong visible-window title detection now also treats huddle, voice-call, remote-desktop, streaming/broadcasting, and generic screen-recorder titles as screen-share risk from any visible app. Packaged Windows EXE and macOS DMG meeting-risk smokes now simulate Slack huddle, Discord voice, WhatsApp video call, remote desktop, and screen-recorder windows in addition to Meet/Teams/Zoom/Webex/presenting/recording.
 - Strong visible-window title detection now also treats active share and recording status indicators as screen-share risk from any visible app, including `You're sharing a window`, `Your screen is being shared`, `Meeting is being recorded`, and `Recording in progress`. Packaged Windows EXE and macOS DMG meeting-risk smokes now simulate these four indicators in addition to the prior 12 scenarios.
 - macOS native privacy gating now enumerates watched meeting/capture process names through `libproc` before shell `ps` fallback. This is specifically to make native-style Teams process detection deterministic on the slower Intel DMG package-smoke runner while keeping the existing supported OS-level detection boundary.
+- The macOS `libproc` process scan is path-aware and ignores ambiguous idle system-only names such as CoreParsec and RemoteManagement screen-sharing daemons when no usable app path is available. This prevents CI runners from hiding Caveman before the initial protected window appears while still detecting real app paths like `MSTeams` or `/Applications/Screen Sharing.app/...`.
 
 ## Verification already run locally
 
@@ -185,6 +186,13 @@ Follow-up CI hardening verification:
   - `node --test scripts/windows-meeting-risk-smoke.test.mjs scripts/macos-meeting-risk-smoke.test.mjs scripts/macos-dmg-meeting-risk-smoke.test.mjs scripts/verify-privacy-shield-package.test.mjs` passed 36 tests.
   - `npm run test:release` passed 156 tests.
   - No local app launch was performed for this follow-up; verification used non-UI tests locally and the failing evidence came from GitHub Actions.
+- macOS `libproc` false-positive follow-up local verification:
+  - Desktop Package Smoke run `26697322763` for `bb41a4e` passed Windows and Linux, but both macOS DMG smokes failed before scenarios because no initial protected onscreen Caveman window was found. That indicated the broad `libproc` all-process scan was hiding on an idle system process before startup visibility.
+  - Follow-up fix makes `libproc` paths visible to the detector and ignores pathless/system-only CoreParsec and RemoteManagement screen-sharing daemon names, while keeping real app paths detectable.
+  - `cargo test --manifest-path src-tauri/Cargo.toml screen_share --lib` passed 64 tests.
+  - `node --test scripts/verify-privacy-shield-package.test.mjs scripts/macos-dmg-meeting-risk-smoke.test.mjs` passed 25 tests.
+  - `npm run test:release` passed 156 tests.
+  - No local app launch was performed for this follow-up.
 - Push Desktop Package Smoke run `26694632145` for `011fb25` passed all lanes:
   - Windows installers: native privacy tests, release contracts, package build, bundled sidecar verification, packaged privacy shield, packaged Windows meeting-risk smoke, and artifact upload passed.
   - Windows smoke output: `READY`; initial `caveman.exe` window was `1044x788` and protected with `WDA_EXCLUDEFROMCAPTURE`; Caveman hid during simulated Google Meet browser, Teams browser share, Teams native process, Zoom meeting, Webex meeting, browser presenting indicator, and screen-recording indicator windows.

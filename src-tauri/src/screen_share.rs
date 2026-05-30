@@ -226,12 +226,15 @@ const MACOS_DIRECT_CAPTURE_PGREP_NO_MATCH_EXIT_CODE: i32 = 1;
 const MACOS_LIBPROC_ALL_PIDS: u32 = 1;
 #[cfg(target_os = "macos")]
 const MACOS_LIBPROC_NAME_BUFFER_SIZE: usize = 4096;
+#[cfg(target_os = "macos")]
+const MACOS_LIBPROC_PATH_BUFFER_SIZE: usize = 4096;
 const MACOS_PROCESS_GUARD_SHORT_CIRCUIT_MARKER: &str =
     "macOS process screen-share guard skips window-title scan after direct capture-process match.";
 #[cfg(target_os = "macos")]
 extern "C" {
     fn proc_listpids(type_: u32, typeinfo: u32, buffer: *mut c_void, buffersize: i32) -> i32;
     fn proc_name(pid: i32, buffer: *mut c_void, buffersize: u32) -> i32;
+    fn proc_pidpath(pid: i32, buffer: *mut c_void, buffersize: u32) -> i32;
 }
 #[cfg(target_os = "macos")]
 const MACOS_VISIBLE_WINDOW_TITLE_SCRIPT: &str = r#"
@@ -1467,11 +1470,37 @@ fn macos_libproc_process(pid: i32) -> Option<ScreenShareProcess> {
         return None;
     }
 
+    let process_name = macos_libproc_process_path(pid).unwrap_or(name);
     Some(ScreenShareProcess {
-        name,
+        name: process_name,
         pid: Some(pid as u32),
         window_title: None,
     })
+}
+
+#[cfg(target_os = "macos")]
+fn macos_libproc_process_path(pid: i32) -> Option<String> {
+    let mut path_buffer = [0u8; MACOS_LIBPROC_PATH_BUFFER_SIZE];
+    let path_length = unsafe {
+        proc_pidpath(
+            pid,
+            path_buffer.as_mut_ptr().cast::<c_void>(),
+            path_buffer.len() as u32,
+        )
+    };
+    if path_length <= 0 {
+        return None;
+    }
+
+    let path = String::from_utf8_lossy(&path_buffer[..path_length as usize])
+        .trim_end_matches('\0')
+        .trim()
+        .to_string();
+    if path.is_empty() {
+        None
+    } else {
+        Some(path)
+    }
 }
 
 #[cfg(target_os = "macos")]
@@ -1851,7 +1880,9 @@ fn is_watched_screen_share_process(process: &ScreenShareProcess) -> bool {
         return false;
     }
 
-    if is_macos_core_parsec_system_process(process, &normalized) {
+    if is_macos_core_parsec_system_process(process, &normalized)
+        || is_macos_idle_system_screen_sharing_process(process, &normalized)
+    {
         return false;
     }
 
@@ -1862,9 +1893,20 @@ fn is_watched_screen_share_process(process: &ScreenShareProcess) -> bool {
 
 fn is_macos_core_parsec_system_process(process: &ScreenShareProcess, normalized: &str) -> bool {
     matches!(normalized, "parsecd" | "parsec-fbf")
-        && process
-            .name
-            .starts_with("/System/Library/PrivateFrameworks/CoreParsec.framework/")
+        && (process.name.contains("/CoreParsec.framework/")
+            || !process_name_has_path(&process.name))
+}
+
+fn is_macos_idle_system_screen_sharing_process(
+    process: &ScreenShareProcess,
+    normalized: &str,
+) -> bool {
+    matches!(normalized, "screensharingd" | "screensharingagent")
+        && (process.name.contains("/RemoteManagement/") || !process_name_has_path(&process.name))
+}
+
+fn process_name_has_path(name: &str) -> bool {
+    name.contains('/') || name.contains('\\')
 }
 
 fn is_screen_share_window_title_host_process(name: &str) -> bool {
@@ -3113,7 +3155,7 @@ mod tests {
     #[test]
     fn ignores_macos_coreparsec_system_services_without_ignoring_parsec_remote_app() {
         let processes = parse_unix_process_list(
-            " 1079 /System/Library/PrivateFrameworks/CoreParsec.framework/parsecd\n 2427 /System/Library/PrivateFrameworks/CoreParsec.framework/parsec-fbf\n 2500 /Applications/Parsec.app/Contents/MacOS/parsecd",
+            " 1079 /System/Library/PrivateFrameworks/CoreParsec.framework/parsecd\n 2427 /System/Library/PrivateFrameworks/CoreParsec.framework/parsec-fbf\n 2428 parsecd\n 2500 /Applications/Parsec.app/Contents/MacOS/parsecd",
         );
 
         let status = screen_share_status_for_processes(processes);
@@ -3124,6 +3166,25 @@ mod tests {
             vec![ScreenShareProcess {
                 name: "/Applications/Parsec.app/Contents/MacOS/parsecd".to_string(),
                 pid: Some(2500),
+                window_title: None,
+            }]
+        );
+    }
+
+    #[test]
+    fn ignores_idle_macos_system_screen_sharing_daemons() {
+        let processes = parse_unix_process_list(
+            " 2600 screensharingd\n 2601 ScreenSharingAgent\n 2602 /System/Library/CoreServices/RemoteManagement/screensharingd.bundle/Contents/MacOS/screensharingd\n 2603 /Applications/Screen Sharing.app/Contents/MacOS/Screen Sharing",
+        );
+
+        let status = screen_share_status_for_processes(processes);
+
+        assert!(status.active);
+        assert_eq!(
+            status.matched_processes,
+            vec![ScreenShareProcess {
+                name: "/Applications/Screen Sharing.app/Contents/MacOS/Screen Sharing".to_string(),
+                pid: Some(2603),
                 window_title: None,
             }]
         );
