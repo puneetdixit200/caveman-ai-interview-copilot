@@ -15,6 +15,7 @@ import {
   resolveCurrentTarget,
   renderSidecarConfig,
   resolveTargets,
+  runWithTransientGitRetry,
   sourceBuildCmakeArgs
 } from "./prepare-whisper-sidecars.mjs";
 
@@ -133,4 +134,24 @@ test("expands current and all target selectors deterministically", () => {
   ]);
   assert.deepEqual(resolveTargets("current", "macos-arm64"), ["macos-arm64"]);
   assert.deepEqual(resolveTargets("windows-x64", "linux-x64"), ["windows-x64"]);
+});
+
+test("retries transient git network failures while preparing source sidecars", async () => {
+  let attempts = 0;
+
+  const result = await runWithTransientGitRetry(
+    async () => {
+      attempts += 1;
+      if (attempts === 1) {
+        throw new Error(
+          "fatal: unable to access 'https://github.com/ggml-org/whisper.cpp.git/': Could not resolve host: github.com"
+        );
+      }
+      return "cloned";
+    },
+    { delayMs: 0 }
+  );
+
+  assert.equal(result, "cloned");
+  assert.equal(attempts, 2);
 });

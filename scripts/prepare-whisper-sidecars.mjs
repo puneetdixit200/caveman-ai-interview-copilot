@@ -18,6 +18,8 @@ export const WHISPER_CPP_RELEASE_TAG = "v1.8.4";
 export const WHISPER_CPP_REPO = "https://github.com/ggml-org/whisper.cpp.git";
 export const SIDECAR_BASE_PATH = "binaries/whisper-runtime/caveman-whisper";
 export const WINDOWS_RUNTIME_RESOURCE_GLOB = "binaries/whisper-runtime/*.dll";
+export const SIDECAR_SOURCE_FETCH_RETRY_ATTEMPTS = 3;
+export const SIDECAR_SOURCE_FETCH_RETRY_DELAY_MS = 2_000;
 
 export const SIDECAR_TARGETS = {
   "windows-x64": {
@@ -266,21 +268,55 @@ async function prepareSourceBuiltSidecar({ target, tauriDir, cacheDir, whisperTa
 
 async function ensureWhisperSource({ sourceDir, whisperTag }) {
   if (await exists(path.join(sourceDir, ".git"))) {
-    await execFileLogged("git", ["-C", sourceDir, "fetch", "--depth", "1", "origin", whisperTag]);
-    await execFileLogged("git", ["-C", sourceDir, "checkout", "--detach", `FETCH_HEAD`]);
+    await runWithTransientGitRetry(() =>
+      execFileLogged("git", ["-C", sourceDir, "fetch", "--depth", "1", "origin", whisperTag])
+    );
+    await runWithTransientGitRetry(() =>
+      execFileLogged("git", ["-C", sourceDir, "checkout", "--detach", `FETCH_HEAD`])
+    );
     return;
   }
 
   await mkdir(path.dirname(sourceDir), { recursive: true });
-  await execFileLogged("git", [
-    "clone",
-    "--depth",
-    "1",
-    "--branch",
-    whisperTag,
-    WHISPER_CPP_REPO,
-    sourceDir
-  ]);
+  await runWithTransientGitRetry(() =>
+    execFileLogged("git", [
+      "clone",
+      "--depth",
+      "1",
+      "--branch",
+      whisperTag,
+      WHISPER_CPP_REPO,
+      sourceDir
+    ])
+  );
+}
+
+export async function runWithTransientGitRetry(
+  operation,
+  {
+    attempts = SIDECAR_SOURCE_FETCH_RETRY_ATTEMPTS,
+    delayMs = SIDECAR_SOURCE_FETCH_RETRY_DELAY_MS
+  } = {}
+) {
+  let lastError;
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    try {
+      return await operation();
+    } catch (error) {
+      lastError = error;
+      if (attempt >= attempts || !isTransientGitNetworkError(error)) {
+        throw error;
+      }
+      await delay(delayMs);
+    }
+  }
+  throw lastError;
+}
+
+function isTransientGitNetworkError(error) {
+  return /Could not resolve host|Failed to connect|Connection timed out|Operation timed out|Connection reset|early EOF|RPC failed|TLS connection/i.test(
+    error instanceof Error ? error.message : String(error)
+  );
 }
 
 async function writeMergedConfig({ baseConfigPath, outputConfigPath, includeWindowsRuntimeResources }) {
@@ -358,6 +394,10 @@ function quotePowerShell(value) {
 
 function isObject(value) {
   return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function delay(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 function parseArgs(argv) {
