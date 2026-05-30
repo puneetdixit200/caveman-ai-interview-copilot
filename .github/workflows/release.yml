@@ -61,6 +61,9 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Run native privacy shield tests
+        run: cargo test --manifest-path src-tauri/Cargo.toml screen_share --lib
+
       - name: Verify release metadata scripts
         run: npm run test:release
 
@@ -159,6 +162,12 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Run native privacy shield tests
+        run: cargo test --manifest-path src-tauri/Cargo.toml screen_share --lib
+
+      - name: Verify release packaging contracts
+        run: npm run test:release
+
       - name: Import Apple Developer certificate
         shell: bash
         run: |
@@ -210,6 +219,9 @@ jobs:
 
       - name: Verify packaged privacy shield
         run: node scripts/verify-privacy-shield-package.mjs --target macos-x64 --write-attestation src-tauri/target/release/bundle/privacy-shield-macos-x64.json
+
+      - name: Run packaged meeting-risk smoke
+        run: npm run dmg-meeting-risk:smoke:mac
 
       - name: Upload macOS Intel build artifact
         uses: actions/upload-artifact@v7.0.1
@@ -278,6 +290,12 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Run native privacy shield tests
+        run: cargo test --manifest-path src-tauri/Cargo.toml screen_share --lib
+
+      - name: Verify release packaging contracts
+        run: npm run test:release
+
       - name: Import Apple Developer certificate
         shell: bash
         run: |
@@ -330,6 +348,9 @@ jobs:
       - name: Verify packaged privacy shield
         run: node scripts/verify-privacy-shield-package.mjs --target macos-arm64 --write-attestation src-tauri/target/release/bundle/privacy-shield-macos-arm64.json
 
+      - name: Run packaged meeting-risk smoke
+        run: npm run dmg-meeting-risk:smoke:mac
+
       - name: Upload macOS Apple Silicon build artifact
         uses: actions/upload-artifact@v7.0.1
         with:
@@ -372,6 +393,12 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
+
+      - name: Run native privacy shield tests
+        run: cargo test --manifest-path src-tauri/Cargo.toml screen_share --lib
+
+      - name: Verify release packaging contracts
+        run: npm run test:release
 
       - name: Prepare Whisper sidecar
         run: npm run sidecars:prepare -- --target current --base-config src-tauri/tauri.release.conf.json --output-config src-tauri/target/tauri.release.sidecars.generated.conf.json

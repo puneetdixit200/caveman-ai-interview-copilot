@@ -56,6 +56,7 @@ Make Caveman harder to expose during Google Meet, Microsoft Teams, and screen-sh
 - The detector catalog was expanded for more supported "all screen share" coverage: additional web meeting/capture origins, desktop meeting apps, screen recorders, and remote-support clients are now anchored in source and package privacy-shield attestations.
 - The package smoke workflow now runs `cargo test --manifest-path src-tauri/Cargo.toml screen_share --lib` in every Windows, macOS, and Linux package lane before packaging contract checks, so EXE/DMG package smoke also compiles and exercises the native detector unit tests.
 - macOS package-smoke artifacts upload the generated DMG and privacy-shield attestation instead of the raw `.app` directory; the DMG smoke still mounts and verifies the app inside the installer before upload.
+- Signed release publishing now mirrors the package-smoke privacy gates: every Windows, macOS, and Linux signed-release lane runs native screen-share detector tests and release contracts before building, and both signed macOS DMG lanes run packaged meeting-risk smoke before uploading release artifacts.
 
 ## Verification already run locally
 
@@ -98,6 +99,9 @@ Follow-up CI hardening verification:
   - macOS Intel app/DMG: native privacy tests, release contracts, package build, sidecar verification, packaged privacy shield, packaged meeting-risk smoke, and DMG artifact upload passed.
   - macOS Apple Silicon app/DMG: native privacy tests, release contracts, package build, sidecar verification, packaged privacy shield, packaged meeting-risk smoke, and DMG artifact upload passed.
   - Linux AppImage/DEB: native privacy tests, release contracts, package build, sidecar verification, packaged privacy shield, and artifact upload passed.
+- Signed-release privacy gate follow-up verification:
+  - `node --test scripts/release-workflow.test.mjs` passed 40 tests after adding native detector tests and signed macOS DMG meeting-risk smoke gates to `.github/workflows/release.yml`.
+  - `npm run test:release` passed 146 tests with the signed-release privacy gates.
 
 ## CI to check next
 
@@ -107,7 +111,7 @@ List recent runs with:
 gh run list --repo puneetdixit200/caveman-ai-interview-copilot --branch main --limit 5 --json databaseId,workflowName,headSha,status,conclusion,createdAt,url
 ```
 
-Latest verified package-smoke run before this handoff refresh: `26689263325` for `3c1245b`, green in all lanes.
+Latest verified package-smoke run before this handoff refresh: `26689263325` for `3c1245b`, green in all lanes. If the signed-release workflow gate commit has just been pushed, verify the next Desktop Package Smoke run because package smoke executes the release workflow contract tests.
 
 ## Suggested next steps
 
