@@ -65,6 +65,19 @@ test("requires packaged WebView privacy command timeout marker", () => {
   );
 });
 
+test("requires packaged companion restore privacy gate markers", () => {
+  assert.ok(
+    COMMON_PRIVACY_SHIELD_MARKERS.includes(
+      "Companion app window restore paths use the native show privacy gate before raising windows."
+    )
+  );
+  assert.ok(
+    COMMON_PRIVACY_SHIELD_MARKERS.includes(
+      "Companion app window focus repair rechecks privacy before raising windows."
+    )
+  );
+});
+
 test("requires packaged Teams and Google Meet WebView detector markers", () => {
   assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("msedgewebview2.exe"));
   assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("msedge_proxy.exe"));

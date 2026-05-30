@@ -59,6 +59,10 @@ pub const COMPANION_WINDOW_SHARE_RISK_CLEAR_REPAIR_MARKER: &str =
     "Companion app windows reactivate after screen-share risk clears to recover usable bounds.";
 pub const COMPANION_WINDOW_REOPEN_PRIVACY_RESTORE_MARKER: &str =
     "Companion app windows use a privacy-gated reopen restore when the bundle is reopened.";
+pub const COMPANION_WINDOW_RESTORE_NATIVE_SHOW_GATE_MARKER: &str =
+    "Companion app window restore paths use the native show privacy gate before raising windows.";
+pub const COMPANION_WINDOW_FOCUS_PRIVACY_RECHECK_MARKER: &str =
+    "Companion app window focus repair rechecks privacy before raising windows.";
 const COMPANION_WINDOW_MIN_WIDTH: u32 = 1024;
 const COMPANION_WINDOW_MIN_HEIGHT: u32 = 720;
 const COMPANION_WINDOW_DEFAULT_WIDTH: u32 = 1280;
@@ -597,8 +601,72 @@ pub fn companion_visibility_success_status(
     companion_window_status(status)
 }
 
+pub fn companion_restore_privacy_gate_status(
+    protection_status: OverlayProtectionStatus,
+    screen_share_decision: crate::screen_share::NativePrivacyShieldDecision,
+) -> OverlayProtectionStatus {
+    std::hint::black_box(COMPANION_WINDOW_RESTORE_NATIVE_SHOW_GATE_MARKER);
+    companion_window_status(native_show_privacy_gate_status(
+        true,
+        protection_status,
+        screen_share_decision,
+        "companion app windows",
+    ))
+}
+
+fn restore_companion_windows_with_native_show_gate(
+    app: &tauri::AppHandle,
+    focus_after_restore: bool,
+) -> OverlayProtectionStatus {
+    let protection_status = protect_overlay_window(app, true);
+    let gated_status = companion_restore_privacy_gate_status(
+        protection_status,
+        crate::screen_share::native_privacy_shield_decision(
+            crate::screen_share::detect_screen_share_status_for_native_visibility_gate(),
+        ),
+    );
+
+    if native_show_was_denied(&gated_status) {
+        let _ = set_overlay_window_visible(app, false, true);
+        let _ = set_companion_windows_visible(app, false, true);
+        return gated_status;
+    }
+
+    let status = set_companion_windows_visible(app, true, true);
+    if status.visible && focus_after_restore {
+        focus_companion_windows(app);
+    }
+    status
+}
+
+fn companion_focus_privacy_gate_denied(app: &tauri::AppHandle) -> bool {
+    std::hint::black_box(COMPANION_WINDOW_FOCUS_PRIVACY_RECHECK_MARKER);
+
+    let protection_status = protect_overlay_window(app, true);
+    let gated_status = native_show_privacy_gate_status(
+        true,
+        protection_status,
+        crate::screen_share::native_privacy_shield_decision(
+            crate::screen_share::detect_screen_share_status_for_native_visibility_gate(),
+        ),
+        "companion app windows",
+    );
+
+    if native_show_was_denied(&gated_status) {
+        let _ = set_overlay_window_visible(app, false, true);
+        let _ = set_companion_windows_visible(app, false, true);
+        return true;
+    }
+
+    false
+}
+
 pub fn focus_companion_windows(app: &tauri::AppHandle) {
     use tauri::Manager;
+
+    if companion_focus_privacy_gate_denied(app) {
+        return;
+    }
 
     for (label, window) in app.webview_windows() {
         if !is_companion_window_label(&label) {
@@ -621,58 +689,15 @@ pub fn focus_companion_windows(app: &tauri::AppHandle) {
 }
 
 pub fn restore_companion_windows_after_clear_privacy_check(app: &tauri::AppHandle) {
-    use tauri::Manager;
-
     std::hint::black_box(COMPANION_WINDOW_BACKGROUND_REPAIR_MARKER);
 
-    for (label, window) in app.webview_windows() {
-        if !is_companion_window_label(&label) {
-            continue;
-        }
-
-        let needs_native_activation = companion_window_needs_native_activation(app);
-        let _ = window.unminimize();
-        let repaired_before_show = repair_companion_window_bounds(app, &window);
-        let native_repaired_before_show =
-            repair_native_companion_window_bounds_if_needed(app, &window, needs_native_activation);
-        let visibility_result = window.show();
-        let repaired_after_show = repair_companion_window_bounds(app, &window);
-        let native_repaired_after_show = repair_native_companion_window_bounds_if_needed(
-            app,
-            &window,
-            companion_window_needs_native_activation(app),
-        );
-        if visibility_result.is_ok()
-            && (needs_native_activation
-                || repaired_before_show
-                || native_repaired_before_show
-                || repaired_after_show
-                || native_repaired_after_show)
-        {
-            focus_repaired_companion_window(app, &window);
-        }
-    }
+    let _ = restore_companion_windows_with_native_show_gate(app, false);
 }
 
 pub fn restore_companion_windows_after_share_risk_cleared(app: &tauri::AppHandle) {
-    use tauri::Manager;
-
     std::hint::black_box(COMPANION_WINDOW_SHARE_RISK_CLEAR_REPAIR_MARKER);
 
-    for (label, window) in app.webview_windows() {
-        if !is_companion_window_label(&label) {
-            continue;
-        }
-
-        let _ = window.unminimize();
-        let _ = repair_companion_window_bounds(app, &window);
-        let _ = force_repair_companion_window_bounds(app, &window);
-        let _ = window.show();
-        let _ = force_repair_companion_window_bounds(app, &window);
-        activate_app_for_companion_window_repair(app);
-        let _ = window.set_focus();
-        let _ = repair_companion_window_bounds(app, &window);
-    }
+    let _ = restore_companion_windows_with_native_show_gate(app, true);
 }
 
 pub fn restore_companion_windows_after_user_reopen(app: &tauri::AppHandle) {
@@ -907,6 +932,10 @@ fn companion_window_status(mut status: OverlayProtectionStatus) -> OverlayProtec
 
 fn focus_repaired_companion_window(app: &tauri::AppHandle, window: &tauri::WebviewWindow) {
     std::hint::black_box(COMPANION_WINDOW_FOREGROUND_REPAIR_MARKER);
+
+    if companion_focus_privacy_gate_denied(app) {
+        return;
+    }
 
     activate_app_for_companion_window_repair(app);
     let _ = window.unminimize();

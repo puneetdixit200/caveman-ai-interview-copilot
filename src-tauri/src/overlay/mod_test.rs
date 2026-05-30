@@ -1,9 +1,10 @@
 use super::{
     bounds_update_privacy_gate_message, capture_exclusion_disabled_status,
     capture_exclusion_enabled_status, capture_exclusion_unavailable_status,
-    companion_capture_exclusion_status, companion_visibility_success_status,
-    enforce_capture_exclusion_setting, is_companion_window_label, is_overlay_window_label,
-    native_show_privacy_gate_status, post_show_privacy_recheck_message, protected_window_labels,
+    companion_capture_exclusion_status, companion_restore_privacy_gate_status,
+    companion_visibility_success_status, enforce_capture_exclusion_setting,
+    is_companion_window_label, is_overlay_window_label, native_show_privacy_gate_status,
+    post_show_privacy_recheck_message, protected_window_labels,
     protection_refresh_fail_closed_message, sanitize_companion_window_bounds,
     sanitize_overlay_bounds, startup_privacy_shield_hide_reason, windows_capture_exclusion_status,
     OverlayProtectionStatus, OverlayWindowBounds, BOUNDS_UPDATE_UNSAFE_PROTECTION_MARKER,
@@ -11,8 +12,9 @@ use super::{
     COMPANION_POST_SHOW_UNSAFE_PROTECTION_MARKER, COMPANION_UNSAFE_PROTECTION_MARKER,
     COMPANION_WINDOW_APP_ACTIVATION_REPAIR_MARKER, COMPANION_WINDOW_BACKGROUND_REPAIR_MARKER,
     COMPANION_WINDOW_BOUNDS_REPAIR_MARKER, COMPANION_WINDOW_BOUNDS_WATCHDOG_INTERVAL_MS,
-    COMPANION_WINDOW_FOREGROUND_REPAIR_MARKER, COMPANION_WINDOW_NATIVE_BOUNDS_REPAIR_MARKER,
-    COMPANION_WINDOW_REOPEN_PRIVACY_RESTORE_MARKER,
+    COMPANION_WINDOW_FOCUS_PRIVACY_RECHECK_MARKER, COMPANION_WINDOW_FOREGROUND_REPAIR_MARKER,
+    COMPANION_WINDOW_NATIVE_BOUNDS_REPAIR_MARKER, COMPANION_WINDOW_REOPEN_PRIVACY_RESTORE_MARKER,
+    COMPANION_WINDOW_RESTORE_NATIVE_SHOW_GATE_MARKER,
     COMPANION_WINDOW_SHARE_RISK_CLEAR_REPAIR_MARKER,
     COMPANION_WINDOW_WATCHDOG_PRIVACY_PAUSE_MARKER,
     COMPANION_WINDOW_WATCHDOG_VISIBLE_RESTORE_MARKER, OVERLAY_POST_SHOW_SHARE_RISK_MARKER,
@@ -99,6 +101,8 @@ fn repairs_tiny_offscreen_companion_window_to_centered_monitor_bounds() {
     assert!(COMPANION_WINDOW_APP_ACTIVATION_REPAIR_MARKER.contains("reactivates the app"));
     assert!(COMPANION_WINDOW_SHARE_RISK_CLEAR_REPAIR_MARKER.contains("screen-share risk clears"));
     assert!(COMPANION_WINDOW_REOPEN_PRIVACY_RESTORE_MARKER.contains("bundle is reopened"));
+    assert!(COMPANION_WINDOW_RESTORE_NATIVE_SHOW_GATE_MARKER.contains("native show privacy gate"));
+    assert!(COMPANION_WINDOW_FOCUS_PRIVACY_RECHECK_MARKER.contains("rechecks privacy"));
     assert_eq!(STARTUP_COMPANION_WINDOW_REPAIR_DELAYS_MS, [150, 600, 1_500]);
     assert_eq!(COMPANION_WINDOW_BOUNDS_WATCHDOG_INTERVAL_MS, 500);
 
@@ -468,4 +472,44 @@ fn companion_capture_exclusion_requires_required_companion_windows() {
         .message
         .unwrap()
         .contains("main window was not found"));
+}
+
+#[test]
+fn companion_restore_gate_blocks_when_share_or_capture_risk_is_active() {
+    let blocked_by_share = companion_restore_privacy_gate_status(
+        capture_exclusion_enabled_status(false),
+        NativePrivacyShieldDecision::Hide {
+            reason: "Known screen-sharing or recording process is running.".to_string(),
+        },
+    );
+
+    assert_eq!(blocked_by_share.capture_exclusion, "enabled");
+    assert!(!blocked_by_share.visible);
+    assert!(blocked_by_share
+        .message
+        .unwrap()
+        .contains("Native privacy shield denied showing companion app windows"));
+
+    let blocked_by_capture = companion_restore_privacy_gate_status(
+        capture_exclusion_unavailable_status(),
+        NativePrivacyShieldDecision::Allow,
+    );
+
+    assert_eq!(blocked_by_capture.capture_exclusion, "unsupported");
+    assert!(!blocked_by_capture.visible);
+    let message = blocked_by_capture.message.unwrap();
+    assert!(message.contains("Capture exclusion is not enforced"));
+    assert!(message.contains("unsupported"));
+}
+
+#[test]
+fn companion_restore_gate_allows_when_share_clear_and_capture_exclusion_enabled() {
+    let status = companion_restore_privacy_gate_status(
+        capture_exclusion_enabled_status(false),
+        NativePrivacyShieldDecision::Allow,
+    );
+
+    assert_eq!(status.capture_exclusion, "enabled");
+    assert!(!status.visible);
+    assert!(status.message.is_none());
 }
