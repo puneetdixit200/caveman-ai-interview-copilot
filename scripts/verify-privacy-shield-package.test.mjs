@@ -28,6 +28,8 @@ const WINDOWS_ENUMWINDOWS_FAST_GATE_MARKER =
   "Native privacy shield checks Windows EnumWindows visible titles before tasklist fallback.";
 const WINDOWS_UNAVAILABLE_BROWSER_TITLE_MARKER =
   "Windows visible browser title guard hides when a visible browser window title is unavailable.";
+const WINDOWS_TOOLHELP_PROCESS_MARKER =
+  "Native privacy shield enumerates Windows processes with ToolHelp before tasklist fallback.";
 
 function assertDesktopProcessMarker(marker) {
   for (const target of DESKTOP_PROCESS_TARGETS) {
@@ -407,6 +409,11 @@ test("requires packaged protection refresh fail-closed marker", () => {
   assert.ok(!TARGET_PRIVACY_SHIELD_MARKERS["macos-arm64"].includes(WINDOWS_UNAVAILABLE_BROWSER_TITLE_MARKER));
   assert.ok(!TARGET_PRIVACY_SHIELD_MARKERS["macos-x64"].includes(WINDOWS_UNAVAILABLE_BROWSER_TITLE_MARKER));
   assert.ok(!TARGET_PRIVACY_SHIELD_MARKERS["linux-x64"].includes(WINDOWS_UNAVAILABLE_BROWSER_TITLE_MARKER));
+  assert.ok(WINDOWS_NATIVE_PRIVACY_SHIELD_MARKERS.includes(WINDOWS_TOOLHELP_PROCESS_MARKER));
+  assert.ok(TARGET_PRIVACY_SHIELD_MARKERS["windows-x64"].includes(WINDOWS_TOOLHELP_PROCESS_MARKER));
+  assert.ok(!TARGET_PRIVACY_SHIELD_MARKERS["macos-arm64"].includes(WINDOWS_TOOLHELP_PROCESS_MARKER));
+  assert.ok(!TARGET_PRIVACY_SHIELD_MARKERS["macos-x64"].includes(WINDOWS_TOOLHELP_PROCESS_MARKER));
+  assert.ok(!TARGET_PRIVACY_SHIELD_MARKERS["linux-x64"].includes(WINDOWS_TOOLHELP_PROCESS_MARKER));
   assert.ok(
     TARGET_PRIVACY_SHIELD_MARKERS["macos-arm64"].includes(
       "macOS process screen-share guard skips window-title scan after direct capture-process match."

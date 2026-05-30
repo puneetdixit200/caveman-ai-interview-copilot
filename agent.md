@@ -8,10 +8,11 @@ Make Caveman harder to expose during Google Meet, Microsoft Teams, and screen-sh
 
 - Branch: `main`
 - Remote: `origin/main`
-- Latest pushed implementation commit before this handoff refresh: `6b88fb1 fix: fail closed on unreadable windows browser titles`
+- Latest pushed implementation commit before this handoff refresh: `a1b2e9c fix: check windows visible titles before tasklist`
 - This handoff file is being kept current as the screen-share hardening work continues.
 - Previous relevant commits:
   - `c7569f5 ci: verify macos privacy shield on push`
+  - `a1b2e9c fix: check windows visible titles before tasklist`
   - `6b88fb1 fix: fail closed on unreadable windows browser titles`
   - `21b87e9 fix: scan windows visible share titles`
   - `3d58c23 fix: scan macos browser share titles faster`
@@ -49,6 +50,7 @@ Make Caveman harder to expose during Google Meet, Microsoft Teams, and screen-sh
 - Windows now has a supported `EnumWindows` visible-title scan layered on top of `tasklist /V`, so the shipped EXE can detect browser/PWA Google Meet, Teams, and sharing titles even when process-list window-title rows are incomplete.
 - Windows visible browser/PWA windows now fail closed when the native title cannot be read, matching the existing macOS redacted-title behavior for supported OS-level detection.
 - Windows native privacy polling now checks visible browser/PWA titles with `EnumWindows` before falling back to slower `tasklist`, so already-visible Meet/Teams/share UI can hide Caveman sooner.
+- Windows screen-share detection now uses supported ToolHelp process enumeration before `tasklist`, so known meeting, recorder, and remote-support processes can trigger hide without waiting for shell process listing.
 
 ## Verification already run locally
 

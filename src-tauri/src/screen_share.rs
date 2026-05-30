@@ -76,6 +76,9 @@ pub const NATIVE_PRIVACY_SHIELD_WINDOWS_ENUMWINDOWS_FAST_GATE_MARKER: &str =
 #[cfg(target_os = "windows")]
 pub const NATIVE_PRIVACY_SHIELD_WINDOWS_UNAVAILABLE_BROWSER_TITLE_MARKER: &str =
     "Windows visible browser title guard hides when a visible browser window title is unavailable.";
+#[cfg(target_os = "windows")]
+pub const NATIVE_PRIVACY_SHIELD_WINDOWS_TOOLHELP_PROCESS_MARKER: &str =
+    "Native privacy shield enumerates Windows processes with ToolHelp before tasklist fallback.";
 pub const NATIVE_PRIVACY_SHIELD_REFRESHES_CAPTURE_BEFORE_SHARE_HIDE_MARKER: &str =
     "Native privacy shield refreshes capture exclusion before hiding for screen-share risk.";
 pub const NATIVE_PRIVACY_SHIELD_MAIN_THREAD_WINDOW_UPDATE_MARKER: &str =
@@ -329,6 +332,8 @@ const PACKAGE_PRIVACY_SHIELD_WEBVIEW_MARKERS: &[&str] = &[
     NATIVE_PRIVACY_SHIELD_WINDOWS_ENUMWINDOWS_FAST_GATE_MARKER,
     #[cfg(target_os = "windows")]
     NATIVE_PRIVACY_SHIELD_WINDOWS_UNAVAILABLE_BROWSER_TITLE_MARKER,
+    #[cfg(target_os = "windows")]
+    NATIVE_PRIVACY_SHIELD_WINDOWS_TOOLHELP_PROCESS_MARKER,
 ];
 
 #[derive(Debug, Clone, PartialEq)]
@@ -655,6 +660,10 @@ pub fn detect_screen_share_status() -> anyhow::Result<ScreenShareStatus> {
 
     #[cfg(target_os = "windows")]
     {
+        if let Some(status) = detect_windows_toolhelp_process_privacy_status() {
+            return Ok(status);
+        }
+
         let output = run_screen_share_guard_command("tasklist", &["/V", "/FO", "CSV", "/NH"])?;
 
         if !output.status.success() {
@@ -1432,6 +1441,68 @@ fn detect_windows_visible_window_title_privacy_status() -> Option<ScreenShareSta
 }
 
 #[cfg(target_os = "windows")]
+fn detect_windows_toolhelp_process_privacy_status() -> Option<ScreenShareStatus> {
+    std::hint::black_box(NATIVE_PRIVACY_SHIELD_WINDOWS_TOOLHELP_PROCESS_MARKER);
+
+    let status = screen_share_status_for_processes(detect_windows_toolhelp_processes());
+    status.active.then_some(status)
+}
+
+#[cfg(target_os = "windows")]
+fn detect_windows_toolhelp_processes() -> Vec<ScreenShareProcess> {
+    use windows::Win32::System::Diagnostics::ToolHelp::{
+        CreateToolhelp32Snapshot, Process32FirstW, Process32NextW, PROCESSENTRY32W,
+        TH32CS_SNAPPROCESS,
+    };
+
+    let snapshot = unsafe { CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0).ok() };
+    let Some(snapshot) = snapshot else {
+        return Vec::new();
+    };
+    let _snapshot_guard = WindowsSnapshotGuard(snapshot);
+    let mut entry = PROCESSENTRY32W {
+        dwSize: std::mem::size_of::<PROCESSENTRY32W>() as u32,
+        ..Default::default()
+    };
+
+    if unsafe { Process32FirstW(snapshot, &mut entry) }.is_err() {
+        return Vec::new();
+    }
+
+    let mut processes = Vec::new();
+    loop {
+        let name = windows_process_entry_name(&entry);
+        if !name.is_empty() {
+            processes.push(ScreenShareProcess {
+                name,
+                pid: Some(entry.th32ProcessID),
+                window_title: None,
+            });
+        }
+
+        if unsafe { Process32NextW(snapshot, &mut entry) }.is_err() {
+            break;
+        }
+    }
+
+    processes
+}
+
+#[cfg(target_os = "windows")]
+fn windows_process_entry_name(
+    entry: &windows::Win32::System::Diagnostics::ToolHelp::PROCESSENTRY32W,
+) -> String {
+    let end = entry
+        .szExeFile
+        .iter()
+        .position(|unit| *unit == 0)
+        .unwrap_or(entry.szExeFile.len());
+    String::from_utf16_lossy(&entry.szExeFile[..end])
+        .trim()
+        .to_string()
+}
+
+#[cfg(target_os = "windows")]
 fn read_windows_window_title(hwnd: windows::Win32::Foundation::HWND) -> String {
     use windows::Win32::UI::WindowsAndMessaging::{GetWindowTextLengthW, GetWindowTextW};
 
@@ -1488,6 +1559,16 @@ struct WindowsHandleGuard(windows::Win32::Foundation::HANDLE);
 
 #[cfg(target_os = "windows")]
 impl Drop for WindowsHandleGuard {
+    fn drop(&mut self) {
+        let _ = unsafe { windows::Win32::Foundation::CloseHandle(self.0) };
+    }
+}
+
+#[cfg(target_os = "windows")]
+struct WindowsSnapshotGuard(windows::Win32::Foundation::HANDLE);
+
+#[cfg(target_os = "windows")]
+impl Drop for WindowsSnapshotGuard {
     fn drop(&mut self) {
         let _ = unsafe { windows::Win32::Foundation::CloseHandle(self.0) };
     }
@@ -2354,7 +2435,11 @@ mod tests {
                 #[cfg(target_os = "windows")]
                 NATIVE_PRIVACY_SHIELD_WINDOWS_ENUMWINDOWS_TITLE_MARKER,
                 #[cfg(target_os = "windows")]
-                NATIVE_PRIVACY_SHIELD_WINDOWS_UNAVAILABLE_BROWSER_TITLE_MARKER
+                NATIVE_PRIVACY_SHIELD_WINDOWS_ENUMWINDOWS_FAST_GATE_MARKER,
+                #[cfg(target_os = "windows")]
+                NATIVE_PRIVACY_SHIELD_WINDOWS_UNAVAILABLE_BROWSER_TITLE_MARKER,
+                #[cfg(target_os = "windows")]
+                NATIVE_PRIVACY_SHIELD_WINDOWS_TOOLHELP_PROCESS_MARKER
             ]
         );
     }

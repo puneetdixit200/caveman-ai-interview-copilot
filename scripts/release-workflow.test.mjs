@@ -354,7 +354,12 @@ test("native privacy shield refreshes capture protection before share-risk hide"
     screenShareRs,
     /Windows visible browser title guard hides when a visible browser window title is unavailable\./
   );
+  assert.match(
+    screenShareRs,
+    /Native privacy shield enumerates Windows processes with ToolHelp before tasklist fallback\./
+  );
   assert.match(screenShareRs, /detect_windows_visible_window_title_processes\(\)/);
+  assert.match(screenShareRs, /detect_windows_toolhelp_process_privacy_status\(\)/);
   const nativePrivacyDetectorStart = screenShareRs.indexOf(
     "pub fn detect_screen_share_status_for_native_privacy_shield()"
   );
@@ -369,6 +374,16 @@ test("native privacy shield refreshes capture protection before share-risk hide"
     nativePrivacyDetectorBody.indexOf("detect_windows_visible_window_title_privacy_status()") <
       nativePrivacyDetectorBody.indexOf("detect_screen_share_status()"),
     "Windows native privacy polling must check visible titles before tasklist fallback"
+  );
+  const windowsDetectorStart = screenShareRs.indexOf("#[cfg(target_os = \"windows\")]\n    {");
+  const windowsDetectorEnd = screenShareRs.indexOf("#[cfg(target_os = \"macos\")]", windowsDetectorStart);
+  const windowsDetectorBody = screenShareRs.slice(windowsDetectorStart, windowsDetectorEnd);
+  assert.notEqual(windowsDetectorStart, -1, "Windows screen-share detector branch must exist");
+  assert.notEqual(windowsDetectorEnd, -1, "Windows screen-share detector branch must be bounded");
+  assert.ok(
+    windowsDetectorBody.indexOf("detect_windows_toolhelp_process_privacy_status()") <
+      windowsDetectorBody.indexOf('run_screen_share_guard_command("tasklist"'),
+    "Windows detector must check ToolHelp processes before tasklist fallback"
   );
   assert.match(
     screenShareRs,
