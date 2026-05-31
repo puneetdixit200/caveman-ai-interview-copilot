@@ -72,6 +72,18 @@ test("summarizes simulated meeting risk hide and restore states", () => {
     summarizeMacosMeetingRiskSmoke({
       platform: "darwin",
       initialWindow: WINDOW,
+      scenarioResults: [{ label: "Google Meet browser window", hiddenDuringRisk: true }],
+      restoredWindow: WINDOW,
+      requireRestore: true,
+      requireScenarioRestore: false
+    }).status,
+    "ready"
+  );
+
+  assert.equal(
+    summarizeMacosMeetingRiskSmoke({
+      platform: "darwin",
+      initialWindow: WINDOW,
       scenarioResults: [
         { label: "Google Meet browser window", hiddenDuringRisk: true, restoredAfterRisk: true },
         { label: "Microsoft Teams browser window", hiddenDuringRisk: false }
@@ -349,6 +361,53 @@ test("terminates simulated meeting apps promptly when restoration is not require
 
   assert.equal(result.status, "ready");
   assert.deepEqual(killSignals, ["SIGTERM"]);
+});
+
+test("requires final restore without bouncing visible between macOS risk-batch scenarios", async () => {
+  const visibleWindowRows = JSON.stringify([WINDOW]);
+  const queryOutputs = [visibleWindowRows, "[]", visibleWindowRows];
+  const killSignals = [];
+
+  const commandRunner = async (command) => {
+    if (command === "swift") {
+      return { stdout: queryOutputs.shift() ?? visibleWindowRows };
+    }
+    return { stdout: "" };
+  };
+
+  const processSpawner = () => {
+    const child = new EventEmitter();
+    child.exitCode = null;
+    child.signalCode = null;
+    child.kill = (signal) => {
+      killSignals.push(signal);
+      child.signalCode = signal;
+      child.emit("exit");
+      return true;
+    };
+    return child;
+  };
+
+  const result = await runMacosMeetingRiskSmoke({
+    platform: "darwin",
+    commandRunner,
+    processSpawner,
+    requireRestore: true,
+    requireScenarioRestore: false,
+    scenarios: [
+      {
+        id: "teams-native",
+        label: "Microsoft Teams native process",
+        executableName: "MSTeams",
+        windowTitle: "Microsoft Teams - Interview"
+      }
+    ]
+  });
+
+  assert.equal(result.status, "ready");
+  assert.deepEqual(killSignals, ["SIGTERM"]);
+  assert.match(result.messages.join("\n"), /was hidden while the simulated meeting window was visible/);
+  assert.match(result.messages.join("\n"), /restored protected onscreen window/);
 });
 
 test("blocks the macOS meeting smoke when any visible Caveman window remains during risk", async () => {

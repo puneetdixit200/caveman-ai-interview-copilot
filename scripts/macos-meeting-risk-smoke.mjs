@@ -176,7 +176,8 @@ export function summarizeMacosMeetingRiskSmoke({
   scenarioResults = [],
   restoredWindow,
   detail,
-  requireRestore = true
+  requireRestore = true,
+  requireScenarioRestore = requireRestore
 }) {
   if (platform !== "darwin") {
     return {
@@ -200,7 +201,7 @@ export function summarizeMacosMeetingRiskSmoke({
       continue;
     }
 
-    if (requireRestore && !result.restoredAfterRisk) {
+    if (requireScenarioRestore && !result.restoredAfterRisk) {
       messages.push(
         `${result.label}: Caveman hid while the simulated meeting window was visible, but did not restore after risk cleared.${
           result.detail ? ` ${result.detail}` : ""
@@ -210,9 +211,9 @@ export function summarizeMacosMeetingRiskSmoke({
     }
 
     messages.push(
-      requireRestore
+      requireScenarioRestore
         ? `${result.label}: Caveman hid while the simulated meeting window was visible and restored after risk cleared.`
-        : `${result.label}: Caveman hid while the simulated meeting window was visible.`
+        : `${result.label}: Caveman was hidden while the simulated meeting window was visible.`
     );
   }
 
@@ -233,7 +234,7 @@ export function summarizeMacosMeetingRiskSmoke({
   const allScenariosHid =
     scenarioResults.length > 0 && scenarioResults.every((result) => result.hiddenDuringRisk);
   const allScenariosRestored =
-    !requireRestore || scenarioResults.every((result) => result.restoredAfterRisk);
+    !requireScenarioRestore || scenarioResults.every((result) => result.restoredAfterRisk);
   return {
     status:
       initialWindow && allScenariosHid && allScenariosRestored && (restoredWindow || !requireRestore)
@@ -250,6 +251,7 @@ export async function runMacosMeetingRiskSmoke({
   bundleId = process.env.CAVEMAN_BUNDLE_ID || DEFAULT_BUNDLE_ID,
   appPath = process.env.CAVEMAN_APP_PATH || null,
   requireRestore = true,
+  requireScenarioRestore = requireRestore,
   restoreWaitMs = RESTORE_WAIT_MS,
   activeRiskWaitMs = MACOS_MEETING_RISK_ACTIVE_WAIT_MS,
   fakeMeetingDurationMs = MACOS_MEETING_RISK_FAKE_MEETING_DURATION_MS,
@@ -281,7 +283,7 @@ export async function runMacosMeetingRiskSmoke({
           scenario,
           commandRunner,
           processSpawner,
-          requireRestore,
+          requireScenarioRestore,
           restoreWaitMs,
           activeRiskWaitMs,
           fakeMeetingDurationMs
@@ -297,7 +299,8 @@ export async function runMacosMeetingRiskSmoke({
       initialWindow,
       scenarioResults,
       restoredWindow,
-      requireRestore
+      requireRestore,
+      requireScenarioRestore
     });
   } finally {
     await rm(tempDir, { recursive: true, force: true });
@@ -309,7 +312,7 @@ async function runMeetingRiskScenario({
   scenario,
   commandRunner,
   processSpawner,
-  requireRestore,
+  requireScenarioRestore,
   restoreWaitMs,
   activeRiskWaitMs,
   fakeMeetingDurationMs
@@ -340,7 +343,7 @@ async function runMeetingRiskScenario({
       shouldStop: () => riskProcessExited
     });
     let restoredAfterRisk = null;
-    if (hiddenDuringRisk && requireRestore) {
+    if (hiddenDuringRisk && requireScenarioRestore) {
       await stopProcess(riskProcess);
       restoredAfterRisk = await waitForVisibleUsableWindow({ commandRunner, timeoutMs: restoreWaitMs });
     }
@@ -350,13 +353,13 @@ async function runMeetingRiskScenario({
       restoredAfterRisk: restoredAfterRisk ?? undefined,
       detail: riskProcessError
         ? riskProcessError.message
-        : hiddenDuringRisk && requireRestore && !restoredAfterRisk
+        : hiddenDuringRisk && requireScenarioRestore && !restoredAfterRisk
           ? "No protected onscreen usable Caveman window returned before timeout."
           : null
     };
   } finally {
     await stopProcess(riskProcess);
-    if (requireRestore) {
+    if (requireScenarioRestore) {
       await waitForVisibleUsableWindow({ commandRunner, timeoutMs: restoreWaitMs });
     }
   }
