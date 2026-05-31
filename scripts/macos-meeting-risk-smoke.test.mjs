@@ -192,6 +192,56 @@ test("lets simulated meeting apps exit before checking Caveman restoration", asy
   assert.deepEqual(killSignals, []);
 });
 
+test("blocks macOS meeting-risk smoke when any visible Caveman window remains during risk", async () => {
+  const visibleWindowRows = JSON.stringify([WINDOW]);
+  const tinyVisibleWindowRows = JSON.stringify([
+    {
+      ...WINDOW,
+      windowNumber: 11,
+      width: 640,
+      height: 410
+    }
+  ]);
+  const queryOutputs = [visibleWindowRows, tinyVisibleWindowRows];
+
+  const commandRunner = async (command) => {
+    if (command === "swift") {
+      return { stdout: queryOutputs.shift() ?? tinyVisibleWindowRows };
+    }
+    return { stdout: "" };
+  };
+
+  const processSpawner = () => {
+    const child = new EventEmitter();
+    child.exitCode = null;
+    child.signalCode = null;
+    child.kill = (signal) => {
+      child.signalCode = signal;
+      child.emit("exit");
+      return true;
+    };
+    return child;
+  };
+
+  const result = await runMacosMeetingRiskSmoke({
+    platform: "darwin",
+    commandRunner,
+    processSpawner,
+    activeRiskWaitMs: 1,
+    scenarios: [
+      {
+        id: "teams-native",
+        label: "Microsoft Teams native process",
+        executableName: "MSTeams",
+        windowTitle: "Microsoft Teams - Interview"
+      }
+    ]
+  });
+
+  assert.equal(result.status, "blocked");
+  assert.match(result.messages.join("\n"), /stayed visible/);
+});
+
 test("terminates simulated meeting apps promptly when restoration is not required", async () => {
   const visibleWindowRows = JSON.stringify([WINDOW]);
   const queryOutputs = [visibleWindowRows, "[]", visibleWindowRows];
@@ -239,4 +289,54 @@ test("terminates simulated meeting apps promptly when restoration is not require
 
   assert.equal(result.status, "ready");
   assert.deepEqual(killSignals, ["SIGTERM"]);
+});
+
+test("blocks the macOS meeting smoke when any visible Caveman window remains during risk", async () => {
+  const visibleWindowRows = JSON.stringify([WINDOW]);
+  const tinyVisibleWindowRows = JSON.stringify([
+    {
+      ...WINDOW,
+      width: 320,
+      height: 200
+    }
+  ]);
+  const queryOutputs = [visibleWindowRows, tinyVisibleWindowRows];
+
+  const commandRunner = async (command) => {
+    if (command === "swift") {
+      return { stdout: queryOutputs.shift() ?? tinyVisibleWindowRows };
+    }
+    return { stdout: "" };
+  };
+
+  const processSpawner = () => {
+    const child = new EventEmitter();
+    child.exitCode = null;
+    child.signalCode = null;
+    child.kill = (signal) => {
+      child.signalCode = signal;
+      child.emit("exit");
+      return true;
+    };
+    return child;
+  };
+
+  const result = await runMacosMeetingRiskSmoke({
+    platform: "darwin",
+    commandRunner,
+    processSpawner,
+    requireRestore: false,
+    activeRiskWaitMs: 1,
+    scenarios: [
+      {
+        id: "google-meet-browser",
+        label: "Google Meet browser window",
+        executableName: "Google Chrome",
+        windowTitle: "Google Meet - Candidate Screen"
+      }
+    ]
+  });
+
+  assert.equal(result.status, "blocked");
+  assert.match(result.messages.join("\n"), /stayed visible/);
 });

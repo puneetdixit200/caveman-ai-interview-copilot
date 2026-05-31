@@ -300,6 +300,16 @@ export function selectVisibleUsableCavemanWindow(rows) {
   );
 }
 
+export function selectVisibleCavemanWindow(rows) {
+  return rows.find(
+    (row) =>
+      isCavemanProcess(row.processName) &&
+      row.visible &&
+      row.width > 0 &&
+      row.height > 0
+  );
+}
+
 export function selectVisibleUsableProtectedCavemanWindow(rows) {
   return rows.find(
     (row) =>
@@ -487,7 +497,7 @@ async function runMeetingRiskScenario({
     const hiddenDuringRisk = await waitForCondition({
       timeoutMs: activeRiskWaitMs,
       commandRunner,
-      predicate: (rows) => !selectVisibleUsableCavemanWindow(rows),
+      predicate: (rows) => !selectVisibleCavemanWindow(rows),
       shouldStop: () => riskProcessExited
     });
     if (hiddenDuringRisk && requireRestore) {

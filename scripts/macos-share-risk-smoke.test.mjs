@@ -3,6 +3,7 @@ import test from "node:test";
 
 import {
   MACOS_SHARE_RISK_SMOKE_MARKER,
+  selectVisibleCavemanWindow,
   selectVisibleUsableCavemanWindow,
   summarizeMacosShareRiskSmoke
 } from "./macos-share-risk-smoke.mjs";
@@ -48,6 +49,7 @@ test("selects only protected onscreen usable Caveman windows", () => {
   ];
 
   assert.equal(selectVisibleUsableCavemanWindow(rows).windowNumber, 4);
+  assert.equal(selectVisibleCavemanWindow(rows).windowNumber, 2);
 });
 
 test("summarizes active share-risk hide and restore states", () => {

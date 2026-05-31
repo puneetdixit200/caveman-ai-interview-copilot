@@ -13,6 +13,7 @@ import {
   WINDOWS_MEETING_RISK_SMOKE_MARKER,
   parseWindowsWindowRows,
   runWindowsMeetingRiskSmoke,
+  selectVisibleCavemanWindow,
   selectVisibleUsableCavemanWindow,
   selectVisibleUsableProtectedCavemanWindow,
   summarizeWindowsMeetingRiskSmoke,
@@ -50,6 +51,7 @@ test("selects only visible usable protected Caveman windows", () => {
   );
 
   assert.equal(selectVisibleUsableCavemanWindow(rows)?.affinity, 0);
+  assert.equal(selectVisibleCavemanWindow(rows)?.width, 640);
   assert.equal(selectVisibleUsableProtectedCavemanWindow(rows)?.affinity, 17);
 });
 
@@ -193,6 +195,57 @@ test("runs the Windows EXE against simulated meeting and recording windows", asy
     }
     assert.ok(commands.some(([command, args]) => command === "taskkill" && args.includes("caveman.exe")));
     assert.ok(killSignals.some(([command]) => command === appExePath));
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test("blocks the Windows EXE smoke when any visible Caveman window remains during risk", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "caveman-windows-risk-visible-"));
+  const appExePath = join(dir, "caveman.exe");
+  const tinyVisibleWindow = {
+    ...PROTECTED_WINDOW,
+    width: 320,
+    height: 200
+  };
+
+  try {
+    await mkdir(dir, { recursive: true });
+    await writeFile(appExePath, "fake exe");
+
+    const commandRunner = async (command) => {
+      if (command === "taskkill") {
+        return { stdout: "", stderr: "" };
+      }
+      return {
+        stdout: JSON.stringify([PROTECTED_WINDOW, tinyVisibleWindow]),
+        stderr: ""
+      };
+    };
+
+    const processSpawner = () => {
+      const child = new EventEmitter();
+      child.exitCode = null;
+      child.signalCode = null;
+      child.kill = (signal) => {
+        child.signalCode = signal;
+        child.emit("exit");
+        return true;
+      };
+      return child;
+    };
+
+    const result = await runWindowsMeetingRiskSmoke({
+      platform: "win32",
+      appExePath,
+      commandRunner,
+      processSpawner,
+      activeRiskWaitMs: 1,
+      scenarios: [WINDOWS_MEETING_RISK_SCENARIOS[0]]
+    });
+
+    assert.equal(result.status, "blocked");
+    assert.match(result.messages.join("\n"), /stayed visible/);
   } finally {
     await rm(dir, { recursive: true, force: true });
   }

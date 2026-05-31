@@ -10,7 +10,10 @@ import {
   CAVEMAN_WINDOW_QUERY_SWIFT,
   parseCavemanWindowRows
 } from "./macos-capture-protection-smoke.mjs";
-import { selectVisibleUsableCavemanWindow } from "./macos-share-risk-smoke.mjs";
+import {
+  selectVisibleCavemanWindow,
+  selectVisibleUsableCavemanWindow
+} from "./macos-share-risk-smoke.mjs";
 
 const execFileAsync = promisify(execFile);
 
@@ -300,7 +303,7 @@ async function runMeetingRiskScenario({
     const hiddenDuringRisk = await waitForCondition({
       timeoutMs: activeRiskWaitMs,
       commandRunner,
-      predicate: (rows) => !selectVisibleUsableCavemanWindow(rows),
+      predicate: (rows) => !selectVisibleCavemanWindow(rows),
       shouldStop: () => riskProcessExited
     });
     if (hiddenDuringRisk && requireRestore) {

@@ -35,6 +35,17 @@ export function selectVisibleUsableCavemanWindow(rows) {
   );
 }
 
+export function selectVisibleCavemanWindow(rows) {
+  return rows.find(
+    (row) =>
+      row.ownerName.toLowerCase().includes("caveman") &&
+      row.windowNumber > 0 &&
+      row.isOnscreen === 1 &&
+      row.width > 0 &&
+      row.height > 0
+  );
+}
+
 export function summarizeMacosShareRiskSmoke({
   platform,
   initialWindow,
@@ -60,8 +71,8 @@ export function summarizeMacosShareRiskSmoke({
 
   messages.push(
     hiddenDuringRisk
-      ? "Caveman left protected onscreen usable window state while screencapture was active."
-      : "Caveman stayed in protected onscreen usable window state while screencapture was active."
+      ? "Caveman had no visible window while screencapture was active."
+      : "Caveman still had a visible window while screencapture was active."
   );
 
   if (restoredWindow) {
@@ -123,7 +134,7 @@ export async function runMacosShareRiskSmoke({
     const hiddenDuringRisk = await waitForCondition({
       timeoutMs: ACTIVE_RISK_WAIT_MS,
       commandRunner,
-      predicate: (rows) => !selectVisibleUsableCavemanWindow(rows),
+      predicate: (rows) => !selectVisibleCavemanWindow(rows),
       shouldStop: () => riskProcessExited
     });
     await stopProcess(riskProcess);
