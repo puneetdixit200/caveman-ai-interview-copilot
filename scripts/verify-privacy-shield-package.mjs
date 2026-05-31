@@ -189,6 +189,7 @@ export const COMMON_PRIVACY_SHIELD_MARKERS = [
   "vmware horizon",
   "amazon workspaces",
   "Screen-share guard command timeout failed closed before privacy polling could stall.",
+  "Native privacy shield retries companion restore until a protected window is visible after share risk clears.",
   "Screen-share window title guard normalizes UI punctuation before matching.",
   "Screen-share window title guard treats strong meeting/share titles from any visible app as risk.",
   "screencaptureui",

@@ -95,6 +95,11 @@ test("requires packaged companion restore privacy gate markers", () => {
       "Companion app window restore stays paused after a native privacy denial."
     )
   );
+  assert.ok(
+    COMMON_PRIVACY_SHIELD_MARKERS.includes(
+      "Native privacy shield retries companion restore until a protected window is visible after share risk clears."
+    )
+  );
 });
 
 test("requires packaged Teams and Google Meet WebView detector markers", () => {

@@ -822,16 +822,20 @@ pub fn focus_companion_windows(app: &tauri::AppHandle) {
     }
 }
 
-pub fn restore_companion_windows_after_clear_privacy_check(app: &tauri::AppHandle) {
+pub fn restore_companion_windows_after_clear_privacy_check(
+    app: &tauri::AppHandle,
+) -> OverlayProtectionStatus {
     std::hint::black_box(COMPANION_WINDOW_BACKGROUND_REPAIR_MARKER);
 
-    let _ = restore_companion_windows_with_native_show_gate(app, false);
+    restore_companion_windows_with_native_show_gate(app, false)
 }
 
-pub fn restore_companion_windows_after_share_risk_cleared(app: &tauri::AppHandle) {
+pub fn restore_companion_windows_after_share_risk_cleared(
+    app: &tauri::AppHandle,
+) -> OverlayProtectionStatus {
     std::hint::black_box(COMPANION_WINDOW_SHARE_RISK_CLEAR_REPAIR_MARKER);
 
-    let _ = restore_companion_windows_with_native_show_gate(app, true);
+    restore_companion_windows_with_native_show_gate(app, true)
 }
 
 pub fn restore_companion_windows_after_user_reopen(app: &tauri::AppHandle) {
