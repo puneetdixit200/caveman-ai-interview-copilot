@@ -201,6 +201,21 @@ const SLACK_HUDDLE_TITLE: &str = "slack huddle";
 const DISCORD_VOICE_TITLE: &str = "discord voice";
 const WHATSAPP_VIDEO_CALL_TITLE: &str = "whatsapp video call";
 const REMOTE_DESKTOP_TITLE: &str = "remote desktop";
+const TEAMVIEWER_REMOTE_CONTROL_TITLE: &str = "teamviewer remote control";
+const ANYDESK_REMOTE_CONTROL_TITLE: &str = "anydesk remote control";
+const RUSTDESK_REMOTE_DESKTOP_TITLE: &str = "rustdesk remote desktop";
+const CHROME_REMOTE_DESKTOP_TITLE: &str = "chrome remote desktop";
+const QUICK_ASSIST_TITLE: &str = "quick assist";
+const REMOTE_ASSISTANCE_TITLE: &str = "remote assistance";
+const SCREENCONNECT_TITLE: &str = "screenconnect";
+const CONNECTWISE_CONTROL_TITLE: &str = "connectwise control";
+const ZOHO_ASSIST_TITLE: &str = "zoho assist";
+const BEYONDTRUST_REMOTE_SUPPORT_TITLE: &str = "beyondtrust remote support";
+const MICROSOFT_REMOTE_DESKTOP_TITLE: &str = "microsoft remote desktop";
+const WINDOWS_APP_REMOTE_DESKTOP_TITLE: &str = "windows app remote desktop";
+const CITRIX_WORKSPACE_TITLE: &str = "citrix workspace";
+const VMWARE_HORIZON_TITLE: &str = "vmware horizon";
+const AMAZON_WORKSPACES_TITLE: &str = "amazon workspaces";
 const WINDOW_TITLE_PUNCTUATION_NORMALIZATION_MARKER: &str =
     "Screen-share window title guard normalizes UI punctuation before matching.";
 const STRONG_WINDOW_TITLE_ANY_APP_MARKER: &str =
@@ -378,6 +393,21 @@ const PACKAGE_PRIVACY_SHIELD_WEBVIEW_MARKERS: &[&str] = &[
     DISCORD_VOICE_TITLE,
     WHATSAPP_VIDEO_CALL_TITLE,
     REMOTE_DESKTOP_TITLE,
+    TEAMVIEWER_REMOTE_CONTROL_TITLE,
+    ANYDESK_REMOTE_CONTROL_TITLE,
+    RUSTDESK_REMOTE_DESKTOP_TITLE,
+    CHROME_REMOTE_DESKTOP_TITLE,
+    QUICK_ASSIST_TITLE,
+    REMOTE_ASSISTANCE_TITLE,
+    SCREENCONNECT_TITLE,
+    CONNECTWISE_CONTROL_TITLE,
+    ZOHO_ASSIST_TITLE,
+    BEYONDTRUST_REMOTE_SUPPORT_TITLE,
+    MICROSOFT_REMOTE_DESKTOP_TITLE,
+    WINDOWS_APP_REMOTE_DESKTOP_TITLE,
+    CITRIX_WORKSPACE_TITLE,
+    VMWARE_HORIZON_TITLE,
+    AMAZON_WORKSPACES_TITLE,
     SCREEN_SHARE_GUARD_COMMAND_TIMEOUT_MARKER,
     WINDOW_TITLE_PUNCTUATION_NORMALIZATION_MARKER,
     STRONG_WINDOW_TITLE_ANY_APP_MARKER,
@@ -559,6 +589,23 @@ const WATCHED_SCREEN_SHARE_PROCESSES: &[&str] = &[
     "rustdesk",
     "remoting_host.exe",
     "chrome remote desktop",
+    "microsoft remote desktop",
+    "windows app",
+    "rdclient",
+    "citrix workspace",
+    "receiver.exe",
+    "selfservice.exe",
+    "wfica32.exe",
+    "vmware horizon client",
+    "vmware-view.exe",
+    "horizon client",
+    "amazon workspaces",
+    "workspaces.exe",
+    "teradici pcoip client",
+    "pcoip client",
+    "realvnc viewer",
+    "tightvnc",
+    "ultravnc",
     "screen sharing",
     "screensharingagent",
     "screensharingd",
@@ -789,6 +836,21 @@ const WATCHED_SCREEN_SHARE_TITLES: &[&str] = &[
     DISCORD_VOICE_TITLE,
     WHATSAPP_VIDEO_CALL_TITLE,
     REMOTE_DESKTOP_TITLE,
+    TEAMVIEWER_REMOTE_CONTROL_TITLE,
+    ANYDESK_REMOTE_CONTROL_TITLE,
+    RUSTDESK_REMOTE_DESKTOP_TITLE,
+    CHROME_REMOTE_DESKTOP_TITLE,
+    QUICK_ASSIST_TITLE,
+    REMOTE_ASSISTANCE_TITLE,
+    SCREENCONNECT_TITLE,
+    CONNECTWISE_CONTROL_TITLE,
+    ZOHO_ASSIST_TITLE,
+    BEYONDTRUST_REMOTE_SUPPORT_TITLE,
+    MICROSOFT_REMOTE_DESKTOP_TITLE,
+    WINDOWS_APP_REMOTE_DESKTOP_TITLE,
+    CITRIX_WORKSPACE_TITLE,
+    VMWARE_HORIZON_TITLE,
+    AMAZON_WORKSPACES_TITLE,
     #[cfg(target_os = "macos")]
     NATIVE_PRIVACY_SHIELD_MACOS_REDACTED_BROWSER_TITLE_MARKER,
     #[cfg(target_os = "windows")]
@@ -1996,6 +2058,21 @@ fn is_strong_screen_share_window_title(title: Option<&str>) -> bool {
         DISCORD_VOICE_TITLE,
         WHATSAPP_VIDEO_CALL_TITLE,
         REMOTE_DESKTOP_TITLE,
+        TEAMVIEWER_REMOTE_CONTROL_TITLE,
+        ANYDESK_REMOTE_CONTROL_TITLE,
+        RUSTDESK_REMOTE_DESKTOP_TITLE,
+        CHROME_REMOTE_DESKTOP_TITLE,
+        QUICK_ASSIST_TITLE,
+        REMOTE_ASSISTANCE_TITLE,
+        SCREENCONNECT_TITLE,
+        CONNECTWISE_CONTROL_TITLE,
+        ZOHO_ASSIST_TITLE,
+        BEYONDTRUST_REMOTE_SUPPORT_TITLE,
+        MICROSOFT_REMOTE_DESKTOP_TITLE,
+        WINDOWS_APP_REMOTE_DESKTOP_TITLE,
+        CITRIX_WORKSPACE_TITLE,
+        VMWARE_HORIZON_TITLE,
+        AMAZON_WORKSPACES_TITLE,
     ];
 
     active_share_titles
@@ -2799,6 +2876,21 @@ mod tests {
                 DISCORD_VOICE_TITLE,
                 WHATSAPP_VIDEO_CALL_TITLE,
                 REMOTE_DESKTOP_TITLE,
+                TEAMVIEWER_REMOTE_CONTROL_TITLE,
+                ANYDESK_REMOTE_CONTROL_TITLE,
+                RUSTDESK_REMOTE_DESKTOP_TITLE,
+                CHROME_REMOTE_DESKTOP_TITLE,
+                QUICK_ASSIST_TITLE,
+                REMOTE_ASSISTANCE_TITLE,
+                SCREENCONNECT_TITLE,
+                CONNECTWISE_CONTROL_TITLE,
+                ZOHO_ASSIST_TITLE,
+                BEYONDTRUST_REMOTE_SUPPORT_TITLE,
+                MICROSOFT_REMOTE_DESKTOP_TITLE,
+                WINDOWS_APP_REMOTE_DESKTOP_TITLE,
+                CITRIX_WORKSPACE_TITLE,
+                VMWARE_HORIZON_TITLE,
+                AMAZON_WORKSPACES_TITLE,
                 SCREEN_SHARE_GUARD_COMMAND_TIMEOUT_MARKER,
                 WINDOW_TITLE_PUNCTUATION_NORMALIZATION_MARKER,
                 STRONG_WINDOW_TITLE_ANY_APP_MARKER,
@@ -3036,6 +3128,64 @@ mod tests {
                 ),
                 ("recording-indicator", Some("Meeting is being recorded")),
                 ("call-recording-indicator", Some("Recording in progress")),
+            ]
+        );
+    }
+
+    #[test]
+    fn detects_strong_remote_control_titles_from_unclassified_visible_apps() {
+        let status = screen_share_status_for_processes(vec![
+            ScreenShareProcess {
+                name: "remote-window".to_string(),
+                pid: Some(801),
+                window_title: Some("TeamViewer Remote Control".to_string()),
+            },
+            ScreenShareProcess {
+                name: "remote-window".to_string(),
+                pid: Some(802),
+                window_title: Some("Quick Assist - Remote Assistance".to_string()),
+            },
+            ScreenShareProcess {
+                name: "remote-window".to_string(),
+                pid: Some(803),
+                window_title: Some("ConnectWise Control - Remote Session".to_string()),
+            },
+            ScreenShareProcess {
+                name: "remote-window".to_string(),
+                pid: Some(804),
+                window_title: Some("Citrix Workspace - Desktop Viewer".to_string()),
+            },
+            ScreenShareProcess {
+                name: "remote-window".to_string(),
+                pid: Some(805),
+                window_title: Some("VMware Horizon - Shared Desktop".to_string()),
+            },
+            ScreenShareProcess {
+                name: "remote-window".to_string(),
+                pid: Some(806),
+                window_title: Some("Amazon WorkSpaces - Candidate Desktop".to_string()),
+            },
+            ScreenShareProcess {
+                name: "notes".to_string(),
+                pid: Some(807),
+                window_title: Some("TeamViewer remote control checklist".to_string()),
+            },
+        ]);
+
+        assert!(status.active);
+        assert_eq!(
+            status
+                .matched_processes
+                .iter()
+                .map(|process| process.pid)
+                .collect::<Vec<_>>(),
+            vec![
+                Some(801),
+                Some(802),
+                Some(803),
+                Some(804),
+                Some(805),
+                Some(806)
             ]
         );
     }
@@ -3467,6 +3617,31 @@ mod tests {
                 pid: Some(2006),
                 window_title: None,
             },
+            ScreenShareProcess {
+                name: "/Applications/Microsoft Remote Desktop.app/Contents/MacOS/Microsoft Remote Desktop".to_string(),
+                pid: Some(2007),
+                window_title: None,
+            },
+            ScreenShareProcess {
+                name: "Citrix Workspace.exe".to_string(),
+                pid: Some(2008),
+                window_title: None,
+            },
+            ScreenShareProcess {
+                name: "vmware-view.exe".to_string(),
+                pid: Some(2009),
+                window_title: None,
+            },
+            ScreenShareProcess {
+                name: "Amazon WorkSpaces".to_string(),
+                pid: Some(2010),
+                window_title: None,
+            },
+            ScreenShareProcess {
+                name: "RealVNC Viewer".to_string(),
+                pid: Some(2011),
+                window_title: None,
+            },
         ];
 
         let status = screen_share_status_for_processes(processes);
@@ -3484,7 +3659,12 @@ mod tests {
                 Some(2003),
                 Some(2004),
                 Some(2005),
-                Some(2006)
+                Some(2006),
+                Some(2007),
+                Some(2008),
+                Some(2009),
+                Some(2010),
+                Some(2011)
             ]
         );
     }

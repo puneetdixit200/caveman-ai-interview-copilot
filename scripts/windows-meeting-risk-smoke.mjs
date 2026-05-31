@@ -21,7 +21,7 @@ export const WINDOWS_MEETING_RISK_ACTIVE_WAIT_MS = 18_000;
 export const WINDOWS_MEETING_RISK_FAKE_MEETING_DURATION_MS = 24_000;
 export const WINDOWS_MEETING_RISK_INITIAL_WAIT_MS = 30_000;
 export const WINDOWS_MEETING_RISK_SMOKE_MARKER =
-  "Windows EXE meeting-risk smoke launches the built app and verifies Caveman hides during simulated Google Meet, Teams, Zoom, Webex, huddle, remote desktop, presenting, and recording windows, then restores after risk clears.";
+  "Windows EXE meeting-risk smoke launches the built app and verifies Caveman hides during simulated Google Meet, Teams, Zoom, Webex, huddle, remote desktop/support, presenting, and recording windows, then restores after risk clears.";
 
 export const WINDOWS_CAVEMAN_WINDOW_QUERY_POWERSHELL = `
 $ErrorActionPreference = "Stop"
@@ -234,6 +234,11 @@ export const WINDOWS_MEETING_RISK_SCENARIOS = [
     id: "remote-desktop",
     label: "Remote desktop window",
     windowTitle: "Remote Desktop - Session"
+  },
+  {
+    id: "remote-support-control",
+    label: "Remote support control window",
+    windowTitle: "TeamViewer Remote Control"
   },
   {
     id: "screen-recorder",

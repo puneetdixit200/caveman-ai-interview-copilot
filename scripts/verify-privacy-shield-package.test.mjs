@@ -39,7 +39,12 @@ function assertDesktopProcessMarker(marker) {
   for (const target of DESKTOP_PROCESS_TARGETS) {
     assert.ok(TARGET_PRIVACY_SHIELD_MARKERS[target].includes(marker), `${target} must require ${marker}`);
   }
-  assert.ok(!TARGET_PRIVACY_SHIELD_MARKERS["linux-x64"].includes(marker), `linux-x64 must not require ${marker}`);
+  if (!COMMON_PRIVACY_SHIELD_MARKERS.includes(marker)) {
+    assert.ok(
+      !TARGET_PRIVACY_SHIELD_MARKERS["linux-x64"].includes(marker),
+      `linux-x64 must not require ${marker}`
+    );
+  }
 }
 
 test("validates packaged native privacy markers from binary content", () => {
@@ -127,6 +132,23 @@ test("requires packaged remote screen-share detector markers", () => {
   assertDesktopProcessMarker("rustdesk.exe");
   assertDesktopProcessMarker("remoting_host.exe");
   assertDesktopProcessMarker("chrome remote desktop");
+  assertDesktopProcessMarker("microsoft remote desktop");
+  assertDesktopProcessMarker("windows app");
+  assertDesktopProcessMarker("rdclient");
+  assertDesktopProcessMarker("citrix workspace");
+  assertDesktopProcessMarker("receiver.exe");
+  assertDesktopProcessMarker("selfservice.exe");
+  assertDesktopProcessMarker("wfica32.exe");
+  assertDesktopProcessMarker("vmware horizon client");
+  assertDesktopProcessMarker("vmware-view.exe");
+  assertDesktopProcessMarker("horizon client");
+  assertDesktopProcessMarker("amazon workspaces");
+  assertDesktopProcessMarker("workspaces.exe");
+  assertDesktopProcessMarker("teradici pcoip client");
+  assertDesktopProcessMarker("pcoip client");
+  assertDesktopProcessMarker("realvnc viewer");
+  assertDesktopProcessMarker("tightvnc");
+  assertDesktopProcessMarker("ultravnc");
   assertDesktopProcessMarker("vnc viewer");
   assertDesktopProcessMarker("parsec");
   assertDesktopProcessMarker("splashtop streamer");
@@ -295,6 +317,21 @@ test("requires packaged web meeting and recording title detector markers", () =>
   assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("discord voice"));
   assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("whatsapp video call"));
   assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("remote desktop"));
+  assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("teamviewer remote control"));
+  assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("anydesk remote control"));
+  assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("rustdesk remote desktop"));
+  assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("chrome remote desktop"));
+  assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("quick assist"));
+  assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("remote assistance"));
+  assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("screenconnect"));
+  assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("connectwise control"));
+  assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("zoho assist"));
+  assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("beyondtrust remote support"));
+  assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("microsoft remote desktop"));
+  assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("windows app remote desktop"));
+  assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("citrix workspace"));
+  assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("vmware horizon"));
+  assert.ok(COMMON_PRIVACY_SHIELD_MARKERS.includes("amazon workspaces"));
   assert.ok(
     COMMON_PRIVACY_SHIELD_MARKERS.includes(
       "Screen-share guard command timeout failed closed before privacy polling could stall."

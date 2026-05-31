@@ -18,7 +18,7 @@ import {
 const execFileAsync = promisify(execFile);
 
 export const MACOS_MEETING_RISK_SMOKE_MARKER =
-  "macOS meeting-risk smoke verifies Caveman hides during simulated Google Meet, Teams, Zoom, Webex, huddle, remote desktop, presenting, and recording windows and restores after risk clears.";
+  "macOS meeting-risk smoke verifies Caveman hides during simulated Google Meet, Teams, Zoom, Webex, huddle, remote desktop/support, presenting, and recording windows and restores after risk clears.";
 
 const DEFAULT_BUNDLE_ID = "com.caveman.desktop";
 const QUERY_MAX_BUFFER = 1024 * 1024;
@@ -137,6 +137,12 @@ export const MACOS_PACKAGED_MEETING_RISK_SCENARIOS = [
     label: "Remote desktop window",
     executableName: "AnyDesk",
     windowTitle: "Remote Desktop - Session"
+  },
+  {
+    id: "remote-support-control",
+    label: "Remote support control window",
+    executableName: "TeamViewer",
+    windowTitle: "TeamViewer Remote Control"
   },
   {
     id: "screen-recorder",
