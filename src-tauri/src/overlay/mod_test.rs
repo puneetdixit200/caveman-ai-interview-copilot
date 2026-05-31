@@ -5,7 +5,8 @@ use super::{
     companion_focus_post_show_privacy_recheck_message, companion_restore_privacy_gate_status,
     companion_restore_status_after_native_visibility_check, companion_visibility_success_status,
     enforce_capture_exclusion_setting, is_companion_window_label, is_overlay_window_label,
-    native_show_privacy_gate_status, post_show_privacy_recheck_message, protected_window_labels,
+    macos_app_activation_command_args, native_show_privacy_gate_status,
+    post_show_privacy_recheck_message, protected_window_labels,
     protection_refresh_fail_closed_message, sanitize_companion_window_bounds,
     sanitize_overlay_bounds, startup_privacy_shield_hide_reason, windows_capture_exclusion_status,
     windows_pre_show_capture_exclusion_can_recheck_after_show, OverlayProtectionStatus,
@@ -27,6 +28,8 @@ use super::{
     WINDOWS_PRE_SHOW_CAPTURE_EXCLUSION_RECHECK_MARKER,
 };
 use crate::screen_share::NativePrivacyShieldDecision;
+use std::ffi::OsString;
+use std::path::Path;
 
 #[test]
 fn reports_unavailable_capture_exclusion_for_unsupported_platforms() {
@@ -566,6 +569,25 @@ fn share_risk_restore_stays_pending_until_native_window_is_usable() {
     );
 
     assert!(restored.visible);
+}
+
+#[test]
+fn macos_activation_prefers_current_app_bundle_path() {
+    let args = macos_app_activation_command_args(
+        Some(Path::new(
+            "/Volumes/Caveman/Caveman.app/Contents/MacOS/caveman",
+        )),
+        "com.caveman.desktop",
+    );
+
+    assert_eq!(args, vec![OsString::from("/Volumes/Caveman/Caveman.app")]);
+
+    let fallback = macos_app_activation_command_args(None, "com.caveman.desktop");
+
+    assert_eq!(
+        fallback,
+        vec![OsString::from("-b"), OsString::from("com.caveman.desktop")]
+    );
 }
 
 #[test]

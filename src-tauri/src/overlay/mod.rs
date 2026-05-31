@@ -1,4 +1,6 @@
 use serde::{Deserialize, Serialize};
+use std::ffi::OsString;
+use std::path::{Path, PathBuf};
 use std::sync::{Mutex, OnceLock};
 use std::time::{Duration, Instant};
 use tauri::{LogicalPosition, LogicalSize, PhysicalPosition, PhysicalSize};
@@ -1140,12 +1142,34 @@ fn activate_app_for_companion_window_repair(app: &tauri::AppHandle) {
     }
 
     let bundle_identifier = app.config().identifier.as_str();
+    let current_exe = std::env::current_exe().ok();
     let _ = std::process::Command::new("open")
-        .args(["-b", bundle_identifier])
+        .args(macos_app_activation_command_args(
+            current_exe.as_deref(),
+            bundle_identifier,
+        ))
         .stdin(std::process::Stdio::null())
         .stdout(std::process::Stdio::null())
         .stderr(std::process::Stdio::null())
         .spawn();
+}
+
+fn macos_app_activation_command_args(
+    current_exe: Option<&Path>,
+    bundle_identifier: &str,
+) -> Vec<OsString> {
+    if let Some(app_bundle_path) = current_exe.and_then(macos_app_bundle_path_from_exe_path) {
+        return vec![app_bundle_path.into_os_string()];
+    }
+
+    vec![OsString::from("-b"), OsString::from(bundle_identifier)]
+}
+
+fn macos_app_bundle_path_from_exe_path(exe_path: &Path) -> Option<PathBuf> {
+    exe_path
+        .ancestors()
+        .find(|path| path.extension().is_some_and(|extension| extension == "app"))
+        .map(Path::to_path_buf)
 }
 
 #[cfg(not(target_os = "macos"))]
