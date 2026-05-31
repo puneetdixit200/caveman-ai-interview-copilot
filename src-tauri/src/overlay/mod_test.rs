@@ -6,7 +6,8 @@ use super::{
     companion_restore_status_after_native_visibility_check, companion_visibility_success_status,
     enforce_capture_exclusion_setting, is_companion_window_label, is_overlay_window_label,
     macos_app_activation_command_arg_sets, macos_app_activation_command_args,
-    native_show_privacy_gate_status, post_show_privacy_recheck_message, protected_window_labels,
+    macos_app_activation_command_specs, native_show_privacy_gate_status,
+    post_show_privacy_recheck_message, protected_window_labels,
     protection_refresh_fail_closed_message, sanitize_companion_window_bounds,
     sanitize_overlay_bounds, startup_privacy_shield_hide_reason, windows_capture_exclusion_status,
     windows_pre_show_capture_exclusion_can_recheck_after_show, OverlayProtectionStatus,
@@ -609,6 +610,39 @@ fn macos_activation_keeps_bundle_id_fallback_after_current_bundle_path() {
                 "/private/var/folders/translocated/Caveman.app"
             )],
             vec![OsString::from("-b"), OsString::from("com.caveman.desktop")]
+        ]
+    );
+}
+
+#[test]
+fn macos_activation_sends_bundle_id_apple_event_after_open_fallbacks() {
+    let command_specs = macos_app_activation_command_specs(
+        Some(Path::new(
+            "/private/var/folders/translocated/Caveman.app/Contents/MacOS/caveman",
+        )),
+        "com.caveman.desktop",
+    );
+
+    assert_eq!(
+        command_specs,
+        vec![
+            (
+                OsString::from("open"),
+                vec![OsString::from(
+                    "/private/var/folders/translocated/Caveman.app"
+                )]
+            ),
+            (
+                OsString::from("open"),
+                vec![OsString::from("-b"), OsString::from("com.caveman.desktop")]
+            ),
+            (
+                OsString::from("osascript"),
+                vec![
+                    OsString::from("-e"),
+                    OsString::from("tell application id \"com.caveman.desktop\" to activate")
+                ]
+            )
         ]
     );
 }

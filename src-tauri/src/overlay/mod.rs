@@ -1150,8 +1150,10 @@ fn activate_app_for_companion_window_repair(app: &tauri::AppHandle) {
 
     let bundle_identifier = app.config().identifier.as_str();
     let current_exe = std::env::current_exe().ok();
-    for args in macos_app_activation_command_arg_sets(current_exe.as_deref(), bundle_identifier) {
-        let _ = std::process::Command::new("open")
+    for (program, args) in
+        macos_app_activation_command_specs(current_exe.as_deref(), bundle_identifier)
+    {
+        let _ = std::process::Command::new(program)
             .args(args)
             .stdin(std::process::Stdio::null())
             .stdout(std::process::Stdio::null())
@@ -1183,6 +1185,33 @@ fn macos_app_activation_command_arg_sets(
     } else {
         vec![primary, bundle_id_fallback]
     }
+}
+
+fn macos_app_activation_command_specs(
+    current_exe: Option<&Path>,
+    bundle_identifier: &str,
+) -> Vec<(OsString, Vec<OsString>)> {
+    let mut command_specs: Vec<(OsString, Vec<OsString>)> =
+        macos_app_activation_command_arg_sets(current_exe, bundle_identifier)
+            .into_iter()
+            .map(|args| (OsString::from("open"), args))
+            .collect();
+
+    command_specs.push((
+        OsString::from("osascript"),
+        vec![
+            OsString::from("-e"),
+            OsString::from(format!(
+                "tell application id \"{}\" to activate",
+                macos_applescript_string_literal(bundle_identifier)
+            )),
+        ],
+    ));
+    command_specs
+}
+
+fn macos_applescript_string_literal(value: &str) -> String {
+    value.replace('\\', "\\\\").replace('"', "\\\"")
 }
 
 fn macos_app_bundle_path_from_exe_path(exe_path: &Path) -> Option<PathBuf> {
