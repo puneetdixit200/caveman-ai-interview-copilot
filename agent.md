@@ -8,9 +8,12 @@ Make Caveman harder to expose during Google Meet, Microsoft Teams, and screen-sh
 
 - Branch: `main`
 - Remote: `origin/main`
-- Latest implementation commit before this handoff refresh: `a8a4855 test: require Windows smoke restore`.
-- This handoff file is current as of Desktop Package Smoke run `26699762562`.
+- Latest implementation commit before this handoff refresh: `9d28950 test: use macos dmg risk batch restore`.
+- This handoff file is current as of Desktop Package Smoke run `26701038173`.
 - Previous relevant commits:
+  - `8c98963 test: stabilize macos dmg restore smoke`
+  - `6750f4b test: require macos dmg smoke restore`
+  - `a8a4855 test: require Windows smoke restore`
   - `a6a0861 fix: reinforce Windows privacy hide`
   - `6a220b5 test: require no visible windows in share smokes`
   - `c79240c docs: record active indicator smoke evidence [skip ci]`
@@ -78,6 +81,8 @@ Make Caveman harder to expose during Google Meet, Microsoft Teams, and screen-sh
 - macOS native privacy gating now enumerates watched meeting/capture process names through `libproc` before shell `ps` fallback. This is specifically to make native-style Teams process detection deterministic on the slower Intel DMG package-smoke runner while keeping the existing supported OS-level detection boundary.
 - The macOS `libproc` process scan is path-aware and ignores ambiguous idle system-only names such as CoreParsec and RemoteManagement screen-sharing daemons when no usable app path is available. This prevents CI runners from hiding Caveman before the initial protected window appears while still detecting real app paths like `MSTeams` or `/Applications/Screen Sharing.app/...`.
 - macOS packaged meeting-risk smoke scenarios for app-specific huddle/remote/recorder cases now use realistic watched owner process names (`Slack`, `Discord`, `AnyDesk`, `OBS`, and browser-hosted WhatsApp/share indicators) instead of relying on repeated custom fake app names for every tail scenario. The any-visible-title detector remains covered by Rust unit tests and package marker attestations.
+- macOS DMG package smoke now models the 16 simulated apps/indicators as a continuous screen-share risk batch: it requires Caveman to stay hidden while each simulated risk window is visible, then requires one final protected onscreen restore after all simulated risk clears. The standalone macOS meeting-risk smoke still supports stricter per-scenario restore by default.
+- The fake macOS meeting app used by the smoke harness now handles `SIGTERM`/`SIGINT` so the harness can clear simulated risk promptly, and the browser screen-recording scenario uses `Google Chrome` with `Screen recording - Loom`, matching a real detector title already covered by native tests.
 
 ## Verification already run locally
 
@@ -251,6 +256,16 @@ Follow-up CI hardening verification:
   - macOS Apple Silicon DMG smoke output: mounted `Caveman_0.1.1_aarch64.dmg`; initial Caveman window was `1024x720` and protected; Caveman hid during the same 12 simulated scenarios.
   - Linux AppImage/DEB passed native privacy tests, release contracts, package build, sidecar verification, packaged privacy shield, and artifact upload.
   - No local app launch was performed for this handoff refresh; verification used local non-UI tests and GitHub Actions package smokes.
+- macOS DMG restore/risk-batch follow-up:
+  - `6750f4b` first made mounted-DMG macOS smoke require restore. Desktop Package Smoke run `26700298226` then exposed that per-scenario restore was too strict for rapid macOS simulated-risk sequences: several scenarios remained hidden until later clear checks, while the app still restored at the end.
+  - `8c98963` stabilized the fake macOS meeting app signal handling and switched the screen-recording scenario to the browser-hosted `Screen recording - Loom` title. Desktop Package Smoke run `26700631782` still showed the same per-scenario restore boundary, but the macOS lanes hid through all 16 simulated scenarios and restored at the end.
+  - `9d28950` changed only the packaged macOS DMG smoke to require hidden-through-risk-batch plus final protected restore; standalone macOS smoke still defaults to per-scenario restore.
+  - Local non-UI verification did not open the app: `node --test scripts/macos-meeting-risk-smoke.test.mjs scripts/macos-dmg-meeting-risk-smoke.test.mjs scripts/release-workflow.test.mjs` passed 55 tests; `npm run test:release` passed 166 tests; `git diff --check` passed.
+  - Push Desktop Package Smoke run `26701038173` for `9d28950` passed all lanes.
+  - macOS Apple Silicon DMG smoke output: `READY`; mounted `Caveman_0.1.1_aarch64.dmg`; initial Caveman window was `1024x720` and protected; Caveman was hidden while all 16 simulated risk windows were visible; final restoration found protected onscreen window `35` at `1024x720`.
+  - macOS Intel DMG smoke output: `READY`; mounted `Caveman_0.1.1_x64.dmg`; initial Caveman window was `1280x820` and protected; Caveman was hidden while all 16 simulated risk windows were visible; final restoration found protected onscreen window `37` at `1280x820`.
+  - Windows installers in the same run still passed restore-required package smoke: `READY`; initial `caveman.exe` window was `1044x788` and protected with `WDA_EXCLUDEFROMCAPTURE`; Caveman hid and restored after risk cleared for all 16 scenarios; final protected visible window was `1044x788`.
+  - Linux AppImage/DEB also passed native privacy tests, release contracts, package build, bundled sidecar verification, packaged privacy shield, artifact upload, and cleanup.
 
 ## CI to check next
 
@@ -260,7 +275,7 @@ List recent runs with:
 gh run list --repo puneetdixit200/caveman-ai-interview-copilot --branch main --limit 5 --json databaseId,workflowName,headSha,status,conclusion,createdAt,url
 ```
 
-Latest verified package-smoke run before this handoff refresh: `26698103755` for `5451775`, green in all lanes. This run verified the expanded packaged Windows EXE and macOS DMG meeting-risk smokes for Google Meet, Teams browser/native, Zoom, Webex, generic presenting UI, generic screen-recording UI, Slack huddle, Discord voice, WhatsApp video call, remote desktop, screen-recorder windows, window-sharing status, screen-shared status, meeting-recording status, and recording-in-progress status.
+Latest verified package-smoke run before this handoff refresh: `26701038173` for `9d28950`, green in all lanes. This run verified the expanded packaged Windows EXE and macOS DMG meeting-risk smokes for Google Meet, Teams browser/native, Zoom, Webex, generic presenting UI, generic screen-recording UI, Slack huddle, Discord voice, WhatsApp video call, remote desktop, screen-recorder windows, window-sharing status, screen-shared status, meeting-recording status, and recording-in-progress status. Windows requires per-scenario restore; macOS DMG requires hidden-through-risk-batch plus final protected restore.
 
 ## Suggested next steps
 
