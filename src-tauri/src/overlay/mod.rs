@@ -1143,10 +1143,23 @@ fn focus_repaired_companion_window(app: &tauri::AppHandle, window: &tauri::Webvi
 }
 
 #[cfg(target_os = "macos")]
+fn activate_current_macos_app_for_companion_window_repair() {
+    let Some(main_thread) = objc2::MainThreadMarker::new() else {
+        return;
+    };
+
+    let app = objc2_app_kit::NSApplication::sharedApplication(main_thread);
+    app.unhide(None);
+    #[allow(deprecated)]
+    app.activateIgnoringOtherApps(true);
+}
+
+#[cfg(target_os = "macos")]
 fn activate_app_for_companion_window_repair(app: &tauri::AppHandle) {
     std::hint::black_box(COMPANION_WINDOW_APP_ACTIVATION_REPAIR_MARKER);
 
     let _ = app.show();
+    activate_current_macos_app_for_companion_window_repair();
     if !companion_window_app_activation_repair_is_due() {
         return;
     }

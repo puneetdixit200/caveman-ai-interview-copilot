@@ -573,6 +573,34 @@ test("share-risk restore activates app before checking native visibility", async
   assert.notEqual(setFocusAfterShow, -1, "focus repair must focus after the post-activation show");
 });
 
+test("macOS share-risk restore directly unhides current app before external activation", async () => {
+  const overlayRs = normalizeLineEndings(await readFile("src-tauri/src/overlay/mod.rs", "utf8"));
+  const activationStart = overlayRs.indexOf("fn activate_app_for_companion_window_repair");
+  const activationEnd = overlayRs.indexOf("fn macos_app_activation_command_args", activationStart);
+  const nativeUnhideStart = overlayRs.indexOf("fn activate_current_macos_app_for_companion_window_repair");
+
+  assert.notEqual(activationStart, -1, "macOS activation helper must exist");
+  assert.notEqual(activationEnd, -1, "macOS activation helper body must be bounded");
+  assert.notEqual(nativeUnhideStart, -1, "direct AppKit unhide helper must exist");
+
+  const activationBody = overlayRs.slice(activationStart, activationEnd);
+  const appShow = activationBody.indexOf("app.show()");
+  const nativeUnhide = activationBody.indexOf("activate_current_macos_app_for_companion_window_repair()");
+  const externalThrottle = activationBody.indexOf("companion_window_app_activation_repair_is_due()");
+
+  assert.notEqual(appShow, -1, "activation must still request Tauri app show");
+  assert.ok(nativeUnhide > appShow, "direct AppKit unhide must follow Tauri app show");
+  assert.ok(
+    nativeUnhide < externalThrottle,
+    "direct AppKit unhide must not be throttled with external activation fallbacks"
+  );
+
+  const nativeUnhideBody = overlayRs.slice(nativeUnhideStart, activationStart);
+  assert.match(nativeUnhideBody, /NSApplication::sharedApplication/);
+  assert.match(nativeUnhideBody, /\.unhide\(None\)/);
+  assert.match(nativeUnhideBody, /activateIgnoringOtherApps\(true\)/);
+});
+
 test("companion bounds watchdog pauses repairs during active share-risk", async () => {
   const overlayRs = normalizeLineEndings(await readFile("src-tauri/src/overlay/mod.rs", "utf8"));
   const watchdogRepairStart = overlayRs.indexOf("pub fn repair_companion_window_bounds_without_show(");
