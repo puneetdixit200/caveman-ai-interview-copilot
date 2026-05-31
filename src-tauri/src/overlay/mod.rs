@@ -952,10 +952,7 @@ pub fn schedule_startup_companion_window_repair(app: tauri::AppHandle) {
             std::thread::sleep(std::time::Duration::from_millis(delay_ms));
             let main_thread_app = worker_app.clone();
             let _ = worker_app.run_on_main_thread(move || {
-                let status = set_companion_windows_visible(&main_thread_app, true, true);
-                if status.visible {
-                    focus_companion_windows(&main_thread_app);
-                }
+                let _ = set_companion_windows_visible(&main_thread_app, true, true);
             });
         });
     }

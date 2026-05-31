@@ -270,6 +270,7 @@ test("packaged dashboard stays hidden until the native privacy gate allows start
   assert.match(libRs, /screen_share::start_native_privacy_shield\(app\.handle\(\)\.clone\(\)\)\?/);
   assert.match(libRs, /if startup_allows_initial_show\s*\{/);
   assert.match(libRs, /overlay::set_companion_windows_visible\(app\.handle\(\),\s*true,\s*true\)/);
+  assert.match(libRs, /overlay::schedule_startup_companion_window_repair\(app\.handle\(\)\.clone\(\)\)/);
   assert.ok(
     libRs.indexOf("let startup_allows_initial_show = overlay::configure_overlay_security(app)") <
       libRs.indexOf("screen_share::start_native_privacy_shield(app.handle().clone())?"),
@@ -284,6 +285,33 @@ test("packaged dashboard stays hidden until the native privacy gate allows start
     libRs.indexOf("if startup_allows_initial_show") <
       libRs.indexOf("overlay::set_companion_windows_visible(app.handle(), true, true)"),
     "startup show must run only after the privacy gate allows it"
+  );
+
+  const startupShowBlock = libRs.slice(
+    libRs.indexOf("if startup_allows_initial_show"),
+    libRs.indexOf("Ok(())", libRs.indexOf("if startup_allows_initial_show"))
+  );
+  assert.doesNotMatch(
+    startupShowBlock,
+    /focus_companion_windows/,
+    "packaged startup must not use active-space focus repair before CoreGraphics reports usable bounds"
+  );
+});
+
+test("startup companion repair does not use active-space focus repair", async () => {
+  const overlayRs = normalizeLineEndings(await readFile("src-tauri/src/overlay/mod.rs", "utf8"));
+  const scheduleStart = overlayRs.indexOf("pub fn schedule_startup_companion_window_repair");
+  const scheduleEnd = overlayRs.indexOf("pub fn set_overlay_window_visible", scheduleStart);
+
+  assert.notEqual(scheduleStart, -1, "startup companion repair scheduler must exist");
+  assert.notEqual(scheduleEnd, -1, "startup companion repair scheduler body must be bounded");
+
+  const scheduleBody = overlayRs.slice(scheduleStart, scheduleEnd);
+  assert.match(scheduleBody, /set_companion_windows_visible\(&main_thread_app,\s*true,\s*true\)/);
+  assert.doesNotMatch(
+    scheduleBody,
+    /focus_companion_windows/,
+    "delayed startup repair must avoid active-space focus repair until a share-risk restore needs it"
   );
 });
 
