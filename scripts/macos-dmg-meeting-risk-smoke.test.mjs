@@ -30,7 +30,7 @@ test("finds the generated macOS DMG for package meeting-risk smoke", async () =>
 test("runs meeting-risk smoke against the mounted DMG app bundle", async () => {
   assert.ok(MACOS_DMG_MEETING_RISK_SMOKE_MARKER.includes("DMG"));
   assert.ok(MACOS_DMG_MEETING_RISK_SMOKE_MARKER.includes("screen-share risk batch"));
-  assert.ok(MACOS_DMG_MEETING_RISK_SMOKE_MARKER.includes("remote-support follow-up"));
+  assert.ok(MACOS_DMG_MEETING_RISK_SMOKE_MARKER.includes("after all risk clears"));
 
   const dir = await mkdtemp(join(tmpdir(), "caveman-dmg-risk-run-"));
   const commands = [];
@@ -74,7 +74,7 @@ test("runs meeting-risk smoke against the mounted DMG app bundle", async () => {
           assert.equal(requireScenarioRestore, true);
           assert.ok(hasScenario("RemoteSupportControl", "TeamViewer Remote Control"));
         } else {
-          assert.equal(requireRestore, false);
+          assert.equal(requireRestore, true);
           assert.equal(requireScenarioRestore, false);
           assert.ok(scenarios.some((scenario) => scenario.windowTitle === "Zoom Meeting - Candidate"));
           assert.ok(scenarios.some((scenario) => scenario.windowTitle === "Webex Meeting - Candidate"));
@@ -99,7 +99,7 @@ test("runs meeting-risk smoke against the mounted DMG app bundle", async () => {
     assert.equal(result.status, "ready");
     assert.match(result.messages[0], /Mounted DMG/);
     assert.equal(meetingRiskCalls.length, 2);
-    assert.equal(meetingRiskCalls[0].requireRestore, false);
+    assert.equal(meetingRiskCalls[0].requireRestore, true);
     assert.equal(meetingRiskCalls[0].requireScenarioRestore, false);
     assert.equal(meetingRiskCalls[1].requireRestore, true);
     assert.equal(meetingRiskCalls[1].requireScenarioRestore, true);
