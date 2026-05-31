@@ -284,7 +284,7 @@ Follow-up CI hardening verification:
   - `5f2744f` stabilized packaged startup smoke by keeping active-Space movement out of the generic initial companion show path, leaving it for focus/restore repair, increasing packaged macOS initial-window wait to `30_000` ms, and adding last-observed CoreGraphics rows to initial-launch failure output.
   - `316ffcf` removed `focus_companion_windows` from initial startup and delayed startup repair, so startup uses `set_companion_windows_visible` plus scheduled non-focus repair only. Share-risk restore still uses active-Space focus repair when needed.
   - Local non-UI verification did not open the app: `cargo fmt --manifest-path src-tauri/Cargo.toml -- --check` passed; `cargo test --manifest-path src-tauri/Cargo.toml overlay:: --lib` passed 38 tests; `node --test scripts/release-workflow.test.mjs scripts/macos-meeting-risk-smoke.test.mjs scripts/macos-dmg-meeting-risk-smoke.test.mjs && git diff --check` passed 65 tests; `npm run test:release` passed 177 tests.
-  - Pushed `316ffcf` to `origin/main`.
+  - Pushed `316ffcf` to `origin/main`; `b07b862` is the `[skip ci]` handoff-doc commit on top.
 
 ## CI to check next
 
@@ -294,7 +294,7 @@ List recent runs with:
 gh run list --repo puneetdixit200/caveman-ai-interview-copilot --branch main --limit 5 --json databaseId,workflowName,headSha,status,conclusion,createdAt,url
 ```
 
-Latest pushed package-smoke run to check: `26711742751` for `316ffcf`, in progress when this handoff was refreshed. Previous run `26711471680` for `5f2744f` was also still in progress, but `316ffcf` is the current `origin/main` head. Last fully verified green package-smoke run before this sequence was `26701038173` for `9d28950`, green in all lanes. That earlier run verified the expanded packaged Windows EXE and macOS DMG meeting-risk smokes for Google Meet, Teams browser/native, Zoom, Webex, generic presenting UI, generic screen-recording UI, Slack huddle, Discord voice, WhatsApp video call, remote desktop, screen-recorder windows, window-sharing status, screen-shared status, meeting-recording status, and recording-in-progress status. Windows requires per-scenario restore; macOS DMG now requires main-batch final restore plus strict remote-support restore.
+Latest pushed package-smoke run to check: `26711742751` for code commit `316ffcf`, in progress when this handoff was refreshed. Previous run `26711471680` for `5f2744f` was also still in progress. `b07b862` is the `[skip ci]` handoff-doc commit on top of `316ffcf`, so `26711742751` is the package-smoke run for the current code. Last fully verified green package-smoke run before this sequence was `26701038173` for `9d28950`, green in all lanes. That earlier run verified the expanded packaged Windows EXE and macOS DMG meeting-risk smokes for Google Meet, Teams browser/native, Zoom, Webex, generic presenting UI, generic screen-recording UI, Slack huddle, Discord voice, WhatsApp video call, remote desktop, screen-recorder windows, window-sharing status, screen-shared status, meeting-recording status, and recording-in-progress status. Windows requires per-scenario restore; macOS DMG now requires main-batch final restore plus strict remote-support restore.
 
 ## Suggested next steps
 
