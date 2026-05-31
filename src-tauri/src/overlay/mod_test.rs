@@ -5,7 +5,8 @@ use super::{
     companion_focus_post_show_privacy_recheck_message, companion_restore_privacy_gate_status,
     companion_restore_status_after_native_visibility_check, companion_visibility_success_status,
     enforce_capture_exclusion_setting, is_companion_window_label, is_overlay_window_label,
-    macos_app_activation_command_args, native_show_privacy_gate_status,
+    macos_app_activation_command_arg_sets, macos_app_activation_command_args,
+    native_show_privacy_gate_status,
     post_show_privacy_recheck_message, protected_window_labels,
     protection_refresh_fail_closed_message, sanitize_companion_window_bounds,
     sanitize_overlay_bounds, startup_privacy_shield_hide_reason, windows_capture_exclusion_status,
@@ -590,6 +591,26 @@ fn macos_activation_prefers_current_app_bundle_path() {
     assert_eq!(
         fallback,
         vec![OsString::from("-b"), OsString::from("com.caveman.desktop")]
+    );
+}
+
+#[test]
+fn macos_activation_keeps_bundle_id_fallback_after_current_bundle_path() {
+    let arg_sets = macos_app_activation_command_arg_sets(
+        Some(Path::new(
+            "/private/var/folders/translocated/Caveman.app/Contents/MacOS/caveman",
+        )),
+        "com.caveman.desktop",
+    );
+
+    assert_eq!(
+        arg_sets,
+        vec![
+            vec![OsString::from(
+                "/private/var/folders/translocated/Caveman.app"
+            )],
+            vec![OsString::from("-b"), OsString::from("com.caveman.desktop")]
+        ]
     );
 }
 

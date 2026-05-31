@@ -838,6 +838,7 @@ pub fn focus_companion_windows(app: &tauri::AppHandle) {
         if needs_native_activation || native_repaired || repaired {
             activate_app_for_companion_window_repair(app);
         }
+        let _ = window.show();
         let _ = window.set_focus();
         let _ = repair_companion_window_bounds(app, &window);
         if companion_focus_post_show_privacy_recheck_denied(app) {
@@ -1149,15 +1150,14 @@ fn activate_app_for_companion_window_repair(app: &tauri::AppHandle) {
 
     let bundle_identifier = app.config().identifier.as_str();
     let current_exe = std::env::current_exe().ok();
-    let _ = std::process::Command::new("open")
-        .args(macos_app_activation_command_args(
-            current_exe.as_deref(),
-            bundle_identifier,
-        ))
-        .stdin(std::process::Stdio::null())
-        .stdout(std::process::Stdio::null())
-        .stderr(std::process::Stdio::null())
-        .spawn();
+    for args in macos_app_activation_command_arg_sets(current_exe.as_deref(), bundle_identifier) {
+        let _ = std::process::Command::new("open")
+            .args(args)
+            .stdin(std::process::Stdio::null())
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .spawn();
+    }
 }
 
 fn macos_app_activation_command_args(
@@ -1169,6 +1169,20 @@ fn macos_app_activation_command_args(
     }
 
     vec![OsString::from("-b"), OsString::from(bundle_identifier)]
+}
+
+fn macos_app_activation_command_arg_sets(
+    current_exe: Option<&Path>,
+    bundle_identifier: &str,
+) -> Vec<Vec<OsString>> {
+    let primary = macos_app_activation_command_args(current_exe, bundle_identifier);
+    let bundle_id_fallback = vec![OsString::from("-b"), OsString::from(bundle_identifier)];
+
+    if primary == bundle_id_fallback {
+        vec![primary]
+    } else {
+        vec![primary, bundle_id_fallback]
+    }
 }
 
 fn macos_app_bundle_path_from_exe_path(exe_path: &Path) -> Option<PathBuf> {

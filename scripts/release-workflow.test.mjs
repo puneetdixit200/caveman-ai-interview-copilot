@@ -558,11 +558,16 @@ test("share-risk restore activates app before checking native visibility", async
   const visibleRestore = restoreBody.indexOf("set_companion_windows_visible(app, true, true)");
   const activateAfterRestore = restoreBody.indexOf("activate_app_for_companion_window_repair(app)", visibleRestore);
   const focusAfterActivate = restoreBody.indexOf("focus_companion_windows(app)", activateAfterRestore);
+  const focusActivation = focusBody.indexOf("activate_app_for_companion_window_repair(app)");
+  const showAfterFocusActivation = focusBody.indexOf("window.show()", focusActivation);
+  const setFocusAfterShow = focusBody.indexOf("window.set_focus()", showAfterFocusActivation);
 
   assert.notEqual(visibleRestore, -1, "share-risk restore must show companion windows");
   assert.notEqual(activateAfterRestore, -1, "share-risk restore must activate the packaged app");
   assert.notEqual(focusAfterActivate, -1, "share-risk restore must focus after activation");
   assert.match(focusBody, /needs_native_activation \|\| native_repaired \|\| repaired/);
+  assert.notEqual(showAfterFocusActivation, -1, "focus repair must show again after app activation");
+  assert.notEqual(setFocusAfterShow, -1, "focus repair must focus after the post-activation show");
 });
 
 test("companion bounds watchdog pauses repairs during active share-risk", async () => {
