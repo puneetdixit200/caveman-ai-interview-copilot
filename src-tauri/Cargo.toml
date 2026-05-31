@@ -35,7 +35,7 @@ windows-native-keyring-store = "1.0.0"
 [target.'cfg(target_os = "macos")'.dependencies]
 apple-native-keyring-store = { version = "1.0.0", features = ["keychain"] }
 objc2 = "0.6.4"
-objc2-app-kit = { version = "0.3.2", default-features = false, features = ["NSApplication", "NSResponder"] }
+objc2-app-kit = { version = "0.3.2", default-features = false, features = ["NSApplication", "NSResponder", "NSWindow"] }
 objc2-core-foundation = "0.3.2"
 objc2-core-graphics = "0.3.2"
 

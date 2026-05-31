@@ -586,6 +586,50 @@ test("share-risk restore activates app before checking native visibility", async
   assert.notEqual(setFocusAfterShow, -1, "focus repair must focus after the post-activation show");
 });
 
+test("macOS companion restore orders native windows front after Tauri show", async () => {
+  const overlayRs = normalizeLineEndings(await readFile("src-tauri/src/overlay/mod.rs", "utf8"));
+  const setVisibleStart = overlayRs.indexOf("pub fn set_companion_windows_visible");
+  const setVisibleEnd = overlayRs.indexOf("pub fn companion_visibility_success_status", setVisibleStart);
+  const focusStart = overlayRs.indexOf("pub fn focus_companion_windows");
+  const focusEnd = overlayRs.indexOf("pub fn restore_companion_windows_after_clear_privacy_check", focusStart);
+  const helperStart = overlayRs.indexOf("fn order_front_macos_companion_window_for_repair");
+  const helperEnd = overlayRs.indexOf("fn activate_current_macos_app_for_companion_window_repair", helperStart);
+
+  assert.notEqual(setVisibleStart, -1, "companion visibility helper must exist");
+  assert.notEqual(setVisibleEnd, -1, "companion visibility helper body must be bounded");
+  assert.notEqual(focusStart, -1, "companion focus helper must exist");
+  assert.notEqual(focusEnd, -1, "companion focus helper body must be bounded");
+  assert.notEqual(helperStart, -1, "macOS native order-front helper must exist");
+  assert.notEqual(helperEnd, -1, "macOS native order-front helper body must be bounded");
+
+  const setVisibleBody = overlayRs.slice(setVisibleStart, setVisibleEnd);
+  const focusBody = overlayRs.slice(focusStart, focusEnd);
+  const helperBody = overlayRs.slice(helperStart, helperEnd);
+  const setVisibleShow = setVisibleBody.indexOf("let visibility_result = window.show()");
+  const setVisibleOrderFront = setVisibleBody.indexOf(
+    "order_front_macos_companion_window_for_repair(window)",
+    setVisibleShow
+  );
+  const focusShow = focusBody.indexOf("window.show()");
+  const focusOrderFront = focusBody.indexOf(
+    "order_front_macos_companion_window_for_repair(&window)",
+    focusShow
+  );
+  const focusSetFocus = focusBody.indexOf("window.set_focus()", focusShow);
+
+  assert.notEqual(setVisibleShow, -1, "companion restore must use Tauri show");
+  assert.notEqual(setVisibleOrderFront, -1, "companion restore must order the native window front after show");
+  assert.notEqual(focusShow, -1, "focus repair must use Tauri show");
+  assert.notEqual(focusOrderFront, -1, "focus repair must order the native window front after show");
+  assert.notEqual(focusSetFocus, -1, "focus repair must set focus after native order-front");
+  assert.ok(focusShow < focusOrderFront && focusOrderFront < focusSetFocus);
+  assert.match(helperBody, /window\.ns_window\(\)/);
+  assert.match(helperBody, /objc2_app_kit::NSWindow/);
+  assert.match(helperBody, /deminiaturize\(None\)/);
+  assert.match(helperBody, /orderFrontRegardless\(\)/);
+  assert.match(helperBody, /makeKeyAndOrderFront\(None\)/);
+});
+
 test("macOS share-risk restore directly unhides current app before external activation", async () => {
   const overlayRs = normalizeLineEndings(await readFile("src-tauri/src/overlay/mod.rs", "utf8"));
   const activationStart = overlayRs.indexOf("fn activate_app_for_companion_window_repair");

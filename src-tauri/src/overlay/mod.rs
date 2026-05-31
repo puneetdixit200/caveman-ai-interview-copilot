@@ -546,6 +546,10 @@ pub fn set_companion_windows_visible(
                 companion_window_needs_native_activation(app),
             );
             let visibility_result = window.show();
+            if visibility_result.is_ok() {
+                #[cfg(target_os = "macos")]
+                order_front_macos_companion_window_for_repair(window);
+            }
             let repaired_after_show = repair_companion_window_bounds(app, window);
             let native_repaired_after_show = repair_native_companion_window_bounds_if_needed(
                 app,
@@ -846,6 +850,8 @@ pub fn focus_companion_windows(app: &tauri::AppHandle) {
             activate_app_for_companion_window_repair(app);
         }
         let _ = window.show();
+        #[cfg(target_os = "macos")]
+        order_front_macos_companion_window_for_repair(&window);
         let _ = window.set_focus();
         let _ = repair_companion_window_bounds(app, &window);
         if companion_focus_post_show_privacy_recheck_denied(app) {
@@ -1141,9 +1147,28 @@ fn focus_repaired_companion_window(app: &tauri::AppHandle, window: &tauri::Webvi
     activate_app_for_companion_window_repair(app);
     let _ = window.unminimize();
     let _ = window.show();
+    #[cfg(target_os = "macos")]
+    order_front_macos_companion_window_for_repair(window);
     let _ = window.set_focus();
     let _ = repair_companion_window_bounds(app, window);
     let _ = companion_focus_post_show_privacy_recheck_denied(app);
+}
+
+#[cfg(target_os = "macos")]
+fn order_front_macos_companion_window_for_repair(window: &tauri::WebviewWindow) {
+    let Ok(ns_window) = window.ns_window() else {
+        return;
+    };
+    if ns_window.is_null() {
+        return;
+    }
+
+    let ns_window = unsafe { &*(ns_window.cast::<objc2_app_kit::NSWindow>()) };
+    if ns_window.isMiniaturized() {
+        ns_window.deminiaturize(None);
+    }
+    ns_window.orderFrontRegardless();
+    ns_window.makeKeyAndOrderFront(None);
 }
 
 #[cfg(target_os = "macos")]
