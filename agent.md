@@ -8,8 +8,12 @@ Make Caveman harder to expose during Google Meet, Microsoft Teams, and screen-sh
 
 - Branch: `main`
 - Remote: `origin/main`
-- Latest implementation commit before this handoff refresh: `9d28950 test: use macos dmg risk batch restore`.
-- This handoff file is current as of Desktop Package Smoke run `26701038173`.
+- Latest pushed implementation commits before this handoff refresh:
+  - `8f55659 test: require macos dmg batch restore`
+  - `6c52505 fix: stabilize macos share-risk restore smoke`
+- This handoff file is current as of local verification after `8f55659`; Desktop Package Smoke run `26705275430` for `8f55659` was still in progress when this handoff was refreshed.
+- Superseded Desktop Package Smoke run `26705244299` for `6c52505` was cancelled after `8f55659` was pushed.
+- User explicitly requested: do not open the app. Use CLI, tests, and GitHub Actions only unless the user later allows UI/app launch.
 - Previous relevant commits:
   - `8c98963 test: stabilize macos dmg restore smoke`
   - `6750f4b test: require macos dmg smoke restore`
@@ -44,6 +48,9 @@ Make Caveman harder to expose during Google Meet, Microsoft Teams, and screen-sh
 
 ## What was implemented
 
+- Native share-risk restore now keeps retry state after a hide until the restore path reports a protected companion window as visible again. Package marker and release-contract tests require this retry marker in shipped binaries.
+- The packaged macOS DMG meeting-risk smoke now runs the main simulated risk batch with final restore required but without per-scenario restore churn, then runs the remote-support `TeamViewer Remote Control` scenario as a separate strict per-scenario restore check.
+- Packaged detector markers now include the synthetic `ScreenShareIndicator` process used by package smokes, and screen-share unit tests cover that process without relying on a title.
 - macOS runtime now fails closed when visible browser window titles are redacted or ambiguous during share-risk checks.
 - Startup, reopen, OCR, active-window typing, and window-show paths route through stronger visibility/share-risk gating.
 - Added repeatable macOS meeting-risk smoke coverage:
@@ -86,6 +93,12 @@ Make Caveman harder to expose during Google Meet, Microsoft Teams, and screen-sh
 
 ## Verification already run locally
 
+- Latest no-app-open verification after `8f55659`:
+  - `cargo fmt --manifest-path src-tauri/Cargo.toml -- --check`
+  - `git diff --check`
+  - `node --test scripts/macos-dmg-meeting-risk-smoke.test.mjs scripts/macos-meeting-risk-smoke.test.mjs` passed 14 tests.
+  - `cargo test --manifest-path src-tauri/Cargo.toml screen_share --lib` passed 66 tests.
+  - `npm run test:release` passed 167 tests.
 - `node --test scripts/macos-meeting-risk-smoke.test.mjs`
 - `npm run meeting-risk:smoke:mac`
 - `npm run test:release`
@@ -275,12 +288,12 @@ List recent runs with:
 gh run list --repo puneetdixit200/caveman-ai-interview-copilot --branch main --limit 5 --json databaseId,workflowName,headSha,status,conclusion,createdAt,url
 ```
 
-Latest verified package-smoke run before this handoff refresh: `26701038173` for `9d28950`, green in all lanes. This run verified the expanded packaged Windows EXE and macOS DMG meeting-risk smokes for Google Meet, Teams browser/native, Zoom, Webex, generic presenting UI, generic screen-recording UI, Slack huddle, Discord voice, WhatsApp video call, remote desktop, screen-recorder windows, window-sharing status, screen-shared status, meeting-recording status, and recording-in-progress status. Windows requires per-scenario restore; macOS DMG requires hidden-through-risk-batch plus final protected restore.
+Latest pushed package-smoke run to check: `26705275430` for `8f55659`, in progress when this handoff was refreshed. Last fully verified green package-smoke run before this sequence was `26701038173` for `9d28950`, green in all lanes. That earlier run verified the expanded packaged Windows EXE and macOS DMG meeting-risk smokes for Google Meet, Teams browser/native, Zoom, Webex, generic presenting UI, generic screen-recording UI, Slack huddle, Discord voice, WhatsApp video call, remote desktop, screen-recorder windows, window-sharing status, screen-shared status, meeting-recording status, and recording-in-progress status. Windows requires per-scenario restore; macOS DMG now requires main-batch final restore plus strict remote-support restore.
 
 ## Suggested next steps
 
 1. Recheck the worktree with `git status --short --branch`.
-2. If code changes resume or the active share/recording indicator expansion is pushed without a recorded green run, verify the next pushed Desktop Package Smoke run includes and passes `Run native privacy shield tests` in all four package lanes, the Windows `Run packaged Windows meeting-risk smoke` step, and both macOS DMG `Run packaged meeting-risk smoke` steps.
+2. Check Desktop Package Smoke run `26705275430` for `8f55659`. It should pass `Run native privacy shield tests` in all four package lanes, the Windows `Run packaged Windows meeting-risk smoke` step, and both macOS DMG `Run packaged meeting-risk smoke` steps.
 3. Only verify the installed app window is visible, non-zero-sized, and protected with CoreGraphics/window inspection when the user allows opening the app.
 4. If the app is collapsed to `0x0`, restart it after clearing saved state:
 
