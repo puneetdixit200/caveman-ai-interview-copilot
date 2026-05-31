@@ -490,6 +490,22 @@ pub fn set_companion_windows_visible(
     visible: bool,
     capture_exclusion_enabled: bool,
 ) -> OverlayProtectionStatus {
+    set_companion_windows_visible_with_repair_focus(app, visible, capture_exclusion_enabled, true)
+}
+
+pub fn set_startup_companion_windows_visible(
+    app: &tauri::AppHandle,
+    capture_exclusion_enabled: bool,
+) -> OverlayProtectionStatus {
+    set_companion_windows_visible_with_repair_focus(app, true, capture_exclusion_enabled, false)
+}
+
+fn set_companion_windows_visible_with_repair_focus(
+    app: &tauri::AppHandle,
+    visible: bool,
+    capture_exclusion_enabled: bool,
+    focus_after_bounds_repair: bool,
+) -> OverlayProtectionStatus {
     use tauri::Manager;
 
     let capture_exclusion_enabled =
@@ -557,6 +573,7 @@ pub fn set_companion_windows_visible(
                 companion_window_needs_native_activation(app),
             );
             if visibility_result.is_ok()
+                && focus_after_bounds_repair
                 && (repaired_before_show
                     || native_repaired_before_show
                     || repaired_after_show
@@ -741,7 +758,8 @@ fn restore_companion_windows_with_native_show_gate(
             activate_current_macos_app_for_companion_window_repair();
         }
     }
-    let status = set_companion_windows_visible(app, true, true);
+    let status =
+        set_companion_windows_visible_with_repair_focus(app, true, true, focus_after_restore);
     if focus_after_restore {
         activate_app_for_companion_window_repair(app);
     }
@@ -952,7 +970,7 @@ pub fn schedule_startup_companion_window_repair(app: tauri::AppHandle) {
             std::thread::sleep(std::time::Duration::from_millis(delay_ms));
             let main_thread_app = worker_app.clone();
             let _ = worker_app.run_on_main_thread(move || {
-                let _ = set_companion_windows_visible(&main_thread_app, true, true);
+                let _ = set_startup_companion_windows_visible(&main_thread_app, true);
             });
         });
     }

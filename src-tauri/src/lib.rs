@@ -39,7 +39,7 @@ pub fn run() {
             screen_share::start_native_privacy_shield(app.handle().clone())?;
             overlay::start_companion_window_bounds_watchdog(app.handle().clone())?;
             if startup_allows_initial_show {
-                let _ = overlay::set_companion_windows_visible(app.handle(), true, true);
+                let _ = overlay::set_startup_companion_windows_visible(app.handle(), true);
                 overlay::schedule_startup_companion_window_repair(app.handle().clone());
             }
             Ok(())

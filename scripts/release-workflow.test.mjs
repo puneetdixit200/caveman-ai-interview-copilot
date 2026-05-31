@@ -269,7 +269,7 @@ test("packaged dashboard stays hidden until the native privacy gate allows start
   assert.match(libRs, /let startup_allows_initial_show = overlay::configure_overlay_security\(app\)/);
   assert.match(libRs, /screen_share::start_native_privacy_shield\(app\.handle\(\)\.clone\(\)\)\?/);
   assert.match(libRs, /if startup_allows_initial_show\s*\{/);
-  assert.match(libRs, /overlay::set_companion_windows_visible\(app\.handle\(\),\s*true,\s*true\)/);
+  assert.match(libRs, /overlay::set_startup_companion_windows_visible\(app\.handle\(\),\s*true\)/);
   assert.match(libRs, /overlay::schedule_startup_companion_window_repair\(app\.handle\(\)\.clone\(\)\)/);
   assert.ok(
     libRs.indexOf("let startup_allows_initial_show = overlay::configure_overlay_security(app)") <
@@ -277,13 +277,13 @@ test("packaged dashboard stays hidden until the native privacy gate allows start
     "startup setup must configure capture protection before starting the privacy shield"
   );
   assert.ok(
-    libRs.indexOf("screen_share::start_native_privacy_shield(app.handle().clone())?") <
+      libRs.indexOf("screen_share::start_native_privacy_shield(app.handle().clone())?") <
       libRs.indexOf("if startup_allows_initial_show"),
     "startup show gate must wait until the native privacy shield thread is running"
   );
   assert.ok(
     libRs.indexOf("if startup_allows_initial_show") <
-      libRs.indexOf("overlay::set_companion_windows_visible(app.handle(), true, true)"),
+      libRs.indexOf("overlay::set_startup_companion_windows_visible(app.handle(), true)"),
     "startup show must run only after the privacy gate allows it"
   );
 
@@ -293,7 +293,7 @@ test("packaged dashboard stays hidden until the native privacy gate allows start
   );
   assert.doesNotMatch(
     startupShowBlock,
-    /focus_companion_windows/,
+    /focus_companion_windows|set_companion_windows_visible\(app\.handle\(\),\s*true,\s*true\)/,
     "packaged startup must not use active-space focus repair before CoreGraphics reports usable bounds"
   );
 });
@@ -307,11 +307,33 @@ test("startup companion repair does not use active-space focus repair", async ()
   assert.notEqual(scheduleEnd, -1, "startup companion repair scheduler body must be bounded");
 
   const scheduleBody = overlayRs.slice(scheduleStart, scheduleEnd);
-  assert.match(scheduleBody, /set_companion_windows_visible\(&main_thread_app,\s*true,\s*true\)/);
+  assert.match(scheduleBody, /set_startup_companion_windows_visible\(&main_thread_app,\s*true\)/);
   assert.doesNotMatch(
     scheduleBody,
-    /focus_companion_windows/,
+    /focus_companion_windows|set_companion_windows_visible\(&main_thread_app,\s*true,\s*true\)/,
     "delayed startup repair must avoid active-space focus repair until a share-risk restore needs it"
+  );
+
+  const startupHelperStart = overlayRs.indexOf("pub fn set_startup_companion_windows_visible");
+  const startupHelperEnd = overlayRs.indexOf("fn set_companion_windows_visible_with_repair_focus", startupHelperStart);
+  const sharedHelperStart = overlayRs.indexOf("fn set_companion_windows_visible_with_repair_focus");
+  const sharedHelperEnd = overlayRs.indexOf("pub fn companion_visibility_success_status", sharedHelperStart);
+
+  assert.notEqual(startupHelperStart, -1, "startup companion show helper must exist");
+  assert.notEqual(startupHelperEnd, -1, "startup companion show helper body must be bounded");
+  assert.notEqual(sharedHelperStart, -1, "shared companion visibility helper must exist");
+  assert.notEqual(sharedHelperEnd, -1, "shared companion visibility helper body must be bounded");
+
+  const startupHelperBody = overlayRs.slice(startupHelperStart, startupHelperEnd);
+  const sharedHelperBody = overlayRs.slice(sharedHelperStart, sharedHelperEnd);
+  assert.match(
+    startupHelperBody,
+    /set_companion_windows_visible_with_repair_focus\(\s*app,\s*true,\s*capture_exclusion_enabled,\s*false,?\s*\)/
+  );
+  assert.match(
+    sharedHelperBody,
+    /visibility_result\.is_ok\(\)\s*&& focus_after_bounds_repair\s*&&/,
+    "bounds repair must only focus windows when the caller explicitly allows it"
   );
 });
 
@@ -390,7 +412,7 @@ test("startup refuses to run when the native privacy shield thread cannot start"
   assert.doesNotMatch(setupBody, /let _ = screen_share::start_native_privacy_shield/);
   assert.ok(
     setupBody.indexOf("screen_share::start_native_privacy_shield(app.handle().clone())?") <
-      setupBody.indexOf("overlay::set_companion_windows_visible(app.handle(), true, true)"),
+      setupBody.indexOf("overlay::set_startup_companion_windows_visible(app.handle(), true)"),
     "startup must refuse before any initial companion window show when shield startup fails"
   );
   assert.match(screenShareRs, /pub fn start_native_privacy_shield\(app: tauri::AppHandle\) -> anyhow::Result<\(\)>/);
@@ -588,7 +610,9 @@ test("share-risk restore activates app before checking native visibility", async
     "activate_current_macos_app_for_companion_window_repair()",
     unhideBeforeRestore
   );
-  const visibleRestore = restoreBody.indexOf("set_companion_windows_visible(app, true, true)");
+  const visibleRestore = restoreBody.indexOf(
+    "set_companion_windows_visible_with_repair_focus(app, true, true, focus_after_restore)"
+  );
   const activateAfterRestore = restoreBody.indexOf("activate_app_for_companion_window_repair(app)", visibleRestore);
   const focusAfterActivate = restoreBody.indexOf("focus_companion_windows(app)", activateAfterRestore);
   const focusActivation = focusBody.indexOf("activate_app_for_companion_window_repair(app)");
