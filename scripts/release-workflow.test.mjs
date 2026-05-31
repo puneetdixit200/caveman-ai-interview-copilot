@@ -998,7 +998,10 @@ test("release workflow contract is part of the release test suite", async () => 
   assert.equal(packageJson.scripts["ai:smoke:openrouter"], "node scripts/openrouter-smoke.mjs");
   assert.equal(packageJson.scripts["obs:smoke"], "node scripts/obs-stealth-smoke.mjs");
   assert.equal(packageJson.scripts["dmg-meeting-risk:smoke:mac"], "node scripts/macos-dmg-meeting-risk-smoke.mjs");
-  assert.equal(packageJson.scripts["meeting-risk:smoke:windows"], "node scripts/windows-meeting-risk-smoke.mjs");
+  assert.equal(
+    packageJson.scripts["meeting-risk:smoke:windows"],
+    "node scripts/windows-meeting-risk-smoke.mjs --require-restore"
+  );
   assert.equal(packageJson.scripts["audio:smoke"], "node scripts/audio-environment-smoke.mjs");
   assert.equal(packageJson.scripts["commercial:check"], "node scripts/commercial-readiness.mjs");
   assert.equal(packageJson.scripts["commercial:secrets"], "node scripts/configure-commercial-secrets.mjs");

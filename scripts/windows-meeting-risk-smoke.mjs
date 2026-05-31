@@ -21,7 +21,7 @@ export const WINDOWS_MEETING_RISK_ACTIVE_WAIT_MS = 18_000;
 export const WINDOWS_MEETING_RISK_FAKE_MEETING_DURATION_MS = 24_000;
 export const WINDOWS_MEETING_RISK_INITIAL_WAIT_MS = 30_000;
 export const WINDOWS_MEETING_RISK_SMOKE_MARKER =
-  "Windows EXE meeting-risk smoke launches the built app and verifies Caveman hides during simulated Google Meet, Teams, Zoom, Webex, huddle, remote desktop, presenting, and recording windows.";
+  "Windows EXE meeting-risk smoke launches the built app and verifies Caveman hides during simulated Google Meet, Teams, Zoom, Webex, huddle, remote desktop, presenting, and recording windows, then restores after risk clears.";
 
 export const WINDOWS_CAVEMAN_WINDOW_QUERY_POWERSHELL = `
 $ErrorActionPreference = "Stop"
@@ -354,12 +354,28 @@ export function summarizeWindowsMeetingRiskSmoke({
   }
 
   for (const result of scenarioResults) {
+    if (!result.hiddenDuringRisk) {
+      messages.push(
+        `${result.label}: Caveman stayed visible while the simulated meeting window was visible.${
+          result.detail ? ` ${result.detail}` : ""
+        }`
+      );
+      continue;
+    }
+
+    if (requireRestore && !result.restoredAfterRisk) {
+      messages.push(
+        `${result.label}: Caveman hid while the simulated meeting window was visible, but did not restore after risk cleared.${
+          result.detail ? ` ${result.detail}` : ""
+        }`
+      );
+      continue;
+    }
+
     messages.push(
-      result.hiddenDuringRisk
-        ? `${result.label}: Caveman hid while the simulated meeting window was visible.`
-        : `${result.label}: Caveman stayed visible while the simulated meeting window was visible.${
-            result.detail ? ` ${result.detail}` : ""
-          }`
+      requireRestore
+        ? `${result.label}: Caveman hid while the simulated meeting window was visible and restored after risk cleared.`
+        : `${result.label}: Caveman hid while the simulated meeting window was visible.`
     );
   }
 
@@ -379,8 +395,13 @@ export function summarizeWindowsMeetingRiskSmoke({
 
   const allScenariosHid =
     scenarioResults.length > 0 && scenarioResults.every((result) => result.hiddenDuringRisk);
+  const allScenariosRestored =
+    !requireRestore || scenarioResults.every((result) => result.restoredAfterRisk);
   return {
-    status: initialWindow && allScenariosHid && (restoredWindow || !requireRestore) ? "ready" : "blocked",
+    status:
+      initialWindow && allScenariosHid && allScenariosRestored && (restoredWindow || !requireRestore)
+        ? "ready"
+        : "blocked",
     messages
   };
 }
@@ -510,15 +531,20 @@ async function runMeetingRiskScenario({
       },
       shouldStop: () => riskProcessExited
     });
+    let restoredAfterRisk = null;
     if (hiddenDuringRisk && requireRestore) {
-      await waitForChildExit(riskProcess, fakeMeetingDurationMs + 5_000);
+      await stopProcess(riskProcess);
+      restoredAfterRisk = await waitForVisibleUsableProtectedWindow({ commandRunner, timeoutMs: restoreWaitMs });
     }
     return {
       ...scenario,
       hiddenDuringRisk,
+      restoredAfterRisk: restoredAfterRisk ?? undefined,
       detail: riskProcessError
         ? `Meeting simulation failed: ${riskProcessError.message}`
-        : hiddenDuringRisk
+        : hiddenDuringRisk && requireRestore && !restoredAfterRisk
+          ? "No protected visible usable Caveman window returned before timeout."
+          : hiddenDuringRisk
           ? null
           : formatVisibleCavemanWindows(visibleCavemanWindows)
     };

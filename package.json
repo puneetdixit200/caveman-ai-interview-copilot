@@ -23,7 +23,7 @@
     "share-risk:smoke:mac": "node scripts/macos-share-risk-smoke.mjs",
     "meeting-risk:smoke:mac": "node scripts/macos-meeting-risk-smoke.mjs",
     "dmg-meeting-risk:smoke:mac": "node scripts/macos-dmg-meeting-risk-smoke.mjs",
-    "meeting-risk:smoke:windows": "node scripts/windows-meeting-risk-smoke.mjs",
+    "meeting-risk:smoke:windows": "node scripts/windows-meeting-risk-smoke.mjs --require-restore",
     "audio:smoke": "node scripts/audio-environment-smoke.mjs",
     "commercial:check": "node scripts/commercial-readiness.mjs",
     "commercial:secrets": "node scripts/configure-commercial-secrets.mjs",
