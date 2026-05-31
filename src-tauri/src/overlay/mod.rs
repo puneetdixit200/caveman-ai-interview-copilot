@@ -731,6 +731,7 @@ fn restore_companion_windows_with_native_show_gate(
     }
 
     if focus_after_restore {
+        #[cfg(target_os = "macos")]
         let _ = app.show();
     }
     let status = set_companion_windows_visible(app, true, true);
