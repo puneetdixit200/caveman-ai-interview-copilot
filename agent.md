@@ -8,9 +8,10 @@ Make Caveman harder to expose during Google Meet, Microsoft Teams, and screen-sh
 
 - Branch: `main`
 - Remote: `origin/main`
-- Latest implementation commit before this handoff refresh: `a6a0861 fix: reinforce Windows privacy hide`.
-- This handoff file is current as of Desktop Package Smoke run `26699176725`.
+- Latest implementation commit before this handoff refresh: `a8a4855 test: require Windows smoke restore`.
+- This handoff file is current as of Desktop Package Smoke run `26699762562`.
 - Previous relevant commits:
+  - `a6a0861 fix: reinforce Windows privacy hide`
   - `6a220b5 test: require no visible windows in share smokes`
   - `c79240c docs: record active indicator smoke evidence [skip ci]`
   - `5451775 test: use stable macos share smoke owners`
@@ -227,6 +228,13 @@ Follow-up CI hardening verification:
   - Push Desktop Package Smoke run `26699176725` for `a6a0861` passed all lanes. Windows installers passed native privacy tests, release contracts, package build, bundled sidecar verification, packaged privacy shield verification, packaged Windows meeting-risk smoke, artifact upload, and cleanup.
   - Windows smoke output: `READY`; initial `caveman.exe` window was `1044x788` and protected with `WDA_EXCLUDEFROMCAPTURE`; Caveman hid during all 16 simulated scenarios: Google Meet browser, Teams browser share, Teams native process, Zoom, Webex, browser presenting, screen recording, Slack huddle, Discord voice, WhatsApp video call, remote desktop, screen recorder, window sharing, screen shared, meeting recording, and recording in progress.
   - Linux, macOS Apple Silicon DMG, and macOS Intel DMG package lanes also passed native privacy tests, release contracts, package builds, bundled sidecar checks, packaged privacy shield verification, package-smoke runtime checks, artifact upload, and cleanup.
+- Windows restore-required package smoke follow-up:
+  - `a8a4855` changed `npm run meeting-risk:smoke:windows` to run `node scripts/windows-meeting-risk-smoke.mjs --require-restore`. Windows EXE package/signed-release smokes now fail unless Caveman hides during each simulated risk window and restores a protected visible usable window after each risk clears.
+  - The Windows smoke summary now distinguishes three failures: visible Caveman windows during risk, hidden-but-not-restored after risk clears, and missing final protected restoration. Added regression tests for restore-required success and restore timeout failure.
+  - Local non-UI verification did not open the app: `node --test scripts/windows-meeting-risk-smoke.test.mjs scripts/release-workflow.test.mjs` passed 53 tests; `npm run test:release` passed 163 tests; `git diff --check` passed.
+  - Push Desktop Package Smoke run `26699762562` for `a8a4855` passed all lanes. Windows installers passed native privacy tests, release contracts, package build, bundled sidecar verification, packaged privacy shield verification, restore-required packaged Windows meeting-risk smoke, artifact upload, and cleanup.
+  - Windows smoke output: `READY`; initial `caveman.exe` window was `1044x788` and protected with `WDA_EXCLUDEFROMCAPTURE`; Caveman hid and restored after risk cleared for all 16 simulated scenarios: Google Meet browser, Teams browser share, Teams native process, Zoom, Webex, browser presenting, screen recording, Slack huddle, Discord voice, WhatsApp video call, remote desktop, screen recorder, window sharing, screen shared, meeting recording, and recording in progress. Final restoration found a protected visible `caveman.exe` window at `1044x788`.
+  - Linux, macOS Apple Silicon DMG, and macOS Intel DMG package lanes also passed.
 - Push Desktop Package Smoke run `26694632145` for `011fb25` passed all lanes:
   - Windows installers: native privacy tests, release contracts, package build, bundled sidecar verification, packaged privacy shield, packaged Windows meeting-risk smoke, and artifact upload passed.
   - Windows smoke output: `READY`; initial `caveman.exe` window was `1044x788` and protected with `WDA_EXCLUDEFROMCAPTURE`; Caveman hid during simulated Google Meet browser, Teams browser share, Teams native process, Zoom meeting, Webex meeting, browser presenting indicator, and screen-recording indicator windows.
