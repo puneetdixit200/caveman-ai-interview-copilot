@@ -8,9 +8,14 @@ Make Caveman harder to expose during Google Meet, Microsoft Teams, and screen-sh
 
 - Branch: `main`
 - Remote: `origin/main`
-- Latest implementation commit before this handoff refresh: `79dc564 test: expand huddle and remote share risk smokes`.
-- This handoff file is current as of Desktop Package Smoke run `26695279321`.
+- Latest implementation commit before this handoff refresh: `5451775 test: use stable macos share smoke owners`.
+- This handoff file is current as of Desktop Package Smoke run `26698103755`.
 - Previous relevant commits:
+  - `332eac9 fix: ignore idle macos system share daemons`
+  - `bb41a4e fix: scan macos meeting processes with libproc`
+  - `d861a3a test: expand active share indicator smokes`
+  - `cab3b35 docs: record huddle remote smoke evidence [skip ci]`
+  - `79dc564 test: expand huddle and remote share risk smokes`
   - `c7569f5 ci: verify macos privacy shield on push`
   - `bdce589 fix: check windows processes before tasklist`
   - `a1b2e9c fix: check windows visible titles before tasklist`
@@ -200,6 +205,15 @@ Follow-up CI hardening verification:
   - `node --test scripts/macos-meeting-risk-smoke.test.mjs scripts/macos-dmg-meeting-risk-smoke.test.mjs` passed 8 tests.
   - `npm run test:release` passed 156 tests.
   - No local app launch was performed for this follow-up.
+- Push Desktop Package Smoke run `26698103755` for `5451775` passed all lanes after stabilizing the macOS package-smoke scenario owner names:
+  - Windows installers: native privacy tests, release contracts, package build, bundled sidecar verification, packaged privacy shield, packaged Windows meeting-risk smoke, artifact upload, and job cleanup passed.
+  - Windows smoke output: `READY`; initial `caveman.exe` window was `1044x788` and protected with `WDA_EXCLUDEFROMCAPTURE`; Caveman hid during all 16 simulated scenarios: Google Meet browser, Teams browser share, Teams native process, Zoom, Webex, browser presenting, screen recording, Slack huddle, Discord voice, WhatsApp video call, remote desktop, screen recorder, window sharing, screen shared, meeting recording, and recording in progress.
+  - macOS Intel app/DMG: native privacy tests passed 64 screen-share tests; release contracts passed; package build, sidecar verification, packaged privacy shield, packaged meeting-risk smoke, DMG artifact upload, and job cleanup passed.
+  - macOS Intel DMG smoke output: mounted `Caveman_0.1.1_x64.dmg`; initial Caveman window was `1280x820` and protected; Caveman hid during the same 16 simulated scenarios, including the active share and recording indicators.
+  - macOS Apple Silicon app/DMG: native privacy tests passed 64 screen-share tests; release contracts passed; package build, sidecar verification, packaged privacy shield, packaged meeting-risk smoke, DMG artifact upload, and job cleanup passed.
+  - macOS Apple Silicon DMG smoke output: mounted `Caveman_0.1.1_aarch64.dmg`; initial Caveman window was `1024x720` and protected; Caveman hid during the same 16 simulated scenarios, including the active share and recording indicators.
+  - Linux AppImage/DEB passed native privacy tests, release contracts, package build, bundled sidecar verification, packaged privacy shield, artifact upload, and job cleanup.
+  - No local app launch was performed for this handoff refresh; verification used local non-UI tests and GitHub Actions package smokes.
 - Push Desktop Package Smoke run `26694632145` for `011fb25` passed all lanes:
   - Windows installers: native privacy tests, release contracts, package build, bundled sidecar verification, packaged privacy shield, packaged Windows meeting-risk smoke, and artifact upload passed.
   - Windows smoke output: `READY`; initial `caveman.exe` window was `1044x788` and protected with `WDA_EXCLUDEFROMCAPTURE`; Caveman hid during simulated Google Meet browser, Teams browser share, Teams native process, Zoom meeting, Webex meeting, browser presenting indicator, and screen-recording indicator windows.
@@ -225,7 +239,7 @@ List recent runs with:
 gh run list --repo puneetdixit200/caveman-ai-interview-copilot --branch main --limit 5 --json databaseId,workflowName,headSha,status,conclusion,createdAt,url
 ```
 
-Latest verified package-smoke run before this handoff refresh: `26695279321` for `79dc564`, green in all lanes after a failed-job rerun for a transient macOS Apple Silicon artifact-upload stall. This run verified the expanded packaged Windows EXE and macOS DMG meeting-risk smokes for Google Meet, Teams browser/native, Zoom, Webex, generic presenting UI, generic screen-recording UI, Slack huddle, Discord voice, WhatsApp video call, remote desktop, and screen-recorder windows.
+Latest verified package-smoke run before this handoff refresh: `26698103755` for `5451775`, green in all lanes. This run verified the expanded packaged Windows EXE and macOS DMG meeting-risk smokes for Google Meet, Teams browser/native, Zoom, Webex, generic presenting UI, generic screen-recording UI, Slack huddle, Discord voice, WhatsApp video call, remote desktop, screen-recorder windows, window-sharing status, screen-shared status, meeting-recording status, and recording-in-progress status.
 
 ## Suggested next steps
 
