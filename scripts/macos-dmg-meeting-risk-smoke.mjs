@@ -59,15 +59,12 @@ export async function runMacosDmgMeetingRiskSmoke({
       processSpawner,
       bundleId,
       appPath,
-      requireRestore: false,
+      requireRestore: true,
       requireScenarioRestore: false,
       restoreWaitMs: PACKAGED_DMG_RESTORE_WAIT_MS,
       activeRiskWaitMs: PACKAGED_DMG_ACTIVE_RISK_WAIT_MS,
       fakeMeetingDurationMs: PACKAGED_DMG_FAKE_MEETING_DURATION_MS,
-      scenarios: [
-        ...MACOS_PACKAGED_MEETING_RISK_SCENARIOS,
-        ...MACOS_PACKAGED_REMOTE_SUPPORT_RISK_SCENARIOS
-      ]
+      scenarios: MACOS_PACKAGED_MEETING_RISK_SCENARIOS
     });
 
     if (batchResult.status !== "ready") {

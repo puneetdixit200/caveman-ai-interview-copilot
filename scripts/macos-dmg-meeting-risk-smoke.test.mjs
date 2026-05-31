@@ -69,10 +69,12 @@ test("runs meeting-risk smoke against the mounted DMG app bundle", async () => {
           scenarios.some(
             (scenario) => scenario.executableName === executableName && scenario.windowTitle === windowTitle
           );
-        if (requireRestore) {
+        if (requireScenarioRestore) {
+          assert.equal(requireRestore, true);
           assert.equal(requireScenarioRestore, true);
           assert.ok(hasScenario("RemoteSupportControl", "TeamViewer Remote Control"));
         } else {
+          assert.equal(requireRestore, true);
           assert.equal(requireScenarioRestore, false);
           assert.ok(scenarios.some((scenario) => scenario.windowTitle === "Zoom Meeting - Candidate"));
           assert.ok(scenarios.some((scenario) => scenario.windowTitle === "Webex Meeting - Candidate"));
@@ -82,7 +84,7 @@ test("runs meeting-risk smoke against the mounted DMG app bundle", async () => {
           assert.ok(hasScenario("AnyDesk", "Remote Desktop - Session"));
           assert.ok(hasScenario("OBS", "Screen Recorder - Active"));
           assert.ok(hasScenario("Google Chrome", "You're sharing a window"));
-          assert.ok(hasScenario("RemoteSupportControl", "TeamViewer Remote Control"));
+          assert.equal(hasScenario("RemoteSupportControl", "TeamViewer Remote Control"), false);
           assert.ok(scenarios.some((scenario) => scenario.windowTitle === "Your screen is being shared"));
           assert.ok(scenarios.some((scenario) => scenario.windowTitle === "Meeting is being recorded"));
           assert.ok(scenarios.some((scenario) => scenario.windowTitle === "Recording in progress"));
@@ -97,7 +99,7 @@ test("runs meeting-risk smoke against the mounted DMG app bundle", async () => {
     assert.equal(result.status, "ready");
     assert.match(result.messages[0], /Mounted DMG/);
     assert.equal(meetingRiskCalls.length, 2);
-    assert.equal(meetingRiskCalls[0].requireRestore, false);
+    assert.equal(meetingRiskCalls[0].requireRestore, true);
     assert.equal(meetingRiskCalls[0].requireScenarioRestore, false);
     assert.equal(meetingRiskCalls[1].requireRestore, true);
     assert.equal(meetingRiskCalls[1].requireScenarioRestore, true);
