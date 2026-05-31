@@ -53,6 +53,7 @@ export const COMMON_PRIVACY_SHIELD_MARKERS = [
   "Native privacy shield refreshes capture exclusion before hiding for screen-share risk.",
   "Native privacy shield applies app-window updates on the Tauri main thread.",
   "Native privacy shield exposes a nonblocking share-risk latch for bounds repair.",
+  "Native privacy shield retries companion restore until a protected window is visible after share risk clears.",
   "Native privacy shield denied screen OCR capture.",
   "Waiting for app windows to leave capture surfaces before screen OCR capture.",
   "Native privacy shield denied active-window typing during screen-share risk.",

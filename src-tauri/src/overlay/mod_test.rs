@@ -3,9 +3,10 @@ use super::{
     capture_exclusion_enabled_status, capture_exclusion_show_block_reason,
     capture_exclusion_unavailable_status, companion_capture_exclusion_status,
     companion_focus_post_show_privacy_recheck_message, companion_restore_privacy_gate_status,
-    companion_visibility_success_status, enforce_capture_exclusion_setting,
-    is_companion_window_label, is_overlay_window_label, macos_app_activation_command_args,
-    native_show_privacy_gate_status, post_show_privacy_recheck_message, protected_window_labels,
+    companion_restore_status_after_native_visibility_check, companion_visibility_success_status,
+    enforce_capture_exclusion_setting, is_companion_window_label, is_overlay_window_label,
+    macos_app_activation_command_args, native_show_privacy_gate_status,
+    post_show_privacy_recheck_message, protected_window_labels,
     protection_refresh_fail_closed_message, sanitize_companion_window_bounds,
     sanitize_overlay_bounds, startup_privacy_shield_hide_reason, windows_capture_exclusion_status,
     windows_pre_show_capture_exclusion_can_recheck_after_show, OverlayProtectionStatus,
@@ -547,6 +548,30 @@ fn companion_restore_gate_allows_when_share_clear_and_capture_exclusion_enabled(
     assert_eq!(status.capture_exclusion, "enabled");
     assert!(!status.visible);
     assert!(status.message.is_none());
+}
+
+#[test]
+fn share_risk_restore_stays_pending_until_native_window_is_usable() {
+    let repaired_tauri_status = companion_restore_status_after_native_visibility_check(
+        capture_exclusion_enabled_status(true),
+        true,
+    );
+
+    assert_eq!(repaired_tauri_status.capture_exclusion, "enabled");
+    assert!(!repaired_tauri_status.visible);
+    assert!(repaired_tauri_status
+        .message
+        .unwrap()
+        .contains("CoreGraphics"));
+
+    let natively_visible_status = companion_restore_status_after_native_visibility_check(
+        capture_exclusion_enabled_status(true),
+        false,
+    );
+
+    assert_eq!(natively_visible_status.capture_exclusion, "enabled");
+    assert!(natively_visible_status.visible);
+    assert!(natively_visible_status.message.is_none());
 }
 
 #[test]

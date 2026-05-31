@@ -386,6 +386,8 @@ test("native privacy shield refreshes capture protection before share-risk hide"
   const shareRiskLatch = shieldBody.indexOf("share_risk_was_active");
   const queuedWindowUpdate = shieldBody.indexOf("apply_native_privacy_shield_window_update", mainThreadDispatch);
   const clearRestore = updateBody.indexOf("restore_companion_windows_after_share_risk_cleared");
+  const pendingRestore = updateBody.indexOf("NATIVE_PRIVACY_SHIELD_RESTORE_AFTER_SHARE_RISK_PENDING");
+  const visibleRestoreClear = updateBody.indexOf("restore_status.visible", clearRestore);
   const refreshIndex = updateBody.indexOf("crate::overlay::protect_overlay_window(app, true)", shareRiskBranchStart);
   const hideIndex = updateBody.indexOf("hide_app_windows_for_native_privacy_shield(app)", shareRiskBranchStart);
 
@@ -397,10 +399,13 @@ test("native privacy shield refreshes capture protection before share-risk hide"
   assert.notEqual(shareRiskLatch, -1, "privacy shield must remember whether the previous poll hid for share risk");
   assert.notEqual(queuedWindowUpdate, -1, "privacy shield must call the queued window update helper");
   assert.notEqual(clearRestore, -1, "privacy shield must run a stronger restore when share risk clears");
+  assert.notEqual(pendingRestore, -1, "privacy shield must keep restoring until a native window is visible");
+  assert.notEqual(visibleRestoreClear, -1, "pending share-risk restore must clear only after a visible status");
   assert.notEqual(refreshIndex, -1, "share-risk branch must refresh capture exclusion before hiding");
   assert.notEqual(hideIndex, -1, "share-risk branch must hide app windows");
   assert.ok(shareRiskLatch < mainThreadDispatch, "share-risk transition state must be computed before UI restore dispatch");
   assert.ok(mainThreadDispatch < queuedWindowUpdate, "privacy decisions must dispatch window updates to the main thread");
+  assert.ok(clearRestore < visibleRestoreClear, "share-risk restore status must be checked before clearing retry state");
   assert.ok(refreshIndex < hideIndex, "capture exclusion must be refreshed before app windows are hidden");
   assert.match(screenShareRs, /Duration::from_millis\(50\)/);
   assert.match(screenShareRs, /Duration::from_millis\(750\)/);
@@ -499,6 +504,10 @@ test("native privacy shield refreshes capture protection before share-risk hide"
   assert.match(
     screenShareRs,
     /Native privacy shield refreshes capture exclusion before hiding for screen-share risk\./
+  );
+  assert.match(
+    screenShareRs,
+    /Native privacy shield retries companion restore until a protected window is visible after share risk clears\./
   );
   assert.match(screenShareRs, /Native privacy shield applies app-window updates on the Tauri main thread\./);
 });
