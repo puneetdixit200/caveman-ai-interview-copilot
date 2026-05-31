@@ -359,6 +359,7 @@ async function runMeetingRiskScenario({
     });
     if (hiddenDuringRisk && requireScenarioRestore) {
       await stopProcess(riskProcess);
+      await stopScenarioProcesses({ tempDir, commandRunner });
       const restoreResult = await waitForVisibleUsableWindowResult({ commandRunner, timeoutMs: restoreWaitMs });
       restoredAfterRisk = restoreResult.window;
       restoreRows = restoreResult.rows;
@@ -366,6 +367,7 @@ async function runMeetingRiskScenario({
   } finally {
     await stopProcess(riskProcess);
     if (hiddenDuringRisk && requireScenarioRestore && !restoredAfterRisk) {
+      await stopScenarioProcesses({ tempDir, commandRunner });
       const restoreResult = await waitForVisibleUsableWindowResult({ commandRunner, timeoutMs: restoreWaitMs });
       restoredAfterRisk = restoreResult.window;
       restoreRows = restoreResult.rows;

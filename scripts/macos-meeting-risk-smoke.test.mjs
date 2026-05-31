@@ -572,6 +572,63 @@ test("clears lingering macOS risk scenario processes before final restore", asyn
   assert.ok(killIndex < finalSwiftIndex, "scenario cleanup must finish before the final restore query");
 });
 
+test("clears lingering macOS risk scenario processes before strict scenario restore", async () => {
+  const visibleWindowRows = JSON.stringify([WINDOW]);
+  const queryOutputs = [visibleWindowRows, "[]", visibleWindowRows, visibleWindowRows];
+  const commands = [];
+
+  const commandRunner = async (command, args = []) => {
+    commands.push([command, args]);
+    if (command === "swift") {
+      return { stdout: queryOutputs.shift() ?? visibleWindowRows };
+    }
+    return { stdout: "" };
+  };
+
+  const processSpawner = () => {
+    const child = new EventEmitter();
+    child.exitCode = null;
+    child.signalCode = null;
+    child.kill = (signal) => {
+      child.signalCode = signal;
+      child.emit("exit");
+      return true;
+    };
+    return child;
+  };
+
+  const result = await runMacosMeetingRiskSmoke({
+    platform: "darwin",
+    commandRunner,
+    processSpawner,
+    requireRestore: true,
+    requireScenarioRestore: true,
+    scenarios: [
+      {
+        id: "remote-support-control",
+        label: "Remote support control window",
+        executableName: "TeamViewer",
+        windowTitle: "TeamViewer Remote Control"
+      }
+    ]
+  });
+
+  const termIndex = commands.findIndex(
+    ([command, args]) => command === "pkill" && args[0] === "-TERM" && args[1] === "-f"
+  );
+  const killIndex = commands.findIndex(
+    ([command, args]) => command === "pkill" && args[0] === "-KILL" && args[1] === "-f"
+  );
+  const restoreSwiftIndex = commands.findIndex(([command], index) => command === "swift" && index > killIndex);
+
+  assert.equal(result.status, "ready");
+  assert.notEqual(termIndex, -1, "strict scenario cleanup must terminate lingering temp-dir processes");
+  assert.notEqual(killIndex, -1, "strict scenario cleanup must force-kill lingering temp-dir processes");
+  assert.ok(termIndex < killIndex, "TERM cleanup should run before KILL cleanup");
+  assert.ok(killIndex < restoreSwiftIndex, "strict cleanup must finish before restore polling");
+  assert.match(result.messages.join("\n"), /Remote support control window: Caveman hid/);
+});
+
 test("blocks the macOS meeting smoke when any visible Caveman window remains during risk", async () => {
   const visibleWindowRows = JSON.stringify([WINDOW]);
   const tinyVisibleWindowRows = JSON.stringify([

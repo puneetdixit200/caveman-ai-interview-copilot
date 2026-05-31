@@ -1182,8 +1182,10 @@ fn activate_current_macos_app_for_companion_window_repair() {
 
     let app = objc2_app_kit::NSApplication::sharedApplication(main_thread);
     app.unhide(None);
+    app.unhideWithoutActivation();
     #[allow(deprecated)]
     app.activateIgnoringOtherApps(true);
+    app.arrangeInFront(None);
 }
 
 #[cfg(target_os = "macos")]

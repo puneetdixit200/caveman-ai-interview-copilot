@@ -661,7 +661,9 @@ test("macOS share-risk restore directly unhides current app before external acti
   const nativeUnhideBody = overlayRs.slice(nativeUnhideStart, activationStart);
   assert.match(nativeUnhideBody, /NSApplication::sharedApplication/);
   assert.match(nativeUnhideBody, /\.unhide\(None\)/);
+  assert.match(nativeUnhideBody, /unhideWithoutActivation\(\)/);
   assert.match(nativeUnhideBody, /activateIgnoringOtherApps\(true\)/);
+  assert.match(nativeUnhideBody, /arrangeInFront\(None\)/);
 });
 
 test("companion bounds watchdog pauses repairs during active share-risk", async () => {
