@@ -214,6 +214,12 @@ Follow-up CI hardening verification:
   - macOS Apple Silicon DMG smoke output: mounted `Caveman_0.1.1_aarch64.dmg`; initial Caveman window was `1024x720` and protected; Caveman hid during the same 16 simulated scenarios, including the active share and recording indicators.
   - Linux AppImage/DEB passed native privacy tests, release contracts, package build, bundled sidecar verification, packaged privacy shield, artifact upload, and job cleanup.
   - No local app launch was performed for this handoff refresh; verification used local non-UI tests and GitHub Actions package smokes.
+- Windows visible-window smoke follow-up:
+  - Desktop Package Smoke run `26698607869` for `6a220b5` passed Linux and both macOS lanes, including stricter macOS no-visible-window package smokes, but failed only Windows packaged meeting-risk smoke. The Windows log showed the app stayed visible for all 16 scenarios after `6a220b5` changed the Windows package smoke to fail on any visible Caveman window.
+  - Follow-up keeps the stricter Windows package-smoke predicate and reinforces the native privacy hide path by hiding app-owned top-level Windows handles after the Tauri window hide calls. The Windows smoke now reports visible Caveman window details when the strict predicate times out, and the package privacy marker requires the native hide reinforcement in Windows builds.
+  - `node --test scripts/windows-meeting-risk-smoke.test.mjs scripts/macos-meeting-risk-smoke.test.mjs scripts/macos-share-risk-smoke.test.mjs` passed 17 tests.
+  - `npm run test:release` passed 160 tests.
+  - `git diff --check` passed.
 - Push Desktop Package Smoke run `26694632145` for `011fb25` passed all lanes:
   - Windows installers: native privacy tests, release contracts, package build, bundled sidecar verification, packaged privacy shield, packaged Windows meeting-risk smoke, and artifact upload passed.
   - Windows smoke output: `READY`; initial `caveman.exe` window was `1044x788` and protected with `WDA_EXCLUDEFROMCAPTURE`; Caveman hid during simulated Google Meet browser, Teams browser share, Teams native process, Zoom meeting, Webex meeting, browser presenting indicator, and screen-recording indicator windows.

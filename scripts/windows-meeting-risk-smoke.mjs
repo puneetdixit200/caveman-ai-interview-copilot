@@ -301,7 +301,11 @@ export function selectVisibleUsableCavemanWindow(rows) {
 }
 
 export function selectVisibleCavemanWindow(rows) {
-  return rows.find(
+  return selectVisibleCavemanWindows(rows)[0];
+}
+
+export function selectVisibleCavemanWindows(rows) {
+  return rows.filter(
     (row) =>
       isCavemanProcess(row.processName) &&
       row.visible &&
@@ -353,7 +357,9 @@ export function summarizeWindowsMeetingRiskSmoke({
     messages.push(
       result.hiddenDuringRisk
         ? `${result.label}: Caveman hid while the simulated meeting window was visible.`
-        : `${result.label}: Caveman stayed visible while the simulated meeting window was visible.`
+        : `${result.label}: Caveman stayed visible while the simulated meeting window was visible.${
+            result.detail ? ` ${result.detail}` : ""
+          }`
     );
   }
 
@@ -494,10 +500,14 @@ async function runMeetingRiskScenario({
   });
 
   try {
+    let visibleCavemanWindows = [];
     const hiddenDuringRisk = await waitForCondition({
       timeoutMs: activeRiskWaitMs,
       commandRunner,
-      predicate: (rows) => !selectVisibleCavemanWindow(rows),
+      predicate: (rows) => {
+        visibleCavemanWindows = selectVisibleCavemanWindows(rows);
+        return visibleCavemanWindows.length === 0;
+      },
       shouldStop: () => riskProcessExited
     });
     if (hiddenDuringRisk && requireRestore) {
@@ -506,7 +516,11 @@ async function runMeetingRiskScenario({
     return {
       ...scenario,
       hiddenDuringRisk,
-      detail: riskProcessError ? riskProcessError.message : null
+      detail: riskProcessError
+        ? `Meeting simulation failed: ${riskProcessError.message}`
+        : hiddenDuringRisk
+          ? null
+          : formatVisibleCavemanWindows(visibleCavemanWindows)
     };
   } finally {
     await stopProcess(riskProcess);
@@ -611,6 +625,21 @@ async function assertFile(path, label) {
 
 function isCavemanProcess(processName) {
   return ["caveman.exe", "caveman"].includes(String(processName || "").trim().toLowerCase());
+}
+
+function formatVisibleCavemanWindows(rows) {
+  const visibleRows = rows.slice(0, 6);
+  if (visibleRows.length === 0) {
+    return "No visible Caveman window rows were captured at timeout.";
+  }
+
+  return `Visible Caveman windows: ${visibleRows
+    .map((row) => {
+      const affinity = row.affinityOk ? `affinity=${row.affinity}` : "affinity=unreadable";
+      const title = row.title ? ` title=${JSON.stringify(row.title)}` : "";
+      return `${row.processName || row.processId} pid=${row.processId} ${row.width}x${row.height}+${row.x}+${row.y} ${affinity}${title}`;
+    })
+    .join("; ")}${rows.length > visibleRows.length ? `; plus ${rows.length - visibleRows.length} more` : ""}`;
 }
 
 function delay(ms) {

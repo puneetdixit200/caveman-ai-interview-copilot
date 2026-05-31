@@ -69,6 +69,8 @@ pub const COMPANION_WINDOW_FOCUS_POST_SHOW_RECHECK_MARKER: &str =
     "Companion app window focus repair rechecks privacy again after raising windows.";
 pub const WINDOWS_PRE_SHOW_CAPTURE_EXCLUSION_RECHECK_MARKER: &str =
     "Windows native show gate retries display-affinity verification after the window becomes visible.";
+pub const WINDOWS_NATIVE_PRIVACY_HIDE_REINFORCEMENT_MARKER: &str =
+    "Windows privacy shield reinforces Tauri hide by hiding app-owned top-level windows.";
 pub const COMPANION_WINDOW_RESTORE_PRIVACY_PAUSE_MARKER: &str =
     "Companion app window restore stays paused after a native privacy denial.";
 const COMPANION_WINDOW_MIN_WIDTH: u32 = 1024;
@@ -140,6 +142,53 @@ pub fn configure_overlay_security(app: &mut tauri::App) -> bool {
 
     startup_allows_initial_show
 }
+
+pub fn hide_app_windows_for_native_privacy_shield(app: &tauri::AppHandle) {
+    let _ = set_overlay_window_visible(app, false, true);
+    let _ = set_companion_windows_visible(app, false, true);
+    reinforce_native_privacy_hide();
+}
+
+#[cfg(target_os = "windows")]
+fn reinforce_native_privacy_hide() {
+    use windows::core::BOOL;
+    use windows::Win32::Foundation::{HWND, LPARAM, TRUE};
+    use windows::Win32::UI::WindowsAndMessaging::{
+        EnumWindows, GetWindowThreadProcessId, IsWindowVisible, ShowWindow, SW_HIDE,
+    };
+
+    struct HideContext {
+        process_id: u32,
+    }
+
+    extern "system" fn hide_matching_window(hwnd: HWND, lparam: LPARAM) -> BOOL {
+        if !unsafe { IsWindowVisible(hwnd) }.as_bool() {
+            return TRUE;
+        }
+
+        let mut process_id = 0_u32;
+        unsafe {
+            GetWindowThreadProcessId(hwnd, Some(&mut process_id));
+        }
+
+        let context = unsafe { &*(lparam.0 as *const HideContext) };
+        if process_id == context.process_id {
+            let _ = unsafe { ShowWindow(hwnd, SW_HIDE) };
+        }
+
+        TRUE
+    }
+
+    std::hint::black_box(WINDOWS_NATIVE_PRIVACY_HIDE_REINFORCEMENT_MARKER);
+    let context = HideContext {
+        process_id: std::process::id(),
+    };
+    let lparam = LPARAM((&context as *const HideContext) as isize);
+    let _ = unsafe { EnumWindows(Some(hide_matching_window), lparam) };
+}
+
+#[cfg(not(target_os = "windows"))]
+fn reinforce_native_privacy_hide() {}
 
 pub fn startup_privacy_shield_hide_reason(
     protection_statuses: &[OverlayProtectionStatus],

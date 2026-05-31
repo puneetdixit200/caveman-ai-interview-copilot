@@ -14,6 +14,7 @@ import {
   parseWindowsWindowRows,
   runWindowsMeetingRiskSmoke,
   selectVisibleCavemanWindow,
+  selectVisibleCavemanWindows,
   selectVisibleUsableCavemanWindow,
   selectVisibleUsableProtectedCavemanWindow,
   summarizeWindowsMeetingRiskSmoke,
@@ -52,6 +53,7 @@ test("selects only visible usable protected Caveman windows", () => {
 
   assert.equal(selectVisibleUsableCavemanWindow(rows)?.affinity, 0);
   assert.equal(selectVisibleCavemanWindow(rows)?.width, 640);
+  assert.equal(selectVisibleCavemanWindows(rows).length, 3);
   assert.equal(selectVisibleUsableProtectedCavemanWindow(rows)?.affinity, 17);
 });
 
@@ -201,13 +203,14 @@ test("runs the Windows EXE against simulated meeting and recording windows", asy
 });
 
 test("blocks the Windows EXE smoke when any visible Caveman window remains during risk", async () => {
-  const dir = await mkdtemp(join(tmpdir(), "caveman-windows-risk-visible-"));
+  const dir = await mkdtemp(join(tmpdir(), "caveman-windows-risk-residual-"));
   const appExePath = join(dir, "caveman.exe");
   const tinyVisibleWindow = {
     ...PROTECTED_WINDOW,
     width: 320,
     height: 200
   };
+  const queryOutputs = [JSON.stringify([PROTECTED_WINDOW]), JSON.stringify([tinyVisibleWindow])];
 
   try {
     await mkdir(dir, { recursive: true });
@@ -218,7 +221,54 @@ test("blocks the Windows EXE smoke when any visible Caveman window remains durin
         return { stdout: "", stderr: "" };
       }
       return {
-        stdout: JSON.stringify([PROTECTED_WINDOW, tinyVisibleWindow]),
+        stdout: queryOutputs.shift() ?? JSON.stringify([tinyVisibleWindow]),
+        stderr: ""
+      };
+    };
+
+    const processSpawner = () => {
+      const child = new EventEmitter();
+      child.exitCode = null;
+      child.signalCode = null;
+      child.kill = (signal) => {
+        child.signalCode = signal;
+        child.emit("exit");
+        return true;
+      };
+      return child;
+    };
+
+    const result = await runWindowsMeetingRiskSmoke({
+      platform: "win32",
+      appExePath,
+      commandRunner,
+      processSpawner,
+      activeRiskWaitMs: 1,
+      scenarios: [WINDOWS_MEETING_RISK_SCENARIOS[0]]
+    });
+
+    assert.equal(result.status, "blocked");
+    assert.match(result.messages.join("\n"), /stayed visible/);
+    assert.match(result.messages.join("\n"), /320x200/);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test("blocks the Windows EXE smoke when a visible usable Caveman window remains during risk", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "caveman-windows-risk-visible-"));
+  const appExePath = join(dir, "caveman.exe");
+
+  try {
+    await mkdir(dir, { recursive: true });
+    await writeFile(appExePath, "fake exe");
+
+    const commandRunner = async (command) => {
+      if (command === "taskkill") {
+        return { stdout: "", stderr: "" };
+      }
+      return {
+        stdout: JSON.stringify([PROTECTED_WINDOW]),
         stderr: ""
       };
     };

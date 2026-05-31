@@ -1848,8 +1848,7 @@ fn apply_native_privacy_shield_window_update(
 }
 
 fn hide_app_windows_for_native_privacy_shield(app: &tauri::AppHandle) {
-    let _ = crate::overlay::set_overlay_window_visible(app, false, true);
-    let _ = crate::overlay::set_companion_windows_visible(app, false, true);
+    crate::overlay::hide_app_windows_for_native_privacy_shield(app);
 }
 
 fn screen_share_status_for_processes(processes: Vec<ScreenShareProcess>) -> ScreenShareStatus {
