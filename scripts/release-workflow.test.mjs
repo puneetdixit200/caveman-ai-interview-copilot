@@ -556,6 +556,10 @@ test("share-risk restore activates app before checking native visibility", async
   const restoreBody = overlayRs.slice(restoreStart, restoreEnd);
   const focusBody = overlayRs.slice(focusStart, focusEnd);
   const unhideBeforeRestore = restoreBody.indexOf("let _ = app.show()");
+  const directUnhideBeforeRestore = restoreBody.indexOf(
+    "activate_current_macos_app_for_companion_window_repair()",
+    unhideBeforeRestore
+  );
   const visibleRestore = restoreBody.indexOf("set_companion_windows_visible(app, true, true)");
   const activateAfterRestore = restoreBody.indexOf("activate_app_for_companion_window_repair(app)", visibleRestore);
   const focusAfterActivate = restoreBody.indexOf("focus_companion_windows(app)", activateAfterRestore);
@@ -564,8 +568,17 @@ test("share-risk restore activates app before checking native visibility", async
   const setFocusAfterShow = focusBody.indexOf("window.set_focus()", showAfterFocusActivation);
 
   assert.notEqual(unhideBeforeRestore, -1, "share-risk restore must unhide the packaged app first");
+  assert.notEqual(
+    directUnhideBeforeRestore,
+    -1,
+    "share-risk restore must directly unhide the packaged app before showing windows"
+  );
   assert.notEqual(visibleRestore, -1, "share-risk restore must show companion windows");
   assert.ok(unhideBeforeRestore < visibleRestore, "packaged app unhide must happen before companion window restore");
+  assert.ok(
+    unhideBeforeRestore < directUnhideBeforeRestore && directUnhideBeforeRestore < visibleRestore,
+    "direct packaged app unhide must happen before companion window restore"
+  );
   assert.notEqual(activateAfterRestore, -1, "share-risk restore must activate the packaged app");
   assert.notEqual(focusAfterActivate, -1, "share-risk restore must focus after activation");
   assert.match(focusBody, /needs_native_activation \|\| native_repaired \|\| repaired/);
