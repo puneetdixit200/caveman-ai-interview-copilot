@@ -172,6 +172,9 @@ test("keeps simulated meeting windows alive long enough for macOS title scans", 
   assert.deepEqual(MACOS_PACKAGED_REMOTE_SUPPORT_RISK_SCENARIOS.map((scenario) => scenario.windowTitle), [
     "TeamViewer Remote Control"
   ]);
+  assert.deepEqual(MACOS_PACKAGED_REMOTE_SUPPORT_RISK_SCENARIOS.map((scenario) => scenario.executableName), [
+    "TeamViewer"
+  ]);
 });
 
 test("fake macOS meeting app exits promptly when simulated risk is cleared", () => {

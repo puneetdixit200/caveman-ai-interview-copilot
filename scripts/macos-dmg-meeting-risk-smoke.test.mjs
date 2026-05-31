@@ -72,7 +72,7 @@ test("runs meeting-risk smoke against the mounted DMG app bundle", async () => {
         if (requireScenarioRestore) {
           assert.equal(requireRestore, true);
           assert.equal(requireScenarioRestore, true);
-          assert.ok(hasScenario("RemoteSupportControl", "TeamViewer Remote Control"));
+          assert.ok(hasScenario("TeamViewer", "TeamViewer Remote Control"));
         } else {
           assert.equal(requireRestore, true);
           assert.equal(requireScenarioRestore, false);
@@ -84,7 +84,7 @@ test("runs meeting-risk smoke against the mounted DMG app bundle", async () => {
           assert.ok(hasScenario("AnyDesk", "Remote Desktop - Session"));
           assert.ok(hasScenario("OBS", "Screen Recorder - Active"));
           assert.ok(hasScenario("Google Chrome", "You're sharing a window"));
-          assert.equal(hasScenario("RemoteSupportControl", "TeamViewer Remote Control"), false);
+          assert.equal(hasScenario("TeamViewer", "TeamViewer Remote Control"), false);
           assert.ok(scenarios.some((scenario) => scenario.windowTitle === "Your screen is being shared"));
           assert.ok(scenarios.some((scenario) => scenario.windowTitle === "Meeting is being recorded"));
           assert.ok(scenarios.some((scenario) => scenario.windowTitle === "Recording in progress"));

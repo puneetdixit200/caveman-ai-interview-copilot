@@ -174,7 +174,7 @@ export const MACOS_PACKAGED_REMOTE_SUPPORT_RISK_SCENARIOS = [
   {
     id: "remote-support-control",
     label: "Remote support control window",
-    executableName: "RemoteSupportControl",
+    executableName: "TeamViewer",
     windowTitle: "TeamViewer Remote Control"
   }
 ];
