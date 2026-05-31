@@ -8,6 +8,7 @@ import {
   MACOS_DMG_MEETING_RISK_SMOKE_MARKER,
   PACKAGED_DMG_ACTIVE_RISK_WAIT_MS,
   PACKAGED_DMG_FAKE_MEETING_DURATION_MS,
+  PACKAGED_DMG_RESTORE_WAIT_MS,
   findSingleMacosDmg,
   runMacosDmgMeetingRiskSmoke
 } from "./macos-dmg-meeting-risk-smoke.mjs";
@@ -59,7 +60,7 @@ test("runs meeting-risk smoke against the mounted DMG app bundle", async () => {
       }) => {
         assert.match(appPath, /Caveman\.app$/);
         assert.equal(requireRestore, true);
-        assert.equal(restoreWaitMs, 12_000);
+        assert.equal(restoreWaitMs, PACKAGED_DMG_RESTORE_WAIT_MS);
         assert.equal(activeRiskWaitMs, PACKAGED_DMG_ACTIVE_RISK_WAIT_MS);
         assert.equal(fakeMeetingDurationMs, PACKAGED_DMG_FAKE_MEETING_DURATION_MS);
         const hasScenario = (executableName, windowTitle) =>
@@ -68,7 +69,7 @@ test("runs meeting-risk smoke against the mounted DMG app bundle", async () => {
           );
         assert.ok(scenarios.some((scenario) => scenario.windowTitle === "Zoom Meeting - Candidate"));
         assert.ok(scenarios.some((scenario) => scenario.windowTitle === "Webex Meeting - Candidate"));
-        assert.ok(scenarios.some((scenario) => scenario.windowTitle === "Screen recording"));
+        assert.ok(hasScenario("Google Chrome", "Screen recording - Loom"));
         assert.ok(hasScenario("Slack", "Slack Huddle - Candidate"));
         assert.ok(hasScenario("Google Chrome", "web.whatsapp.com - Video call"));
         assert.ok(hasScenario("AnyDesk", "Remote Desktop - Session"));

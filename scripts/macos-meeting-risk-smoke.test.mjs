@@ -7,6 +7,7 @@ import {
   MACOS_MEETING_RISK_FAKE_MEETING_DURATION_MS,
   MACOS_PACKAGED_MEETING_RISK_SCENARIOS,
   MACOS_MEETING_RISK_SMOKE_MARKER,
+  FAKE_MEETING_APP_SWIFT,
   cavemanActivationArgs,
   runMacosMeetingRiskSmoke,
   summarizeMacosMeetingRiskSmoke
@@ -141,7 +142,7 @@ test("keeps simulated meeting windows alive long enough for macOS title scans", 
       "Zoom Meeting - Candidate",
       "Webex Meeting - Candidate",
       "You are presenting",
-      "Screen recording",
+      "Screen recording - Loom",
       "Slack Huddle - Candidate",
       "Discord Voice - Candidate",
       "web.whatsapp.com - Video call",
@@ -153,6 +154,12 @@ test("keeps simulated meeting windows alive long enough for macOS title scans", 
       "Recording in progress"
     ]
   );
+});
+
+test("fake macOS meeting app exits promptly when simulated risk is cleared", () => {
+  assert.match(FAKE_MEETING_APP_SWIFT, /DispatchSource\.makeSignalSource\(signal: terminationSignal/);
+  assert.match(FAKE_MEETING_APP_SWIFT, /NSApp\.terminate\(nil\)/);
+  assert.match(FAKE_MEETING_APP_SWIFT, /SIGTERM/);
 });
 
 test("stops simulated meeting apps before checking Caveman restoration", async () => {

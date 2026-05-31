@@ -19,6 +19,7 @@ const DEFAULT_APP_NAME = "Caveman";
 const DEFAULT_BUNDLE_ID = "com.caveman.desktop";
 const COMMAND_MAX_BUFFER = 1024 * 1024 * 20;
 export const PACKAGED_DMG_ACTIVE_RISK_WAIT_MS = 18_000;
+export const PACKAGED_DMG_RESTORE_WAIT_MS = 30_000;
 export const PACKAGED_DMG_FAKE_MEETING_DURATION_MS = 24_000;
 
 export const MACOS_DMG_MEETING_RISK_SMOKE_MARKER =
@@ -58,7 +59,7 @@ export async function runMacosDmgMeetingRiskSmoke({
       bundleId,
       appPath,
       requireRestore: true,
-      restoreWaitMs: 12_000,
+      restoreWaitMs: PACKAGED_DMG_RESTORE_WAIT_MS,
       activeRiskWaitMs: PACKAGED_DMG_ACTIVE_RISK_WAIT_MS,
       fakeMeetingDurationMs: PACKAGED_DMG_FAKE_MEETING_DURATION_MS,
       scenarios: MACOS_PACKAGED_MEETING_RISK_SCENARIOS

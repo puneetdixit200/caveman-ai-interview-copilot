@@ -28,11 +28,25 @@ const RESTORE_WAIT_MS = 12_000;
 const POLL_INTERVAL_MS = 250;
 export const MACOS_MEETING_RISK_FAKE_MEETING_DURATION_MS = 20_000;
 
-const FAKE_MEETING_APP_SWIFT = `
+export const FAKE_MEETING_APP_SWIFT = `
 import AppKit
+import Darwin
+import Dispatch
 
 let app = NSApplication.shared
 app.setActivationPolicy(.regular)
+
+let terminationSignals = [SIGTERM, SIGINT]
+var terminationSources: [DispatchSourceSignal] = []
+for terminationSignal in terminationSignals {
+  signal(terminationSignal, SIG_IGN)
+  let source = DispatchSource.makeSignalSource(signal: terminationSignal, queue: .main)
+  source.setEventHandler {
+    NSApp.terminate(nil)
+  }
+  source.resume()
+  terminationSources.append(source)
+}
 
 let title = CommandLine.arguments.dropFirst().first ?? "Google Meet - Candidate Screen"
 let durationMs = Double(CommandLine.arguments.dropFirst(2).first ?? "20000") ?? 20000
@@ -97,8 +111,8 @@ export const MACOS_PACKAGED_MEETING_RISK_SCENARIOS = [
   {
     id: "screen-recording",
     label: "Screen recording indicator",
-    executableName: "ScreenRecordingIndicator",
-    windowTitle: "Screen recording"
+    executableName: "Google Chrome",
+    windowTitle: "Screen recording - Loom"
   },
   {
     id: "slack-huddle",
