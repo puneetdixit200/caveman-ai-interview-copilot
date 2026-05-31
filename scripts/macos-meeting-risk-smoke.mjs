@@ -297,6 +297,7 @@ export async function runMacosMeetingRiskSmoke({
       );
     }
 
+    await stopScenarioProcesses({ tempDir, commandRunner });
     const restoredWindow = requireRestore
       ? await waitForVisibleUsableWindow({ commandRunner, timeoutMs: restoreWaitMs })
       : null;
@@ -439,6 +440,17 @@ async function stopProcess(child) {
     child.kill("SIGKILL");
     await waitForChildExit(child, 1_000);
   }
+}
+
+async function stopScenarioProcesses({ tempDir, commandRunner }) {
+  await commandRunner("pkill", ["-TERM", "-f", tempDir], { maxBuffer: QUERY_MAX_BUFFER }).catch(
+    () => undefined
+  );
+  await delay(500);
+  await commandRunner("pkill", ["-KILL", "-f", tempDir], { maxBuffer: QUERY_MAX_BUFFER }).catch(
+    () => undefined
+  );
+  await delay(500);
 }
 
 function waitForChildExit(child, timeoutMs) {
