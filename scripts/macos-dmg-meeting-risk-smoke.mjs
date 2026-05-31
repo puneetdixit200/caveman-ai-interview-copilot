@@ -53,28 +53,7 @@ export async function runMacosDmgMeetingRiskSmoke({
     const appPath = join(mountDir, `${appName}.app`);
     await assertDirectory(appPath, `${appName}.app inside mounted DMG`);
 
-    const batchResult = await meetingRiskRunner({
-      platform,
-      commandRunner,
-      processSpawner,
-      bundleId,
-      appPath,
-      requireRestore: true,
-      requireScenarioRestore: false,
-      restoreWaitMs: PACKAGED_DMG_RESTORE_WAIT_MS,
-      activeRiskWaitMs: PACKAGED_DMG_ACTIVE_RISK_WAIT_MS,
-      fakeMeetingDurationMs: PACKAGED_DMG_FAKE_MEETING_DURATION_MS,
-      scenarios: MACOS_PACKAGED_MEETING_RISK_SCENARIOS
-    });
-
-    if (batchResult.status !== "ready") {
-      return {
-        ...batchResult,
-        messages: [`Mounted DMG ${dmgPath}.`, ...batchResult.messages]
-      };
-    }
-
-    const remoteSupportResult = await meetingRiskRunner({
+    const result = await meetingRiskRunner({
       platform,
       commandRunner,
       processSpawner,
@@ -85,14 +64,15 @@ export async function runMacosDmgMeetingRiskSmoke({
       restoreWaitMs: PACKAGED_DMG_RESTORE_WAIT_MS,
       activeRiskWaitMs: PACKAGED_DMG_ACTIVE_RISK_WAIT_MS,
       fakeMeetingDurationMs: PACKAGED_DMG_FAKE_MEETING_DURATION_MS,
-      scenarios: MACOS_PACKAGED_REMOTE_SUPPORT_RISK_SCENARIOS
+      scenarios: [
+        ...MACOS_PACKAGED_MEETING_RISK_SCENARIOS,
+        ...MACOS_PACKAGED_REMOTE_SUPPORT_RISK_SCENARIOS
+      ]
     });
 
-    const status =
-      batchResult.status === "ready" && remoteSupportResult.status === "ready" ? "ready" : "blocked";
     return {
-      status,
-      messages: [`Mounted DMG ${dmgPath}.`, ...batchResult.messages, ...remoteSupportResult.messages]
+      ...result,
+      messages: [`Mounted DMG ${dmgPath}.`, ...result.messages]
     };
   } finally {
     await quitCaveman({ bundleId, commandRunner });
