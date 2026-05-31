@@ -35,22 +35,22 @@ test("summarizes simulated meeting risk hide and restore states", () => {
       platform: "darwin",
       initialWindow: WINDOW,
       scenarioResults: [
-        { label: "Google Meet browser window", hiddenDuringRisk: true },
-        { label: "Microsoft Teams browser window", hiddenDuringRisk: true },
-        { label: "Microsoft Teams native process", hiddenDuringRisk: true },
-        { label: "Zoom meeting window", hiddenDuringRisk: true },
-        { label: "Webex meeting window", hiddenDuringRisk: true },
-        { label: "Browser presenting indicator", hiddenDuringRisk: true },
-        { label: "Screen recording indicator", hiddenDuringRisk: true },
-        { label: "Slack huddle window", hiddenDuringRisk: true },
-        { label: "Discord voice window", hiddenDuringRisk: true },
-        { label: "WhatsApp video call window", hiddenDuringRisk: true },
-        { label: "Remote desktop window", hiddenDuringRisk: true },
-        { label: "Screen recorder window", hiddenDuringRisk: true },
-        { label: "Window sharing indicator", hiddenDuringRisk: true },
-        { label: "Screen shared indicator", hiddenDuringRisk: true },
-        { label: "Meeting recording indicator", hiddenDuringRisk: true },
-        { label: "Recording in progress indicator", hiddenDuringRisk: true }
+        { label: "Google Meet browser window", hiddenDuringRisk: true, restoredAfterRisk: true },
+        { label: "Microsoft Teams browser window", hiddenDuringRisk: true, restoredAfterRisk: true },
+        { label: "Microsoft Teams native process", hiddenDuringRisk: true, restoredAfterRisk: true },
+        { label: "Zoom meeting window", hiddenDuringRisk: true, restoredAfterRisk: true },
+        { label: "Webex meeting window", hiddenDuringRisk: true, restoredAfterRisk: true },
+        { label: "Browser presenting indicator", hiddenDuringRisk: true, restoredAfterRisk: true },
+        { label: "Screen recording indicator", hiddenDuringRisk: true, restoredAfterRisk: true },
+        { label: "Slack huddle window", hiddenDuringRisk: true, restoredAfterRisk: true },
+        { label: "Discord voice window", hiddenDuringRisk: true, restoredAfterRisk: true },
+        { label: "WhatsApp video call window", hiddenDuringRisk: true, restoredAfterRisk: true },
+        { label: "Remote desktop window", hiddenDuringRisk: true, restoredAfterRisk: true },
+        { label: "Screen recorder window", hiddenDuringRisk: true, restoredAfterRisk: true },
+        { label: "Window sharing indicator", hiddenDuringRisk: true, restoredAfterRisk: true },
+        { label: "Screen shared indicator", hiddenDuringRisk: true, restoredAfterRisk: true },
+        { label: "Meeting recording indicator", hiddenDuringRisk: true, restoredAfterRisk: true },
+        { label: "Recording in progress indicator", hiddenDuringRisk: true, restoredAfterRisk: true }
       ],
       restoredWindow: WINDOW
     }).status,
@@ -61,8 +61,18 @@ test("summarizes simulated meeting risk hide and restore states", () => {
     summarizeMacosMeetingRiskSmoke({
       platform: "darwin",
       initialWindow: WINDOW,
+      scenarioResults: [{ label: "Google Meet browser window", hiddenDuringRisk: true, restoredAfterRisk: false }],
+      restoredWindow: WINDOW
+    }).status,
+    "blocked"
+  );
+
+  assert.equal(
+    summarizeMacosMeetingRiskSmoke({
+      platform: "darwin",
+      initialWindow: WINDOW,
       scenarioResults: [
-        { label: "Google Meet browser window", hiddenDuringRisk: true },
+        { label: "Google Meet browser window", hiddenDuringRisk: true, restoredAfterRisk: true },
         { label: "Microsoft Teams browser window", hiddenDuringRisk: false }
       ],
       restoredWindow: WINDOW
@@ -145,7 +155,7 @@ test("keeps simulated meeting windows alive long enough for macOS title scans", 
   );
 });
 
-test("lets simulated meeting apps exit before checking Caveman restoration", async () => {
+test("stops simulated meeting apps before checking Caveman restoration", async () => {
   const visibleWindowRows = JSON.stringify([WINDOW]);
   const queryOutputs = [visibleWindowRows, "[]", visibleWindowRows];
   const killSignals = [];
@@ -189,7 +199,50 @@ test("lets simulated meeting apps exit before checking Caveman restoration", asy
   });
 
   assert.equal(result.status, "ready");
-  assert.deepEqual(killSignals, []);
+  assert.deepEqual(killSignals, ["SIGTERM"]);
+  assert.match(result.messages.join("\n"), /restored after risk cleared/);
+});
+
+test("blocks macOS meeting-risk smoke when Caveman hides but does not restore after risk clears", async () => {
+  const visibleWindowRows = JSON.stringify([WINDOW]);
+  const queryOutputs = [visibleWindowRows, "[]"];
+
+  const commandRunner = async (command) => {
+    if (command === "swift") {
+      return { stdout: queryOutputs.shift() ?? "[]" };
+    }
+    return { stdout: "" };
+  };
+
+  const processSpawner = () => {
+    const child = new EventEmitter();
+    child.exitCode = null;
+    child.signalCode = null;
+    child.kill = (signal) => {
+      child.signalCode = signal;
+      child.emit("exit");
+      return true;
+    };
+    return child;
+  };
+
+  const result = await runMacosMeetingRiskSmoke({
+    platform: "darwin",
+    commandRunner,
+    processSpawner,
+    restoreWaitMs: 1,
+    scenarios: [
+      {
+        id: "teams-native",
+        label: "Microsoft Teams native process",
+        executableName: "MSTeams",
+        windowTitle: "Microsoft Teams - Interview"
+      }
+    ]
+  });
+
+  assert.equal(result.status, "blocked");
+  assert.match(result.messages.join("\n"), /did not restore after risk cleared/);
 });
 
 test("blocks macOS meeting-risk smoke when any visible Caveman window remains during risk", async () => {

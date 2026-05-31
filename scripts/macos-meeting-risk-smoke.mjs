@@ -181,10 +181,24 @@ export function summarizeMacosMeetingRiskSmoke({
   }
 
   for (const result of scenarioResults) {
+    if (!result.hiddenDuringRisk) {
+      messages.push(`${result.label}: Caveman stayed visible while the simulated meeting window was visible.`);
+      continue;
+    }
+
+    if (requireRestore && !result.restoredAfterRisk) {
+      messages.push(
+        `${result.label}: Caveman hid while the simulated meeting window was visible, but did not restore after risk cleared.${
+          result.detail ? ` ${result.detail}` : ""
+        }`
+      );
+      continue;
+    }
+
     messages.push(
-      result.hiddenDuringRisk
-        ? `${result.label}: Caveman hid while the simulated meeting window was visible.`
-        : `${result.label}: Caveman stayed visible while the simulated meeting window was visible.`
+      requireRestore
+        ? `${result.label}: Caveman hid while the simulated meeting window was visible and restored after risk cleared.`
+        : `${result.label}: Caveman hid while the simulated meeting window was visible.`
     );
   }
 
@@ -204,8 +218,13 @@ export function summarizeMacosMeetingRiskSmoke({
 
   const allScenariosHid =
     scenarioResults.length > 0 && scenarioResults.every((result) => result.hiddenDuringRisk);
+  const allScenariosRestored =
+    !requireRestore || scenarioResults.every((result) => result.restoredAfterRisk);
   return {
-    status: initialWindow && allScenariosHid && (restoredWindow || !requireRestore) ? "ready" : "blocked",
+    status:
+      initialWindow && allScenariosHid && allScenariosRestored && (restoredWindow || !requireRestore)
+        ? "ready"
+        : "blocked",
     messages
   };
 }
@@ -306,13 +325,20 @@ async function runMeetingRiskScenario({
       predicate: (rows) => !selectVisibleCavemanWindow(rows),
       shouldStop: () => riskProcessExited
     });
+    let restoredAfterRisk = null;
     if (hiddenDuringRisk && requireRestore) {
-      await waitForChildExit(riskProcess, fakeMeetingDurationMs + 5_000);
+      await stopProcess(riskProcess);
+      restoredAfterRisk = await waitForVisibleUsableWindow({ commandRunner, timeoutMs: restoreWaitMs });
     }
     return {
       ...scenario,
       hiddenDuringRisk,
-      detail: riskProcessError ? riskProcessError.message : null
+      restoredAfterRisk: restoredAfterRisk ?? undefined,
+      detail: riskProcessError
+        ? riskProcessError.message
+        : hiddenDuringRisk && requireRestore && !restoredAfterRisk
+          ? "No protected onscreen usable Caveman window returned before timeout."
+          : null
     };
   } finally {
     await stopProcess(riskProcess);

@@ -28,8 +28,8 @@ test("finds the generated macOS DMG for package meeting-risk smoke", async () =>
 
 test("runs meeting-risk smoke against the mounted DMG app bundle", async () => {
   assert.ok(MACOS_DMG_MEETING_RISK_SMOKE_MARKER.includes("DMG"));
-  assert.ok(MACOS_DMG_MEETING_RISK_SMOKE_MARKER.includes("Google Meet"));
-  assert.ok(MACOS_DMG_MEETING_RISK_SMOKE_MARKER.includes("Teams"));
+  assert.ok(MACOS_DMG_MEETING_RISK_SMOKE_MARKER.includes("screen-share risk"));
+  assert.ok(MACOS_DMG_MEETING_RISK_SMOKE_MARKER.includes("restore"));
 
   const dir = await mkdtemp(join(tmpdir(), "caveman-dmg-risk-run-"));
   const commands = [];
@@ -58,8 +58,8 @@ test("runs meeting-risk smoke against the mounted DMG app bundle", async () => {
         scenarios
       }) => {
         assert.match(appPath, /Caveman\.app$/);
-        assert.equal(requireRestore, false);
-        assert.equal(restoreWaitMs, 5_000);
+        assert.equal(requireRestore, true);
+        assert.equal(restoreWaitMs, 12_000);
         assert.equal(activeRiskWaitMs, PACKAGED_DMG_ACTIVE_RISK_WAIT_MS);
         assert.equal(fakeMeetingDurationMs, PACKAGED_DMG_FAKE_MEETING_DURATION_MS);
         const hasScenario = (executableName, windowTitle) =>

@@ -22,7 +22,7 @@ export const PACKAGED_DMG_ACTIVE_RISK_WAIT_MS = 18_000;
 export const PACKAGED_DMG_FAKE_MEETING_DURATION_MS = 24_000;
 
 export const MACOS_DMG_MEETING_RISK_SMOKE_MARKER =
-  "macOS DMG meeting-risk smoke launches the mounted DMG app before simulating Google Meet and Teams windows.";
+  "macOS DMG meeting-risk smoke launches the mounted DMG app, verifies Caveman hides during simulated screen-share risk, and requires restore after risk clears.";
 
 export async function runMacosDmgMeetingRiskSmoke({
   platform = process.platform,
@@ -57,8 +57,8 @@ export async function runMacosDmgMeetingRiskSmoke({
       processSpawner,
       bundleId,
       appPath,
-      requireRestore: false,
-      restoreWaitMs: 5_000,
+      requireRestore: true,
+      restoreWaitMs: 12_000,
       activeRiskWaitMs: PACKAGED_DMG_ACTIVE_RISK_WAIT_MS,
       fakeMeetingDurationMs: PACKAGED_DMG_FAKE_MEETING_DURATION_MS,
       scenarios: MACOS_PACKAGED_MEETING_RISK_SCENARIOS
