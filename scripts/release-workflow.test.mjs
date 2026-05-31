@@ -386,8 +386,6 @@ test("native privacy shield refreshes capture protection before share-risk hide"
   const shareRiskLatch = shieldBody.indexOf("share_risk_was_active");
   const queuedWindowUpdate = shieldBody.indexOf("apply_native_privacy_shield_window_update", mainThreadDispatch);
   const clearRestore = updateBody.indexOf("restore_companion_windows_after_share_risk_cleared");
-  const pendingRestore = updateBody.indexOf("NATIVE_PRIVACY_SHIELD_RESTORE_AFTER_SHARE_RISK_PENDING");
-  const visibleRestoreClear = updateBody.indexOf("restore_status.visible", clearRestore);
   const refreshIndex = updateBody.indexOf("crate::overlay::protect_overlay_window(app, true)", shareRiskBranchStart);
   const hideIndex = updateBody.indexOf("hide_app_windows_for_native_privacy_shield(app)", shareRiskBranchStart);
 
@@ -399,8 +397,6 @@ test("native privacy shield refreshes capture protection before share-risk hide"
   assert.notEqual(shareRiskLatch, -1, "privacy shield must remember whether the previous poll hid for share risk");
   assert.notEqual(queuedWindowUpdate, -1, "privacy shield must call the queued window update helper");
   assert.notEqual(clearRestore, -1, "privacy shield must run a stronger restore when share risk clears");
-  assert.notEqual(pendingRestore, -1, "privacy shield must keep retrying share-risk restore until visible");
-  assert.notEqual(visibleRestoreClear, -1, "privacy shield must clear pending share-risk restore only after visibility returns");
   assert.notEqual(refreshIndex, -1, "share-risk branch must refresh capture exclusion before hiding");
   assert.notEqual(hideIndex, -1, "share-risk branch must hide app windows");
   assert.ok(shareRiskLatch < mainThreadDispatch, "share-risk transition state must be computed before UI restore dispatch");

@@ -35,7 +35,6 @@ const MACOS_WINDOW_TITLE_PRIVACY_SCAN_INTERVAL: Duration = Duration::from_millis
 #[cfg(target_os = "macos")]
 const MACOS_CORE_GRAPHICS_TITLE_PRIVACY_SCAN_INTERVAL: Duration = Duration::from_millis(250);
 static NATIVE_PRIVACY_SHIELD_SHARE_RISK_ACTIVE: AtomicBool = AtomicBool::new(false);
-static NATIVE_PRIVACY_SHIELD_RESTORE_AFTER_SHARE_RISK_PENDING: AtomicBool = AtomicBool::new(false);
 #[cfg(target_os = "macos")]
 static MACOS_WINDOW_TITLE_PRIVACY_RISK_ACTIVE: AtomicBool = AtomicBool::new(false);
 #[cfg(target_os = "macos")]
@@ -89,8 +88,6 @@ pub const NATIVE_PRIVACY_SHIELD_MAIN_THREAD_WINDOW_UPDATE_MARKER: &str =
     "Native privacy shield applies app-window updates on the Tauri main thread.";
 pub const NATIVE_PRIVACY_SHIELD_SHARE_RISK_LATCH_MARKER: &str =
     "Native privacy shield exposes a nonblocking share-risk latch for bounds repair.";
-pub const NATIVE_PRIVACY_SHIELD_RETRIES_SHARE_RISK_RESTORE_MARKER: &str =
-    "Native privacy shield retries companion restore until a protected window is visible after share risk clears.";
 pub const SCREEN_SHARE_GUARD_COMMAND_TIMEOUT_MARKER: &str =
     "Screen-share guard command timeout failed closed before privacy polling could stall.";
 const EDGE_WEBVIEW_HOST_PROCESS: &str = "msedgewebview2.exe";
@@ -412,7 +409,6 @@ const PACKAGE_PRIVACY_SHIELD_WEBVIEW_MARKERS: &[&str] = &[
     VMWARE_HORIZON_TITLE,
     AMAZON_WORKSPACES_TITLE,
     SCREEN_SHARE_GUARD_COMMAND_TIMEOUT_MARKER,
-    NATIVE_PRIVACY_SHIELD_RETRIES_SHARE_RISK_RESTORE_MARKER,
     WINDOW_TITLE_PUNCTUATION_NORMALIZATION_MARKER,
     STRONG_WINDOW_TITLE_ANY_APP_MARKER,
     MACOS_SCREEN_CAPTURE_UI_PROCESS,
@@ -1171,7 +1167,6 @@ pub fn start_native_privacy_shield(app: tauri::AppHandle) -> anyhow::Result<()> 
     std::hint::black_box(NATIVE_PRIVACY_SHIELD_REFRESHES_CAPTURE_BEFORE_SHARE_HIDE_MARKER);
     std::hint::black_box(NATIVE_PRIVACY_SHIELD_MAIN_THREAD_WINDOW_UPDATE_MARKER);
     std::hint::black_box(NATIVE_PRIVACY_SHIELD_SHARE_RISK_LATCH_MARKER);
-    std::hint::black_box(NATIVE_PRIVACY_SHIELD_RETRIES_SHARE_RISK_RESTORE_MARKER);
 
     #[cfg(target_os = "macos")]
     start_macos_window_title_privacy_scan_thread()?;
@@ -1899,22 +1894,14 @@ fn apply_native_privacy_shield_window_update(
                 NativePrivacyShieldDecision::Hide { .. }
             ) {
                 hide_app_windows_for_native_privacy_shield(app);
-            } else if restore_after_share_risk
-                || NATIVE_PRIVACY_SHIELD_RESTORE_AFTER_SHARE_RISK_PENDING.load(Ordering::Relaxed)
-            {
-                let restore_status =
-                    crate::overlay::restore_companion_windows_after_share_risk_cleared(app);
-                if restore_status.visible {
-                    NATIVE_PRIVACY_SHIELD_RESTORE_AFTER_SHARE_RISK_PENDING
-                        .store(false, Ordering::Relaxed);
-                }
+            } else if restore_after_share_risk {
+                crate::overlay::restore_companion_windows_after_share_risk_cleared(app);
             } else {
                 crate::overlay::restore_companion_windows_after_clear_privacy_check(app);
             }
         }
         NativePrivacyShieldDecision::Hide { .. } => {
             std::hint::black_box(NATIVE_PRIVACY_SHIELD_REFRESHES_CAPTURE_BEFORE_SHARE_HIDE_MARKER);
-            NATIVE_PRIVACY_SHIELD_RESTORE_AFTER_SHARE_RISK_PENDING.store(true, Ordering::Relaxed);
             crate::overlay::pause_companion_window_restore_after_privacy_denial();
             let _ = crate::overlay::protect_overlay_window(app, true);
             hide_app_windows_for_native_privacy_shield(app);
@@ -2905,7 +2892,6 @@ mod tests {
                 VMWARE_HORIZON_TITLE,
                 AMAZON_WORKSPACES_TITLE,
                 SCREEN_SHARE_GUARD_COMMAND_TIMEOUT_MARKER,
-                NATIVE_PRIVACY_SHIELD_RETRIES_SHARE_RISK_RESTORE_MARKER,
                 WINDOW_TITLE_PUNCTUATION_NORMALIZATION_MARKER,
                 STRONG_WINDOW_TITLE_ANY_APP_MARKER,
                 MACOS_SCREEN_CAPTURE_UI_PROCESS,

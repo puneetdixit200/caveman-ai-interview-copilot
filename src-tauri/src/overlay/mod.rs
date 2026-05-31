@@ -734,20 +734,6 @@ fn restore_companion_windows_with_native_show_gate(
     if status.visible && focus_after_restore {
         focus_companion_windows(app);
     }
-    companion_restore_status_after_native_visibility_check(
-        status,
-        focus_after_restore && companion_window_needs_native_activation(app),
-    )
-}
-
-fn companion_restore_status_after_native_visibility_check(
-    mut status: OverlayProtectionStatus,
-    native_activation_needed_after_restore: bool,
-) -> OverlayProtectionStatus {
-    if status.visible && native_activation_needed_after_restore {
-        status.visible = false;
-    }
-
     status
 }
 
@@ -838,20 +824,16 @@ pub fn focus_companion_windows(app: &tauri::AppHandle) {
     }
 }
 
-pub fn restore_companion_windows_after_clear_privacy_check(
-    app: &tauri::AppHandle,
-) -> OverlayProtectionStatus {
+pub fn restore_companion_windows_after_clear_privacy_check(app: &tauri::AppHandle) {
     std::hint::black_box(COMPANION_WINDOW_BACKGROUND_REPAIR_MARKER);
 
-    restore_companion_windows_with_native_show_gate(app, false)
+    let _ = restore_companion_windows_with_native_show_gate(app, false);
 }
 
-pub fn restore_companion_windows_after_share_risk_cleared(
-    app: &tauri::AppHandle,
-) -> OverlayProtectionStatus {
+pub fn restore_companion_windows_after_share_risk_cleared(app: &tauri::AppHandle) {
     std::hint::black_box(COMPANION_WINDOW_SHARE_RISK_CLEAR_REPAIR_MARKER);
 
-    restore_companion_windows_with_native_show_gate(app, true)
+    let _ = restore_companion_windows_with_native_show_gate(app, true);
 }
 
 pub fn restore_companion_windows_after_user_reopen(app: &tauri::AppHandle) {
