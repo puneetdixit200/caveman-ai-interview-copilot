@@ -563,13 +563,17 @@ test("clears lingering macOS risk scenario processes before final restore", asyn
   const killIndex = commands.findIndex(
     ([command, args]) => command === "pkill" && args[0] === "-KILL" && args[1] === "-f"
   );
+  const pgrepIndex = commands.findIndex(
+    ([command, args], index) => command === "pgrep" && args[0] === "-f" && index > killIndex
+  );
   const finalSwiftIndex = commands.map(([command]) => command).lastIndexOf("swift");
 
   assert.equal(result.status, "ready");
   assert.notEqual(termIndex, -1, "scenario cleanup must terminate lingering temp-dir processes");
   assert.notEqual(killIndex, -1, "scenario cleanup must force-kill lingering temp-dir processes");
+  assert.notEqual(pgrepIndex, -1, "scenario cleanup must verify temp-dir processes are gone");
   assert.ok(termIndex < killIndex, "TERM cleanup should run before KILL cleanup");
-  assert.ok(killIndex < finalSwiftIndex, "scenario cleanup must finish before the final restore query");
+  assert.ok(killIndex < pgrepIndex && pgrepIndex < finalSwiftIndex, "scenario cleanup must finish before the final restore query");
 });
 
 test("clears lingering macOS risk scenario processes before strict scenario restore", async () => {
@@ -619,13 +623,17 @@ test("clears lingering macOS risk scenario processes before strict scenario rest
   const killIndex = commands.findIndex(
     ([command, args]) => command === "pkill" && args[0] === "-KILL" && args[1] === "-f"
   );
+  const pgrepIndex = commands.findIndex(
+    ([command, args], index) => command === "pgrep" && args[0] === "-f" && index > killIndex
+  );
   const restoreSwiftIndex = commands.findIndex(([command], index) => command === "swift" && index > killIndex);
 
   assert.equal(result.status, "ready");
   assert.notEqual(termIndex, -1, "strict scenario cleanup must terminate lingering temp-dir processes");
   assert.notEqual(killIndex, -1, "strict scenario cleanup must force-kill lingering temp-dir processes");
+  assert.notEqual(pgrepIndex, -1, "strict scenario cleanup must verify temp-dir processes are gone");
   assert.ok(termIndex < killIndex, "TERM cleanup should run before KILL cleanup");
-  assert.ok(killIndex < restoreSwiftIndex, "strict cleanup must finish before restore polling");
+  assert.ok(killIndex < pgrepIndex && pgrepIndex < restoreSwiftIndex, "strict cleanup must finish before restore polling");
   assert.match(result.messages.join("\n"), /Remote support control window: Caveman hid/);
 });
 

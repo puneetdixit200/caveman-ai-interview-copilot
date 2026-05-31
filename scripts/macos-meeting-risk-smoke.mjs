@@ -26,6 +26,7 @@ const INITIAL_WAIT_MS = 6_000;
 export const MACOS_MEETING_RISK_ACTIVE_WAIT_MS = 15_000;
 const RESTORE_WAIT_MS = 12_000;
 const POLL_INTERVAL_MS = 250;
+const SCENARIO_PROCESS_CLEAR_WAIT_MS = 3_000;
 export const MACOS_MEETING_RISK_FAKE_MEETING_DURATION_MS = 20_000;
 
 export const FAKE_MEETING_APP_SWIFT = `
@@ -484,7 +485,21 @@ async function stopScenarioProcesses({ tempDir, commandRunner }) {
   await commandRunner("pkill", ["-KILL", "-f", tempDir], { maxBuffer: QUERY_MAX_BUFFER }).catch(
     () => undefined
   );
+  await waitForScenarioProcessesToClear({ tempDir, commandRunner });
   await delay(500);
+}
+
+async function waitForScenarioProcessesToClear({ tempDir, commandRunner }) {
+  const deadline = Date.now() + SCENARIO_PROCESS_CLEAR_WAIT_MS;
+  while (Date.now() <= deadline) {
+    const result = await commandRunner("pgrep", ["-f", tempDir], { maxBuffer: QUERY_MAX_BUFFER }).catch(
+      () => null
+    );
+    if (!String(result?.stdout ?? "").trim()) {
+      return;
+    }
+    await delay(POLL_INTERVAL_MS);
+  }
 }
 
 function waitForChildExit(child, timeoutMs) {

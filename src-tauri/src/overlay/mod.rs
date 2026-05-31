@@ -1167,6 +1167,10 @@ fn order_front_macos_companion_window_for_repair(window: &tauri::WebviewWindow) 
     }
 
     let ns_window = unsafe { &*(ns_window.cast::<objc2_app_kit::NSWindow>()) };
+    let collection_behavior = ns_window.collectionBehavior()
+        | objc2_app_kit::NSWindowCollectionBehavior::CanJoinAllSpaces
+        | objc2_app_kit::NSWindowCollectionBehavior::MoveToActiveSpace;
+    ns_window.setCollectionBehavior(collection_behavior);
     if ns_window.isMiniaturized() {
         ns_window.deminiaturize(None);
     }

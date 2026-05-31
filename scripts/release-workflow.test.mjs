@@ -631,6 +631,10 @@ test("macOS companion restore orders native windows front after Tauri show", asy
   assert.ok(focusShow < focusOrderFront && focusOrderFront < focusSetFocus);
   assert.match(helperBody, /window\.ns_window\(\)/);
   assert.match(helperBody, /objc2_app_kit::NSWindow/);
+  assert.match(helperBody, /NSWindowCollectionBehavior/);
+  assert.match(helperBody, /CanJoinAllSpaces/);
+  assert.match(helperBody, /MoveToActiveSpace/);
+  assert.match(helperBody, /setCollectionBehavior/);
   assert.match(helperBody, /deminiaturize\(None\)/);
   assert.match(helperBody, /orderFrontRegardless\(\)/);
   assert.match(helperBody, /makeKeyAndOrderFront\(None\)/);
