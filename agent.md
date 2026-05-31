@@ -279,6 +279,12 @@ Follow-up CI hardening verification:
   - macOS Intel DMG smoke output: `READY`; mounted `Caveman_0.1.1_x64.dmg`; initial Caveman window was `1280x820` and protected; Caveman was hidden while all 16 simulated risk windows were visible; final restoration found protected onscreen window `37` at `1280x820`.
   - Windows installers in the same run still passed restore-required package smoke: `READY`; initial `caveman.exe` window was `1044x788` and protected with `WDA_EXCLUDEFROMCAPTURE`; Caveman hid and restored after risk cleared for all 16 scenarios; final protected visible window was `1044x788`.
   - Linux AppImage/DEB also passed native privacy tests, release contracts, package build, bundled sidecar verification, packaged privacy shield, artifact upload, and cleanup.
+- macOS packaged startup/focus follow-up:
+  - `b48eb26` moved restored macOS companion windows to the active Space, but Desktop Package Smoke run `26710845872` failed on Apple Silicon before scenarios with `No initial protected onscreen Caveman window was found`.
+  - `5f2744f` stabilized packaged startup smoke by keeping active-Space movement out of the generic initial companion show path, leaving it for focus/restore repair, increasing packaged macOS initial-window wait to `30_000` ms, and adding last-observed CoreGraphics rows to initial-launch failure output.
+  - `316ffcf` removed `focus_companion_windows` from initial startup and delayed startup repair, so startup uses `set_companion_windows_visible` plus scheduled non-focus repair only. Share-risk restore still uses active-Space focus repair when needed.
+  - Local non-UI verification did not open the app: `cargo fmt --manifest-path src-tauri/Cargo.toml -- --check` passed; `cargo test --manifest-path src-tauri/Cargo.toml overlay:: --lib` passed 38 tests; `node --test scripts/release-workflow.test.mjs scripts/macos-meeting-risk-smoke.test.mjs scripts/macos-dmg-meeting-risk-smoke.test.mjs && git diff --check` passed 65 tests; `npm run test:release` passed 177 tests.
+  - Pushed `316ffcf` to `origin/main`.
 
 ## CI to check next
 
@@ -288,12 +294,12 @@ List recent runs with:
 gh run list --repo puneetdixit200/caveman-ai-interview-copilot --branch main --limit 5 --json databaseId,workflowName,headSha,status,conclusion,createdAt,url
 ```
 
-Latest pushed package-smoke run to check: `26705275430` for `8f55659`, in progress when this handoff was refreshed. Last fully verified green package-smoke run before this sequence was `26701038173` for `9d28950`, green in all lanes. That earlier run verified the expanded packaged Windows EXE and macOS DMG meeting-risk smokes for Google Meet, Teams browser/native, Zoom, Webex, generic presenting UI, generic screen-recording UI, Slack huddle, Discord voice, WhatsApp video call, remote desktop, screen-recorder windows, window-sharing status, screen-shared status, meeting-recording status, and recording-in-progress status. Windows requires per-scenario restore; macOS DMG now requires main-batch final restore plus strict remote-support restore.
+Latest pushed package-smoke run to check: `26711742751` for `316ffcf`, in progress when this handoff was refreshed. Previous run `26711471680` for `5f2744f` was also still in progress, but `316ffcf` is the current `origin/main` head. Last fully verified green package-smoke run before this sequence was `26701038173` for `9d28950`, green in all lanes. That earlier run verified the expanded packaged Windows EXE and macOS DMG meeting-risk smokes for Google Meet, Teams browser/native, Zoom, Webex, generic presenting UI, generic screen-recording UI, Slack huddle, Discord voice, WhatsApp video call, remote desktop, screen-recorder windows, window-sharing status, screen-shared status, meeting-recording status, and recording-in-progress status. Windows requires per-scenario restore; macOS DMG now requires main-batch final restore plus strict remote-support restore.
 
 ## Suggested next steps
 
 1. Recheck the worktree with `git status --short --branch`.
-2. Check Desktop Package Smoke run `26705275430` for `8f55659`. It should pass `Run native privacy shield tests` in all four package lanes, the Windows `Run packaged Windows meeting-risk smoke` step, and both macOS DMG `Run packaged meeting-risk smoke` steps.
+2. Check Desktop Package Smoke run `26711742751` for `316ffcf`. It should pass `Run native privacy shield tests` in all four package lanes, the Windows `Run packaged Windows meeting-risk smoke` step, and both macOS DMG `Run packaged meeting-risk smoke` steps.
 3. Only verify the installed app window is visible, non-zero-sized, and protected with CoreGraphics/window inspection when the user allows opening the app.
 4. If the app is collapsed to `0x0`, restart it after clearing saved state:
 
