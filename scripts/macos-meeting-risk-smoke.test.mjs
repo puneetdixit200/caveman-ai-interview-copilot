@@ -6,6 +6,7 @@ import {
   MACOS_MEETING_RISK_ACTIVE_WAIT_MS,
   MACOS_MEETING_RISK_FAKE_MEETING_DURATION_MS,
   MACOS_PACKAGED_MEETING_RISK_SCENARIOS,
+  MACOS_PACKAGED_REMOTE_SUPPORT_RISK_SCENARIOS,
   MACOS_MEETING_RISK_SMOKE_MARKER,
   FAKE_MEETING_APP_SWIFT,
   cavemanActivationArgs,
@@ -161,7 +162,6 @@ test("keeps simulated meeting windows alive long enough for macOS title scans", 
       "Discord Voice - Candidate",
       "web.whatsapp.com - Video call",
       "Remote Desktop - Session",
-      "TeamViewer Remote Control",
       "Screen Recorder - Active",
       "You're sharing a window",
       "Your screen is being shared",
@@ -169,6 +169,9 @@ test("keeps simulated meeting windows alive long enough for macOS title scans", 
       "Recording in progress"
     ]
   );
+  assert.deepEqual(MACOS_PACKAGED_REMOTE_SUPPORT_RISK_SCENARIOS.map((scenario) => scenario.windowTitle), [
+    "TeamViewer Remote Control"
+  ]);
 });
 
 test("fake macOS meeting app exits promptly when simulated risk is cleared", () => {

@@ -139,12 +139,6 @@ export const MACOS_PACKAGED_MEETING_RISK_SCENARIOS = [
     windowTitle: "Remote Desktop - Session"
   },
   {
-    id: "remote-support-control",
-    label: "Remote support control window",
-    executableName: "RemoteSupportControl",
-    windowTitle: "TeamViewer Remote Control"
-  },
-  {
     id: "screen-recorder",
     label: "Screen recorder window",
     executableName: "OBS",
@@ -173,6 +167,15 @@ export const MACOS_PACKAGED_MEETING_RISK_SCENARIOS = [
     label: "Recording in progress indicator",
     executableName: "Google Chrome",
     windowTitle: "Recording in progress"
+  }
+];
+
+export const MACOS_PACKAGED_REMOTE_SUPPORT_RISK_SCENARIOS = [
+  {
+    id: "remote-support-control",
+    label: "Remote support control window",
+    executableName: "RemoteSupportControl",
+    windowTitle: "TeamViewer Remote Control"
   }
 ];
 

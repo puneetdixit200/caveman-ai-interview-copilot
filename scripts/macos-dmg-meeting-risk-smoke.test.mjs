@@ -39,6 +39,7 @@ test("runs meeting-risk smoke against the mounted DMG app bundle", async () => {
     await mkdir(dmgDir, { recursive: true });
     const dmgPath = join(dmgDir, "Caveman_0.1.1_x64.dmg");
     await writeFile(dmgPath, "fake dmg");
+    const meetingRiskCalls = [];
 
     const result = await runMacosDmgMeetingRiskSmoke({
       platform: "darwin",
@@ -59,9 +60,9 @@ test("runs meeting-risk smoke against the mounted DMG app bundle", async () => {
         fakeMeetingDurationMs,
         scenarios
       }) => {
+        meetingRiskCalls.push({ requireScenarioRestore, scenarios });
         assert.match(appPath, /Caveman\.app$/);
         assert.equal(requireRestore, true);
-        assert.equal(requireScenarioRestore, false);
         assert.equal(restoreWaitMs, PACKAGED_DMG_RESTORE_WAIT_MS);
         assert.equal(activeRiskWaitMs, PACKAGED_DMG_ACTIVE_RISK_WAIT_MS);
         assert.equal(fakeMeetingDurationMs, PACKAGED_DMG_FAKE_MEETING_DURATION_MS);
@@ -69,18 +70,22 @@ test("runs meeting-risk smoke against the mounted DMG app bundle", async () => {
           scenarios.some(
             (scenario) => scenario.executableName === executableName && scenario.windowTitle === windowTitle
           );
-        assert.ok(scenarios.some((scenario) => scenario.windowTitle === "Zoom Meeting - Candidate"));
-        assert.ok(scenarios.some((scenario) => scenario.windowTitle === "Webex Meeting - Candidate"));
-        assert.ok(hasScenario("Google Chrome", "Screen recording - Loom"));
-        assert.ok(hasScenario("Slack", "Slack Huddle - Candidate"));
-        assert.ok(hasScenario("Google Chrome", "web.whatsapp.com - Video call"));
-        assert.ok(hasScenario("AnyDesk", "Remote Desktop - Session"));
-        assert.ok(hasScenario("RemoteSupportControl", "TeamViewer Remote Control"));
-        assert.ok(hasScenario("OBS", "Screen Recorder - Active"));
-        assert.ok(hasScenario("Google Chrome", "You're sharing a window"));
-        assert.ok(scenarios.some((scenario) => scenario.windowTitle === "Your screen is being shared"));
-        assert.ok(scenarios.some((scenario) => scenario.windowTitle === "Meeting is being recorded"));
-        assert.ok(scenarios.some((scenario) => scenario.windowTitle === "Recording in progress"));
+        if (requireScenarioRestore) {
+          assert.ok(hasScenario("RemoteSupportControl", "TeamViewer Remote Control"));
+        } else {
+          assert.ok(scenarios.some((scenario) => scenario.windowTitle === "Zoom Meeting - Candidate"));
+          assert.ok(scenarios.some((scenario) => scenario.windowTitle === "Webex Meeting - Candidate"));
+          assert.ok(hasScenario("Google Chrome", "Screen recording - Loom"));
+          assert.ok(hasScenario("Slack", "Slack Huddle - Candidate"));
+          assert.ok(hasScenario("Google Chrome", "web.whatsapp.com - Video call"));
+          assert.ok(hasScenario("AnyDesk", "Remote Desktop - Session"));
+          assert.ok(hasScenario("OBS", "Screen Recorder - Active"));
+          assert.ok(hasScenario("Google Chrome", "You're sharing a window"));
+          assert.ok(scenarios.some((scenario) => scenario.windowTitle === "Your screen is being shared"));
+          assert.ok(scenarios.some((scenario) => scenario.windowTitle === "Meeting is being recorded"));
+          assert.ok(scenarios.some((scenario) => scenario.windowTitle === "Recording in progress"));
+          assert.ok(!hasScenario("RemoteSupportControl", "TeamViewer Remote Control"));
+        }
         return {
           status: "ready",
           messages: [`ran against ${appPath}`]
@@ -90,6 +95,17 @@ test("runs meeting-risk smoke against the mounted DMG app bundle", async () => {
 
     assert.equal(result.status, "ready");
     assert.match(result.messages[0], /Mounted DMG/);
+    assert.equal(meetingRiskCalls.length, 2);
+    assert.equal(meetingRiskCalls[0].requireScenarioRestore, false);
+    assert.equal(meetingRiskCalls[1].requireScenarioRestore, true);
+    assert.deepEqual(meetingRiskCalls[1].scenarios, [
+      {
+        id: "remote-support-control",
+        label: "Remote support control window",
+        executableName: "RemoteSupportControl",
+        windowTitle: "TeamViewer Remote Control"
+      }
+    ]);
     assert.ok(commands.some(([command, args]) => command === "hdiutil" && args[0] === "attach"));
     assert.ok(commands.some(([command, args]) => command === "hdiutil" && args[0] === "detach"));
     assert.ok(commands.some(([command]) => command === "osascript"));
