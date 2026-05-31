@@ -22,7 +22,7 @@ export const MACOS_MEETING_RISK_SMOKE_MARKER =
 
 const DEFAULT_BUNDLE_ID = "com.caveman.desktop";
 const QUERY_MAX_BUFFER = 1024 * 1024;
-const INITIAL_WAIT_MS = 6_000;
+const INITIAL_WAIT_MS = 30_000;
 export const MACOS_MEETING_RISK_ACTIVE_WAIT_MS = 15_000;
 const RESTORE_WAIT_MS = 12_000;
 const POLL_INTERVAL_MS = 250;
@@ -262,6 +262,7 @@ export async function runMacosMeetingRiskSmoke({
   appPath = process.env.CAVEMAN_APP_PATH || null,
   requireRestore = true,
   requireScenarioRestore = requireRestore,
+  initialWaitMs = INITIAL_WAIT_MS,
   restoreWaitMs = RESTORE_WAIT_MS,
   activeRiskWaitMs = MACOS_MEETING_RISK_ACTIVE_WAIT_MS,
   fakeMeetingDurationMs = MACOS_MEETING_RISK_FAKE_MEETING_DURATION_MS,
@@ -273,13 +274,18 @@ export async function runMacosMeetingRiskSmoke({
 
   keepMarkerReachable();
   await activateCaveman(commandRunner, { appPath, bundleId });
-  const initialWindow = await waitForVisibleUsableWindow({ commandRunner, timeoutMs: INITIAL_WAIT_MS });
+  const initialWindowResult = await waitForVisibleUsableWindowResult({
+    commandRunner,
+    timeoutMs: initialWaitMs
+  });
+  const initialWindow = initialWindowResult.window;
   if (!initialWindow) {
     return summarizeMacosMeetingRiskSmoke({
       platform,
       initialWindow,
       scenarioResults: [],
-      restoredWindow: null
+      restoredWindow: null,
+      detail: formatCavemanWindowRows(initialWindowResult.rows)
     });
   }
 

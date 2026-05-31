@@ -545,11 +545,10 @@ pub fn set_companion_windows_visible(
                 window,
                 companion_window_needs_native_activation(app),
             );
-            let _ = window.set_visible_on_all_workspaces(true);
             let visibility_result = window.show();
             if visibility_result.is_ok() {
                 #[cfg(target_os = "macos")]
-                order_front_macos_companion_window_for_repair(window);
+                order_front_macos_companion_window_for_repair(window, false);
             }
             let repaired_after_show = repair_companion_window_bounds(app, window);
             let native_repaired_after_show = repair_native_companion_window_bounds_if_needed(
@@ -853,7 +852,7 @@ pub fn focus_companion_windows(app: &tauri::AppHandle) {
         let _ = window.set_visible_on_all_workspaces(true);
         let _ = window.show();
         #[cfg(target_os = "macos")]
-        order_front_macos_companion_window_for_repair(&window);
+        order_front_macos_companion_window_for_repair(&window, true);
         let _ = window.set_focus();
         let _ = repair_companion_window_bounds(app, &window);
         if companion_focus_post_show_privacy_recheck_denied(app) {
@@ -1151,14 +1150,17 @@ fn focus_repaired_companion_window(app: &tauri::AppHandle, window: &tauri::Webvi
     let _ = window.set_visible_on_all_workspaces(true);
     let _ = window.show();
     #[cfg(target_os = "macos")]
-    order_front_macos_companion_window_for_repair(window);
+    order_front_macos_companion_window_for_repair(window, true);
     let _ = window.set_focus();
     let _ = repair_companion_window_bounds(app, window);
     let _ = companion_focus_post_show_privacy_recheck_denied(app);
 }
 
 #[cfg(target_os = "macos")]
-fn order_front_macos_companion_window_for_repair(window: &tauri::WebviewWindow) {
+fn order_front_macos_companion_window_for_repair(
+    window: &tauri::WebviewWindow,
+    move_to_active_space: bool,
+) {
     let Ok(ns_window) = window.ns_window() else {
         return;
     };
@@ -1167,10 +1169,12 @@ fn order_front_macos_companion_window_for_repair(window: &tauri::WebviewWindow) 
     }
 
     let ns_window = unsafe { &*(ns_window.cast::<objc2_app_kit::NSWindow>()) };
-    let collection_behavior = ns_window.collectionBehavior()
-        | objc2_app_kit::NSWindowCollectionBehavior::CanJoinAllSpaces
-        | objc2_app_kit::NSWindowCollectionBehavior::MoveToActiveSpace;
-    ns_window.setCollectionBehavior(collection_behavior);
+    if move_to_active_space {
+        let collection_behavior = ns_window.collectionBehavior()
+            | objc2_app_kit::NSWindowCollectionBehavior::CanJoinAllSpaces
+            | objc2_app_kit::NSWindowCollectionBehavior::MoveToActiveSpace;
+        ns_window.setCollectionBehavior(collection_behavior);
+    }
     if ns_window.isMiniaturized() {
         ns_window.deminiaturize(None);
     }

@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { EventEmitter } from "node:events";
+import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 import {
@@ -175,6 +176,18 @@ test("keeps simulated meeting windows alive long enough for macOS title scans", 
   assert.deepEqual(MACOS_PACKAGED_REMOTE_SUPPORT_RISK_SCENARIOS.map((scenario) => scenario.executableName), [
     "TeamViewer"
   ]);
+});
+
+test("allows enough time for packaged macOS apps to show their first window", async () => {
+  const source = await readFile(new URL("./macos-meeting-risk-smoke.mjs", import.meta.url), "utf8");
+  const [, initialWaitLiteral] =
+    source.match(/const INITIAL_WAIT_MS = ([0-9_]+);/) ?? [];
+
+  assert.ok(initialWaitLiteral, "macOS meeting-risk smoke must define an initial window wait");
+  assert.ok(
+    Number(initialWaitLiteral.replaceAll("_", "")) >= 30_000,
+    "packaged macOS DMG launch should get the same startup budget as the Windows EXE smoke"
+  );
 });
 
 test("fake macOS meeting app exits promptly when simulated risk is cleared", () => {
@@ -365,6 +378,48 @@ test("reports last macOS Caveman rows when final batch restore fails", async () 
   });
 
   assert.equal(result.status, "blocked");
+  assert.match(result.messages.join("\n"), /Last observed Caveman windows:/);
+  assert.match(result.messages.join("\n"), /640x410/);
+  assert.match(result.messages.join("\n"), /sharingState=1/);
+});
+
+test("reports last macOS Caveman rows when initial packaged launch never becomes usable", async () => {
+  const tinyVisibleWindowRows = JSON.stringify([
+    {
+      ...WINDOW,
+      windowNumber: 11,
+      sharingState: 1,
+      width: 640,
+      height: 410
+    }
+  ]);
+
+  const commandRunner = async (command) => {
+    if (command === "swift") {
+      return { stdout: tinyVisibleWindowRows };
+    }
+    return { stdout: "" };
+  };
+
+  const result = await runMacosMeetingRiskSmoke({
+    platform: "darwin",
+    commandRunner,
+    processSpawner: () => {
+      throw new Error("initial failure should not start scenarios");
+    },
+    initialWaitMs: 1,
+    scenarios: [
+      {
+        id: "teams-native",
+        label: "Microsoft Teams native process",
+        executableName: "MSTeams",
+        windowTitle: "Microsoft Teams - Interview"
+      }
+    ]
+  });
+
+  assert.equal(result.status, "blocked");
+  assert.match(result.messages.join("\n"), /No initial protected onscreen Caveman window/);
   assert.match(result.messages.join("\n"), /Last observed Caveman windows:/);
   assert.match(result.messages.join("\n"), /640x410/);
   assert.match(result.messages.join("\n"), /sharingState=1/);
