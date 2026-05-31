@@ -75,7 +75,7 @@ test("runs meeting-risk smoke against the mounted DMG app bundle", async () => {
         assert.ok(hasScenario("Slack", "Slack Huddle - Candidate"));
         assert.ok(hasScenario("Google Chrome", "web.whatsapp.com - Video call"));
         assert.ok(hasScenario("AnyDesk", "Remote Desktop - Session"));
-        assert.ok(hasScenario("TeamViewer", "TeamViewer Remote Control"));
+        assert.ok(hasScenario("RemoteSupportControl", "TeamViewer Remote Control"));
         assert.ok(hasScenario("OBS", "Screen Recorder - Active"));
         assert.ok(hasScenario("Google Chrome", "You're sharing a window"));
         assert.ok(scenarios.some((scenario) => scenario.windowTitle === "Your screen is being shared"));
