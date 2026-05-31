@@ -730,6 +730,9 @@ fn restore_companion_windows_with_native_show_gate(
         return gated_status;
     }
 
+    if focus_after_restore {
+        let _ = app.show();
+    }
     let status = set_companion_windows_visible(app, true, true);
     if focus_after_restore {
         activate_app_for_companion_window_repair(app);
@@ -911,7 +914,7 @@ pub fn repair_companion_window_bounds_without_show(app: &tauri::AppHandle) {
     }
 
     if needs_visible_restore {
-        restore_companion_windows_after_clear_privacy_check(app);
+        restore_companion_windows_after_share_risk_cleared(app);
     }
 }
 

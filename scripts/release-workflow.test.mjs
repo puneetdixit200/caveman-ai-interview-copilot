@@ -555,6 +555,7 @@ test("share-risk restore activates app before checking native visibility", async
 
   const restoreBody = overlayRs.slice(restoreStart, restoreEnd);
   const focusBody = overlayRs.slice(focusStart, focusEnd);
+  const unhideBeforeRestore = restoreBody.indexOf("let _ = app.show()");
   const visibleRestore = restoreBody.indexOf("set_companion_windows_visible(app, true, true)");
   const activateAfterRestore = restoreBody.indexOf("activate_app_for_companion_window_repair(app)", visibleRestore);
   const focusAfterActivate = restoreBody.indexOf("focus_companion_windows(app)", activateAfterRestore);
@@ -562,7 +563,9 @@ test("share-risk restore activates app before checking native visibility", async
   const showAfterFocusActivation = focusBody.indexOf("window.show()", focusActivation);
   const setFocusAfterShow = focusBody.indexOf("window.set_focus()", showAfterFocusActivation);
 
+  assert.notEqual(unhideBeforeRestore, -1, "share-risk restore must unhide the packaged app first");
   assert.notEqual(visibleRestore, -1, "share-risk restore must show companion windows");
+  assert.ok(unhideBeforeRestore < visibleRestore, "packaged app unhide must happen before companion window restore");
   assert.notEqual(activateAfterRestore, -1, "share-risk restore must activate the packaged app");
   assert.notEqual(focusAfterActivate, -1, "share-risk restore must focus after activation");
   assert.match(focusBody, /needs_native_activation \|\| native_repaired \|\| repaired/);
@@ -586,7 +589,7 @@ test("companion bounds watchdog pauses repairs during active share-risk", async 
   const nativeRepair = watchdogRepairBody.indexOf("repair_native_companion_window_bounds_if_needed");
   const standardRepair = watchdogRepairBody.indexOf("repair_companion_window_bounds(app, &window)");
   const visibleRestoreFlag = watchdogRepairBody.indexOf("needs_visible_restore");
-  const visibleRestore = watchdogRepairBody.indexOf("restore_companion_windows_after_clear_privacy_check(app)");
+  const visibleRestore = watchdogRepairBody.indexOf("restore_companion_windows_after_share_risk_cleared(app)");
 
   assert.notEqual(shareRiskLatch, -1, "watchdog must check the nonblocking share-risk latch");
   assert.equal(fullDetector, -1, "watchdog must not run the full screen-share detector on the UI thread");
@@ -595,7 +598,7 @@ test("companion bounds watchdog pauses repairs during active share-risk", async 
   assert.notEqual(nativeRepair, -1, "watchdog must still run native bounds repair when clear");
   assert.notEqual(standardRepair, -1, "watchdog must still run standard bounds repair when clear");
   assert.notEqual(visibleRestoreFlag, -1, "watchdog must track when hidden/tiny windows need visible restore");
-  assert.notEqual(visibleRestore, -1, "watchdog must visibly restore unusable windows after privacy clears");
+  assert.notEqual(visibleRestore, -1, "watchdog must run focused visible restore after privacy clears");
   assert.ok(shareRiskLatch < earlyReturn, "privacy latch must control the watchdog early return");
   assert.ok(earlyReturn < windowLoop, "watchdog must skip all repairs while share-risk is active");
   assert.ok(windowLoop < nativeRepair, "native repair must only run after the privacy pause check");
