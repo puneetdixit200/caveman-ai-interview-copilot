@@ -228,6 +228,48 @@ test("stops simulated meeting apps before checking Caveman restoration", async (
   assert.match(result.messages.join("\n"), /restored after risk cleared/);
 });
 
+test("counts cleanup restore as macOS scenario restore before continuing", async () => {
+  const visibleWindowRows = JSON.stringify([WINDOW]);
+  const queryOutputs = [visibleWindowRows, "[]", "[]", visibleWindowRows, visibleWindowRows];
+
+  const commandRunner = async (command) => {
+    if (command === "swift") {
+      return { stdout: queryOutputs.shift() ?? visibleWindowRows };
+    }
+    return { stdout: "" };
+  };
+
+  const processSpawner = () => {
+    const child = new EventEmitter();
+    child.exitCode = null;
+    child.signalCode = null;
+    child.kill = (signal) => {
+      child.signalCode = signal;
+      child.emit("exit");
+      return true;
+    };
+    return child;
+  };
+
+  const result = await runMacosMeetingRiskSmoke({
+    platform: "darwin",
+    commandRunner,
+    processSpawner,
+    restoreWaitMs: 1,
+    scenarios: [
+      {
+        id: "teams-native",
+        label: "Microsoft Teams native process",
+        executableName: "MSTeams",
+        windowTitle: "Microsoft Teams - Interview"
+      }
+    ]
+  });
+
+  assert.equal(result.status, "ready");
+  assert.match(result.messages.join("\n"), /restored after risk cleared/);
+});
+
 test("blocks macOS meeting-risk smoke when Caveman hides but does not restore after risk clears", async () => {
   const visibleWindowRows = JSON.stringify([WINDOW]);
   const queryOutputs = [visibleWindowRows, "[]"];
@@ -268,6 +310,61 @@ test("blocks macOS meeting-risk smoke when Caveman hides but does not restore af
 
   assert.equal(result.status, "blocked");
   assert.match(result.messages.join("\n"), /did not restore after risk cleared/);
+});
+
+test("reports last macOS Caveman rows when final batch restore fails", async () => {
+  const visibleWindowRows = JSON.stringify([WINDOW]);
+  const tinyVisibleWindowRows = JSON.stringify([
+    {
+      ...WINDOW,
+      windowNumber: 11,
+      sharingState: 1,
+      width: 640,
+      height: 410
+    }
+  ]);
+  const queryOutputs = [visibleWindowRows, "[]", tinyVisibleWindowRows];
+
+  const commandRunner = async (command) => {
+    if (command === "swift") {
+      return { stdout: queryOutputs.shift() ?? tinyVisibleWindowRows };
+    }
+    return { stdout: "" };
+  };
+
+  const processSpawner = () => {
+    const child = new EventEmitter();
+    child.exitCode = null;
+    child.signalCode = null;
+    child.kill = (signal) => {
+      child.signalCode = signal;
+      child.emit("exit");
+      return true;
+    };
+    return child;
+  };
+
+  const result = await runMacosMeetingRiskSmoke({
+    platform: "darwin",
+    commandRunner,
+    processSpawner,
+    requireRestore: true,
+    requireScenarioRestore: false,
+    restoreWaitMs: 1,
+    scenarios: [
+      {
+        id: "teams-native",
+        label: "Microsoft Teams native process",
+        executableName: "MSTeams",
+        windowTitle: "Microsoft Teams - Interview"
+      }
+    ]
+  });
+
+  assert.equal(result.status, "blocked");
+  assert.match(result.messages.join("\n"), /Last observed Caveman windows:/);
+  assert.match(result.messages.join("\n"), /640x410/);
+  assert.match(result.messages.join("\n"), /sharingState=1/);
 });
 
 test("blocks macOS meeting-risk smoke when any visible Caveman window remains during risk", async () => {

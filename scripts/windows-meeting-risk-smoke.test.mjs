@@ -286,6 +286,57 @@ test("runs the Windows EXE smoke with restore required after meeting risk clears
   }
 });
 
+test("counts cleanup restore as Windows scenario restore before continuing", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "caveman-windows-risk-cleanup-restore-"));
+  const appExePath = join(dir, "caveman.exe");
+  const queryOutputs = [
+    JSON.stringify([PROTECTED_WINDOW]),
+    "[]",
+    "[]",
+    JSON.stringify([PROTECTED_WINDOW]),
+    JSON.stringify([PROTECTED_WINDOW])
+  ];
+
+  try {
+    await mkdir(dir, { recursive: true });
+    await writeFile(appExePath, "fake exe");
+
+    const commandRunner = async (command) => {
+      if (command === "taskkill") {
+        return { stdout: "", stderr: "" };
+      }
+      return { stdout: queryOutputs.shift() ?? JSON.stringify([PROTECTED_WINDOW]), stderr: "" };
+    };
+
+    const processSpawner = () => {
+      const child = new EventEmitter();
+      child.exitCode = null;
+      child.signalCode = null;
+      child.kill = (signal) => {
+        child.signalCode = signal;
+        child.emit("exit");
+        return true;
+      };
+      return child;
+    };
+
+    const result = await runWindowsMeetingRiskSmoke({
+      platform: "win32",
+      appExePath,
+      commandRunner,
+      processSpawner,
+      requireRestore: true,
+      restoreWaitMs: 1,
+      scenarios: [WINDOWS_MEETING_RISK_SCENARIOS[0]]
+    });
+
+    assert.equal(result.status, "ready");
+    assert.match(result.messages.join("\n"), /restored after risk cleared/);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
 test("blocks the Windows EXE smoke when it hides but does not restore after risk clears", async () => {
   const dir = await mkdtemp(join(tmpdir(), "caveman-windows-risk-no-restore-"));
   const appExePath = join(dir, "caveman.exe");

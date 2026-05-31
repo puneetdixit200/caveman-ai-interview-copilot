@@ -525,9 +525,11 @@ async function runMeetingRiskScenario({
     riskProcessExited = true;
   });
 
+  let hiddenDuringRisk = false;
+  let restoredAfterRisk = null;
+  let visibleCavemanWindows = [];
   try {
-    let visibleCavemanWindows = [];
-    const hiddenDuringRisk = await waitForCondition({
+    hiddenDuringRisk = await waitForCondition({
       timeoutMs: activeRiskWaitMs,
       commandRunner,
       predicate: (rows) => {
@@ -536,29 +538,29 @@ async function runMeetingRiskScenario({
       },
       shouldStop: () => riskProcessExited
     });
-    let restoredAfterRisk = null;
     if (hiddenDuringRisk && requireRestore) {
       await stopProcess(riskProcess);
       restoredAfterRisk = await waitForVisibleUsableProtectedWindow({ commandRunner, timeoutMs: restoreWaitMs });
     }
-    return {
-      ...scenario,
-      hiddenDuringRisk,
-      restoredAfterRisk: restoredAfterRisk ?? undefined,
-      detail: riskProcessError
-        ? `Meeting simulation failed: ${riskProcessError.message}`
-        : hiddenDuringRisk && requireRestore && !restoredAfterRisk
-          ? "No protected visible usable Caveman window returned before timeout."
-          : hiddenDuringRisk
-          ? null
-          : formatVisibleCavemanWindows(visibleCavemanWindows)
-    };
   } finally {
     await stopProcess(riskProcess);
-    if (requireRestore) {
-      await waitForVisibleUsableProtectedWindow({ commandRunner, timeoutMs: restoreWaitMs });
+    if (hiddenDuringRisk && requireRestore && !restoredAfterRisk) {
+      restoredAfterRisk = await waitForVisibleUsableProtectedWindow({ commandRunner, timeoutMs: restoreWaitMs });
     }
   }
+
+  return {
+    ...scenario,
+    hiddenDuringRisk,
+    restoredAfterRisk: restoredAfterRisk ?? undefined,
+    detail: riskProcessError
+      ? `Meeting simulation failed: ${riskProcessError.message}`
+      : hiddenDuringRisk && requireRestore && !restoredAfterRisk
+        ? "No protected visible usable Caveman window returned before timeout."
+        : hiddenDuringRisk
+          ? null
+          : formatVisibleCavemanWindows(visibleCavemanWindows)
+  };
 }
 
 function launchCavemanExe({ appExePath, processSpawner }) {

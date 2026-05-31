@@ -301,16 +301,18 @@ export async function runMacosMeetingRiskSmoke({
     }
 
     await stopScenarioProcesses({ tempDir, commandRunner });
-    const restoredWindow = requireRestore
-      ? await waitForVisibleUsableWindow({ commandRunner, timeoutMs: restoreWaitMs })
-      : null;
+    const restoredWindowResult = requireRestore
+      ? await waitForVisibleUsableWindowResult({ commandRunner, timeoutMs: restoreWaitMs })
+      : { window: null, rows: [] };
+    const restoredWindow = restoredWindowResult.window;
     return summarizeMacosMeetingRiskSmoke({
       platform,
       initialWindow,
       scenarioResults,
       restoredWindow,
       requireRestore,
-      requireScenarioRestore
+      requireScenarioRestore,
+      detail: requireRestore && !restoredWindow ? formatCavemanWindowRows(restoredWindowResult.rows) : null
     });
   } finally {
     await rm(tempDir, { recursive: true, force: true });
@@ -345,34 +347,41 @@ async function runMeetingRiskScenario({
     riskProcessExited = true;
   });
 
+  let hiddenDuringRisk = false;
+  let restoredAfterRisk = null;
+  let restoreRows = [];
   try {
-    const hiddenDuringRisk = await waitForCondition({
+    hiddenDuringRisk = await waitForCondition({
       timeoutMs: activeRiskWaitMs,
       commandRunner,
       predicate: (rows) => !selectVisibleCavemanWindow(rows),
       shouldStop: () => riskProcessExited
     });
-    let restoredAfterRisk = null;
     if (hiddenDuringRisk && requireScenarioRestore) {
       await stopProcess(riskProcess);
-      restoredAfterRisk = await waitForVisibleUsableWindow({ commandRunner, timeoutMs: restoreWaitMs });
+      const restoreResult = await waitForVisibleUsableWindowResult({ commandRunner, timeoutMs: restoreWaitMs });
+      restoredAfterRisk = restoreResult.window;
+      restoreRows = restoreResult.rows;
     }
-    return {
-      ...scenario,
-      hiddenDuringRisk,
-      restoredAfterRisk: restoredAfterRisk ?? undefined,
-      detail: riskProcessError
-        ? riskProcessError.message
-        : hiddenDuringRisk && requireScenarioRestore && !restoredAfterRisk
-          ? "No protected onscreen usable Caveman window returned before timeout."
-          : null
-    };
   } finally {
     await stopProcess(riskProcess);
-    if (requireScenarioRestore) {
-      await waitForVisibleUsableWindow({ commandRunner, timeoutMs: restoreWaitMs });
+    if (hiddenDuringRisk && requireScenarioRestore && !restoredAfterRisk) {
+      const restoreResult = await waitForVisibleUsableWindowResult({ commandRunner, timeoutMs: restoreWaitMs });
+      restoredAfterRisk = restoreResult.window;
+      restoreRows = restoreResult.rows;
     }
   }
+
+  return {
+    ...scenario,
+    hiddenDuringRisk,
+    restoredAfterRisk: restoredAfterRisk ?? undefined,
+    detail: riskProcessError
+      ? riskProcessError.message
+      : hiddenDuringRisk && requireScenarioRestore && !restoredAfterRisk
+        ? `No protected onscreen usable Caveman window returned before timeout. ${formatCavemanWindowRows(restoreRows)}`
+        : null
+  };
 }
 
 export function cavemanActivationArgs({ appPath = null, bundleId = DEFAULT_BUNDLE_ID } = {}) {
@@ -392,16 +401,22 @@ async function activateCaveman(commandRunner, options) {
 }
 
 async function waitForVisibleUsableWindow({ commandRunner, timeoutMs }) {
+  return (await waitForVisibleUsableWindowResult({ commandRunner, timeoutMs })).window;
+}
+
+async function waitForVisibleUsableWindowResult({ commandRunner, timeoutMs }) {
   let selectedWindow = null;
+  let lastRows = [];
   await waitForCondition({
     timeoutMs,
     commandRunner,
     predicate: (rows) => {
+      lastRows = rows;
       selectedWindow = selectVisibleUsableCavemanWindow(rows) || null;
       return Boolean(selectedWindow);
     }
   });
-  return selectedWindow;
+  return { window: selectedWindow, rows: lastRows };
 }
 
 async function waitForCondition({
@@ -430,6 +445,20 @@ async function queryCavemanWindowRows(commandRunner) {
     maxBuffer: QUERY_MAX_BUFFER
   });
   return parseCavemanWindowRows(stdout);
+}
+
+export function formatCavemanWindowRows(rows) {
+  const cavemanRows = rows.slice(0, 6);
+  if (cavemanRows.length === 0) {
+    return "Last observed Caveman windows: none.";
+  }
+
+  return `Last observed Caveman windows: ${cavemanRows
+    .map(
+      (row) =>
+        `${row.ownerName || "unknown owner"} window=${JSON.stringify(row.windowName)} id=${row.windowNumber} ${row.width}x${row.height}+${row.x}+${row.y} onscreen=${row.isOnscreen} sharingState=${row.sharingState}`
+    )
+    .join("; ")}${rows.length > cavemanRows.length ? `; plus ${rows.length - cavemanRows.length} more` : ""}`;
 }
 
 async function stopProcess(child) {
