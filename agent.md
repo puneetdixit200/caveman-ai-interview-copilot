@@ -8,9 +8,12 @@ Make Caveman harder to expose during Google Meet, Microsoft Teams, and screen-sh
 
 - Branch: `main`
 - Remote: `origin/main`
-- Latest implementation commit before this handoff refresh: `5451775 test: use stable macos share smoke owners`.
-- This handoff file is current as of Desktop Package Smoke run `26698103755`.
+- Latest implementation commit before this handoff refresh: `a6a0861 fix: reinforce Windows privacy hide`.
+- This handoff file is current as of Desktop Package Smoke run `26699176725`.
 - Previous relevant commits:
+  - `6a220b5 test: require no visible windows in share smokes`
+  - `c79240c docs: record active indicator smoke evidence [skip ci]`
+  - `5451775 test: use stable macos share smoke owners`
   - `332eac9 fix: ignore idle macos system share daemons`
   - `bb41a4e fix: scan macos meeting processes with libproc`
   - `d861a3a test: expand active share indicator smokes`
@@ -216,10 +219,14 @@ Follow-up CI hardening verification:
   - No local app launch was performed for this handoff refresh; verification used local non-UI tests and GitHub Actions package smokes.
 - Windows visible-window smoke follow-up:
   - Desktop Package Smoke run `26698607869` for `6a220b5` passed Linux and both macOS lanes, including stricter macOS no-visible-window package smokes, but failed only Windows packaged meeting-risk smoke. The Windows log showed the app stayed visible for all 16 scenarios after `6a220b5` changed the Windows package smoke to fail on any visible Caveman window.
-  - Follow-up keeps the stricter Windows package-smoke predicate and reinforces the native privacy hide path by hiding app-owned top-level Windows handles after the Tauri window hide calls. The Windows smoke now reports visible Caveman window details when the strict predicate times out, and the package privacy marker requires the native hide reinforcement in Windows builds.
-  - `node --test scripts/windows-meeting-risk-smoke.test.mjs scripts/macos-meeting-risk-smoke.test.mjs scripts/macos-share-risk-smoke.test.mjs` passed 17 tests.
-  - `npm run test:release` passed 160 tests.
+  - Follow-up keeps the stricter Windows package-smoke predicate: any visible nonzero Caveman-owned window now blocks. The runtime fix reinforces native privacy hides on Windows by hiding app-owned top-level HWNDs with `ShowWindow(SW_HIDE)` after the Tauri window hide calls.
+  - The Windows smoke now reports visible Caveman window details when the strict predicate times out, and the package privacy marker requires the native hide reinforcement in Windows builds.
+  - Local verification did not open the app: `node --test scripts/windows-meeting-risk-smoke.test.mjs scripts/verify-privacy-shield-package.test.mjs scripts/release-workflow.test.mjs` passed 72 tests; `npm run test:release` passed 160 tests; `cargo test` passed 148 library tests, 1 collaboration contract test, and 12 database contract tests; `cargo fmt -- --check` passed.
   - `git diff --check` passed.
+  - Desktop Package Smoke run `26699176725` for `a6a0861c16d3ae5b3ea5f7698b86cb6ae7b50126` passed all lanes: Linux AppImage/DEB, Windows installers, macOS Apple Silicon app/DMG, and macOS Intel app/DMG. The Windows lane passed packaged privacy shield verification and `Run packaged Windows meeting-risk smoke`.
+  - Push Desktop Package Smoke run `26699176725` for `a6a0861` passed all lanes. Windows installers passed native privacy tests, release contracts, package build, bundled sidecar verification, packaged privacy shield verification, packaged Windows meeting-risk smoke, artifact upload, and cleanup.
+  - Windows smoke output: `READY`; initial `caveman.exe` window was `1044x788` and protected with `WDA_EXCLUDEFROMCAPTURE`; Caveman hid during all 16 simulated scenarios: Google Meet browser, Teams browser share, Teams native process, Zoom, Webex, browser presenting, screen recording, Slack huddle, Discord voice, WhatsApp video call, remote desktop, screen recorder, window sharing, screen shared, meeting recording, and recording in progress.
+  - Linux, macOS Apple Silicon DMG, and macOS Intel DMG package lanes also passed native privacy tests, release contracts, package builds, bundled sidecar checks, packaged privacy shield verification, package-smoke runtime checks, artifact upload, and cleanup.
 - Push Desktop Package Smoke run `26694632145` for `011fb25` passed all lanes:
   - Windows installers: native privacy tests, release contracts, package build, bundled sidecar verification, packaged privacy shield, packaged Windows meeting-risk smoke, and artifact upload passed.
   - Windows smoke output: `READY`; initial `caveman.exe` window was `1044x788` and protected with `WDA_EXCLUDEFROMCAPTURE`; Caveman hid during simulated Google Meet browser, Teams browser share, Teams native process, Zoom meeting, Webex meeting, browser presenting indicator, and screen-recording indicator windows.
