@@ -731,6 +731,9 @@ fn restore_companion_windows_with_native_show_gate(
     }
 
     let status = set_companion_windows_visible(app, true, true);
+    if focus_after_restore {
+        activate_app_for_companion_window_repair(app);
+    }
     if status.visible && focus_after_restore {
         focus_companion_windows(app);
     }
@@ -827,14 +830,12 @@ pub fn focus_companion_windows(app: &tauri::AppHandle) {
             continue;
         }
 
-        let native_repaired = repair_native_companion_window_bounds_if_needed(
-            app,
-            &window,
-            companion_window_needs_native_activation(app),
-        );
+        let needs_native_activation = companion_window_needs_native_activation(app);
+        let native_repaired =
+            repair_native_companion_window_bounds_if_needed(app, &window, needs_native_activation);
         let _ = window.unminimize();
         let repaired = repair_companion_window_bounds(app, &window);
-        if native_repaired || repaired {
+        if needs_native_activation || native_repaired || repaired {
             activate_app_for_companion_window_repair(app);
         }
         let _ = window.set_focus();

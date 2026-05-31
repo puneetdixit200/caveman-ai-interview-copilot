@@ -541,6 +541,30 @@ test("macOS reopen uses the same privacy gate before restoring companion windows
   );
 });
 
+test("share-risk restore activates app before checking native visibility", async () => {
+  const overlayRs = normalizeLineEndings(await readFile("src-tauri/src/overlay/mod.rs", "utf8"));
+  const restoreStart = overlayRs.indexOf("fn restore_companion_windows_with_native_show_gate");
+  const restoreEnd = overlayRs.indexOf("fn companion_restore_status_after_native_visibility_check", restoreStart);
+  const focusStart = overlayRs.indexOf("pub fn focus_companion_windows");
+  const focusEnd = overlayRs.indexOf("pub fn restore_companion_windows_after_clear_privacy_check", focusStart);
+
+  assert.notEqual(restoreStart, -1, "share-risk restore helper must exist");
+  assert.notEqual(restoreEnd, -1, "share-risk restore helper body must be bounded");
+  assert.notEqual(focusStart, -1, "companion focus helper must exist");
+  assert.notEqual(focusEnd, -1, "companion focus helper body must be bounded");
+
+  const restoreBody = overlayRs.slice(restoreStart, restoreEnd);
+  const focusBody = overlayRs.slice(focusStart, focusEnd);
+  const visibleRestore = restoreBody.indexOf("set_companion_windows_visible(app, true, true)");
+  const activateAfterRestore = restoreBody.indexOf("activate_app_for_companion_window_repair(app)", visibleRestore);
+  const focusAfterActivate = restoreBody.indexOf("focus_companion_windows(app)", activateAfterRestore);
+
+  assert.notEqual(visibleRestore, -1, "share-risk restore must show companion windows");
+  assert.notEqual(activateAfterRestore, -1, "share-risk restore must activate the packaged app");
+  assert.notEqual(focusAfterActivate, -1, "share-risk restore must focus after activation");
+  assert.match(focusBody, /needs_native_activation \|\| native_repaired \|\| repaired/);
+});
+
 test("companion bounds watchdog pauses repairs during active share-risk", async () => {
   const overlayRs = normalizeLineEndings(await readFile("src-tauri/src/overlay/mod.rs", "utf8"));
   const watchdogRepairStart = overlayRs.indexOf("pub fn repair_companion_window_bounds_without_show(");
