@@ -640,6 +640,8 @@ fn macos_activation_sends_bundle_id_apple_event_after_open_fallbacks() {
                 OsString::from("osascript"),
                 vec![
                     OsString::from("-e"),
+                    OsString::from("tell application id \"com.caveman.desktop\" to reopen"),
+                    OsString::from("-e"),
                     OsString::from("tell application id \"com.caveman.desktop\" to activate")
                 ]
             )

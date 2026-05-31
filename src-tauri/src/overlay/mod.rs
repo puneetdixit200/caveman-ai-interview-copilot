@@ -545,6 +545,7 @@ pub fn set_companion_windows_visible(
                 window,
                 companion_window_needs_native_activation(app),
             );
+            let _ = window.set_visible_on_all_workspaces(true);
             let visibility_result = window.show();
             if visibility_result.is_ok() {
                 #[cfg(target_os = "macos")]
@@ -849,6 +850,7 @@ pub fn focus_companion_windows(app: &tauri::AppHandle) {
         if needs_native_activation || native_repaired || repaired {
             activate_app_for_companion_window_repair(app);
         }
+        let _ = window.set_visible_on_all_workspaces(true);
         let _ = window.show();
         #[cfg(target_os = "macos")]
         order_front_macos_companion_window_for_repair(&window);
@@ -1146,6 +1148,7 @@ fn focus_repaired_companion_window(app: &tauri::AppHandle, window: &tauri::Webvi
 
     activate_app_for_companion_window_repair(app);
     let _ = window.unminimize();
+    let _ = window.set_visible_on_all_workspaces(true);
     let _ = window.show();
     #[cfg(target_os = "macos")]
     order_front_macos_companion_window_for_repair(window);
@@ -1245,6 +1248,11 @@ fn macos_app_activation_command_specs(
     command_specs.push((
         OsString::from("osascript"),
         vec![
+            OsString::from("-e"),
+            OsString::from(format!(
+                "tell application id \"{}\" to reopen",
+                macos_applescript_string_literal(bundle_identifier)
+            )),
             OsString::from("-e"),
             OsString::from(format!(
                 "tell application id \"{}\" to activate",

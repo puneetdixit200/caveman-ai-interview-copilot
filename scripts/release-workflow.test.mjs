@@ -605,11 +605,13 @@ test("macOS companion restore orders native windows front after Tauri show", asy
   const setVisibleBody = overlayRs.slice(setVisibleStart, setVisibleEnd);
   const focusBody = overlayRs.slice(focusStart, focusEnd);
   const helperBody = overlayRs.slice(helperStart, helperEnd);
+  const setVisibleAllSpaces = setVisibleBody.indexOf("window.set_visible_on_all_workspaces(true)");
   const setVisibleShow = setVisibleBody.indexOf("let visibility_result = window.show()");
   const setVisibleOrderFront = setVisibleBody.indexOf(
     "order_front_macos_companion_window_for_repair(window)",
     setVisibleShow
   );
+  const focusAllSpaces = focusBody.indexOf("window.set_visible_on_all_workspaces(true)");
   const focusShow = focusBody.indexOf("window.show()");
   const focusOrderFront = focusBody.indexOf(
     "order_front_macos_companion_window_for_repair(&window)",
@@ -617,11 +619,15 @@ test("macOS companion restore orders native windows front after Tauri show", asy
   );
   const focusSetFocus = focusBody.indexOf("window.set_focus()", focusShow);
 
+  assert.notEqual(setVisibleAllSpaces, -1, "companion restore must move windows onto all workspaces");
   assert.notEqual(setVisibleShow, -1, "companion restore must use Tauri show");
   assert.notEqual(setVisibleOrderFront, -1, "companion restore must order the native window front after show");
+  assert.ok(setVisibleAllSpaces < setVisibleShow);
+  assert.notEqual(focusAllSpaces, -1, "focus repair must keep windows visible on the active workspace");
   assert.notEqual(focusShow, -1, "focus repair must use Tauri show");
   assert.notEqual(focusOrderFront, -1, "focus repair must order the native window front after show");
   assert.notEqual(focusSetFocus, -1, "focus repair must set focus after native order-front");
+  assert.ok(focusAllSpaces < focusShow);
   assert.ok(focusShow < focusOrderFront && focusOrderFront < focusSetFocus);
   assert.match(helperBody, /window\.ns_window\(\)/);
   assert.match(helperBody, /objc2_app_kit::NSWindow/);
