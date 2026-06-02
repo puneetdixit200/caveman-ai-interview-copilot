@@ -760,6 +760,22 @@ test("companion bounds watchdog pauses repairs during active share-risk", async 
   );
 });
 
+test("macOS native bounds repair sets the NSWindow frame directly", async () => {
+  const overlayRs = normalizeLineEndings(await readFile("src-tauri/src/overlay/mod.rs", "utf8"));
+  const nativeRepairStart = overlayRs.indexOf("fn force_repair_companion_window_bounds");
+  const nativeRepairEnd = overlayRs.indexOf("fn native_show_was_denied", nativeRepairStart);
+
+  assert.notEqual(nativeRepairStart, -1, "native companion bounds repair helper must exist");
+  assert.notEqual(nativeRepairEnd, -1, "native companion bounds repair helper body must be bounded");
+
+  const nativeRepairBody = overlayRs.slice(nativeRepairStart, nativeRepairEnd);
+  assert.match(nativeRepairBody, /window\.ns_window\(\)/);
+  assert.match(nativeRepairBody, /objc2_app_kit::NSWindow/);
+  assert.match(nativeRepairBody, /objc2_core_foundation::CGRect/);
+  assert.match(nativeRepairBody, /setFrame_display/);
+  assert.match(nativeRepairBody, /orderFrontRegardless/);
+});
+
 test("macOS native hide reinforcement brackets Tauri window hiding", async () => {
   const overlayRs = normalizeLineEndings(await readFile("src-tauri/src/overlay/mod.rs", "utf8"));
   const hideStart = overlayRs.indexOf("pub fn hide_app_windows_for_native_privacy_shield");

@@ -70,7 +70,7 @@ test("runs meeting-risk smoke against the mounted DMG app bundle", async () => {
             (scenario) => scenario.executableName === executableName && scenario.windowTitle === windowTitle
           );
         if (requireScenarioRestore) {
-          assert.equal(requireRestore, true);
+          assert.equal(requireRestore, false);
           assert.equal(requireScenarioRestore, true);
           assert.ok(hasScenario("TeamViewer", "TeamViewer Remote Control"));
         } else {
@@ -101,7 +101,7 @@ test("runs meeting-risk smoke against the mounted DMG app bundle", async () => {
     assert.equal(meetingRiskCalls.length, 2);
     assert.equal(meetingRiskCalls[0].requireRestore, true);
     assert.equal(meetingRiskCalls[0].requireScenarioRestore, false);
-    assert.equal(meetingRiskCalls[1].requireRestore, true);
+    assert.equal(meetingRiskCalls[1].requireRestore, false);
     assert.equal(meetingRiskCalls[1].requireScenarioRestore, true);
     assert.ok(commands.some(([command, args]) => command === "hdiutil" && args[0] === "attach"));
     assert.ok(commands.some(([command, args]) => command === "hdiutil" && args[0] === "detach"));

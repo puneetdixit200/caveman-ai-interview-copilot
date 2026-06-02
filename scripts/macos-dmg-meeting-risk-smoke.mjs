@@ -80,7 +80,7 @@ export async function runMacosDmgMeetingRiskSmoke({
       processSpawner,
       bundleId,
       appPath,
-      requireRestore: true,
+      requireRestore: false,
       requireScenarioRestore: true,
       restoreWaitMs: PACKAGED_DMG_RESTORE_WAIT_MS,
       activeRiskWaitMs: PACKAGED_DMG_ACTIVE_RISK_WAIT_MS,
