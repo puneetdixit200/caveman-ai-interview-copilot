@@ -621,14 +621,19 @@ test("clears lingering macOS risk scenario processes before final restore", asyn
   const pgrepIndex = commands.findIndex(
     ([command, args], index) => command === "pgrep" && args[0] === "-f" && index > killIndex
   );
+  const restoreActivationIndex = commands.findIndex(([command], index) => command === "open" && index > pgrepIndex);
   const finalSwiftIndex = commands.map(([command]) => command).lastIndexOf("swift");
 
   assert.equal(result.status, "ready");
   assert.notEqual(termIndex, -1, "scenario cleanup must terminate lingering temp-dir processes");
   assert.notEqual(killIndex, -1, "scenario cleanup must force-kill lingering temp-dir processes");
   assert.notEqual(pgrepIndex, -1, "scenario cleanup must verify temp-dir processes are gone");
+  assert.notEqual(restoreActivationIndex, -1, "final restore should request Caveman activation after risk cleanup");
   assert.ok(termIndex < killIndex, "TERM cleanup should run before KILL cleanup");
-  assert.ok(killIndex < pgrepIndex && pgrepIndex < finalSwiftIndex, "scenario cleanup must finish before the final restore query");
+  assert.ok(
+    killIndex < pgrepIndex && pgrepIndex < restoreActivationIndex && restoreActivationIndex < finalSwiftIndex,
+    "scenario cleanup must finish before final restore activation and query"
+  );
 });
 
 test("clears lingering macOS risk scenario processes before strict scenario restore", async () => {
@@ -681,14 +686,19 @@ test("clears lingering macOS risk scenario processes before strict scenario rest
   const pgrepIndex = commands.findIndex(
     ([command, args], index) => command === "pgrep" && args[0] === "-f" && index > killIndex
   );
+  const restoreActivationIndex = commands.findIndex(([command], index) => command === "open" && index > pgrepIndex);
   const restoreSwiftIndex = commands.findIndex(([command], index) => command === "swift" && index > killIndex);
 
   assert.equal(result.status, "ready");
   assert.notEqual(termIndex, -1, "strict scenario cleanup must terminate lingering temp-dir processes");
   assert.notEqual(killIndex, -1, "strict scenario cleanup must force-kill lingering temp-dir processes");
   assert.notEqual(pgrepIndex, -1, "strict scenario cleanup must verify temp-dir processes are gone");
+  assert.notEqual(restoreActivationIndex, -1, "strict scenario restore should request Caveman activation after cleanup");
   assert.ok(termIndex < killIndex, "TERM cleanup should run before KILL cleanup");
-  assert.ok(killIndex < pgrepIndex && pgrepIndex < restoreSwiftIndex, "strict cleanup must finish before restore polling");
+  assert.ok(
+    killIndex < pgrepIndex && pgrepIndex < restoreActivationIndex && restoreActivationIndex < restoreSwiftIndex,
+    "strict cleanup must finish before restore activation and polling"
+  );
   assert.match(result.messages.join("\n"), /Remote support control window: Caveman hid/);
 });
 

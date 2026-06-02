@@ -299,6 +299,8 @@ export async function runMacosMeetingRiskSmoke({
           scenario,
           commandRunner,
           processSpawner,
+          appPath,
+          bundleId,
           requireScenarioRestore,
           restoreWaitMs,
           activeRiskWaitMs,
@@ -308,6 +310,9 @@ export async function runMacosMeetingRiskSmoke({
     }
 
     await stopScenarioProcesses({ tempDir, commandRunner });
+    if (requireRestore) {
+      await activateCaveman(commandRunner, { appPath, bundleId });
+    }
     const restoredWindowResult = requireRestore
       ? await waitForVisibleUsableWindowResult({ commandRunner, timeoutMs: restoreWaitMs })
       : { window: null, rows: [] };
@@ -331,6 +336,8 @@ async function runMeetingRiskScenario({
   scenario,
   commandRunner,
   processSpawner,
+  appPath,
+  bundleId,
   requireScenarioRestore,
   restoreWaitMs,
   activeRiskWaitMs,
@@ -367,6 +374,7 @@ async function runMeetingRiskScenario({
     if (hiddenDuringRisk && requireScenarioRestore) {
       await stopProcess(riskProcess);
       await stopScenarioProcesses({ tempDir, commandRunner });
+      await activateCaveman(commandRunner, { appPath, bundleId });
       const restoreResult = await waitForVisibleUsableWindowResult({ commandRunner, timeoutMs: restoreWaitMs });
       restoredAfterRisk = restoreResult.window;
       restoreRows = restoreResult.rows;
@@ -375,6 +383,7 @@ async function runMeetingRiskScenario({
     await stopProcess(riskProcess);
     if (hiddenDuringRisk && requireScenarioRestore && !restoredAfterRisk) {
       await stopScenarioProcesses({ tempDir, commandRunner });
+      await activateCaveman(commandRunner, { appPath, bundleId });
       const restoreResult = await waitForVisibleUsableWindowResult({ commandRunner, timeoutMs: restoreWaitMs });
       restoredAfterRisk = restoreResult.window;
       restoreRows = restoreResult.rows;

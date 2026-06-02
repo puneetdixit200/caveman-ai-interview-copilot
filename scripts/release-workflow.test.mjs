@@ -689,6 +689,41 @@ test("macOS companion restore orders native windows front after Tauri show", asy
   assert.match(helperBody, /makeKeyAndOrderFront\(None\)/);
 });
 
+test("macOS share-risk restore reinforces ordered-out native windows before CoreGraphics check", async () => {
+  const overlayRs = normalizeLineEndings(await readFile("src-tauri/src/overlay/mod.rs", "utf8"));
+  const restoreStart = overlayRs.indexOf("fn restore_companion_windows_with_native_show_gate");
+  const restoreEnd = overlayRs.indexOf("fn companion_restore_status_after_native_visibility_check", restoreStart);
+  const helperStart = overlayRs.indexOf("fn reinforce_native_privacy_restore");
+  const helperEnd = overlayRs.indexOf("pub fn startup_privacy_shield_hide_reason", helperStart);
+
+  assert.notEqual(restoreStart, -1, "share-risk restore helper must exist");
+  assert.notEqual(restoreEnd, -1, "share-risk restore helper body must be bounded");
+  assert.notEqual(helperStart, -1, "macOS native restore reinforcement helper must exist");
+  assert.notEqual(helperEnd, -1, "macOS native restore reinforcement helper body must be bounded");
+
+  const restoreBody = overlayRs.slice(restoreStart, restoreEnd);
+  const helperBody = overlayRs.slice(helperStart, helperEnd);
+  const visibleRestore = restoreBody.indexOf(
+    "set_companion_windows_visible_with_repair_focus(app, true, true, focus_after_restore)"
+  );
+  const nativeRestore = restoreBody.indexOf("reinforce_native_privacy_restore()", visibleRestore);
+  const visibilityCheck = restoreBody.indexOf(
+    "companion_restore_status_after_native_visibility_check(",
+    nativeRestore
+  );
+
+  assert.notEqual(visibleRestore, -1, "share-risk restore must show companion windows");
+  assert.notEqual(nativeRestore, -1, "restore must reverse native orderOut after Tauri show");
+  assert.notEqual(visibilityCheck, -1, "restore must run native reinforcement before CoreGraphics visibility check");
+  assert.ok(visibleRestore < nativeRestore && nativeRestore < visibilityCheck);
+  assert.match(helperBody, /MACOS_NATIVE_PRIVACY_RESTORE_REINFORCEMENT_MARKER/);
+  assert.match(helperBody, /NSApplication::sharedApplication/);
+  assert.match(helperBody, /app\.unhide\(None\)/);
+  assert.match(helperBody, /windows\.objectAtIndex\(index\)/);
+  assert.match(helperBody, /orderFrontRegardless\(\)/);
+  assert.match(helperBody, /makeKeyAndOrderFront\(None\)/);
+});
+
 test("macOS share-risk restore directly unhides current app before external activation", async () => {
   const overlayRs = normalizeLineEndings(await readFile("src-tauri/src/overlay/mod.rs", "utf8"));
   const activationStart = overlayRs.indexOf("fn activate_app_for_companion_window_repair");

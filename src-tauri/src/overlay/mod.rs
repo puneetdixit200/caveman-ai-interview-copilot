@@ -75,6 +75,8 @@ pub const WINDOWS_NATIVE_PRIVACY_HIDE_REINFORCEMENT_MARKER: &str =
     "Windows privacy shield reinforces Tauri hide by hiding app-owned top-level windows.";
 pub const MACOS_NATIVE_PRIVACY_HIDE_REINFORCEMENT_MARKER: &str =
     "macOS privacy shield reinforces Tauri hide by ordering out all app windows through NSWindow.";
+pub const MACOS_NATIVE_PRIVACY_RESTORE_REINFORCEMENT_MARKER: &str =
+    "macOS privacy shield restores ordered-out app windows through NSWindow before CoreGraphics visibility checks.";
 pub const COMPANION_WINDOW_RESTORE_PRIVACY_PAUSE_MARKER: &str =
     "Companion app window restore stays paused after a native privacy denial.";
 const COMPANION_WINDOW_MIN_WIDTH: u32 = 1024;
@@ -208,6 +210,31 @@ fn reinforce_native_privacy_hide() {
 
 #[cfg(not(any(target_os = "windows", target_os = "macos")))]
 fn reinforce_native_privacy_hide() {}
+
+#[cfg(target_os = "macos")]
+fn reinforce_native_privacy_restore() {
+    std::hint::black_box(MACOS_NATIVE_PRIVACY_RESTORE_REINFORCEMENT_MARKER);
+    let Some(main_thread) = objc2::MainThreadMarker::new() else {
+        return;
+    };
+
+    let app = objc2_app_kit::NSApplication::sharedApplication(main_thread);
+    app.unhide(None);
+    app.unhideWithoutActivation();
+    let windows = app.windows();
+    for index in 0..windows.count() {
+        let window = windows.objectAtIndex(index);
+        if window.isMiniaturized() {
+            window.deminiaturize(None);
+        }
+        window.orderFrontRegardless();
+        window.makeKeyAndOrderFront(None);
+    }
+    app.arrangeInFront(None);
+}
+
+#[cfg(not(target_os = "macos"))]
+fn reinforce_native_privacy_restore() {}
 
 pub fn startup_privacy_shield_hide_reason(
     protection_statuses: &[OverlayProtectionStatus],
@@ -779,6 +806,7 @@ fn restore_companion_windows_with_native_show_gate(
         set_companion_windows_visible_with_repair_focus(app, true, true, focus_after_restore);
     if focus_after_restore {
         activate_app_for_companion_window_repair(app);
+        reinforce_native_privacy_restore();
     }
     if status.visible && focus_after_restore {
         focus_companion_windows(app);
