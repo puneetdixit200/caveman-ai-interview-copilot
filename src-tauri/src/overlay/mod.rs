@@ -73,6 +73,8 @@ pub const WINDOWS_PRE_SHOW_CAPTURE_EXCLUSION_RECHECK_MARKER: &str =
     "Windows native show gate retries display-affinity verification after the window becomes visible.";
 pub const WINDOWS_NATIVE_PRIVACY_HIDE_REINFORCEMENT_MARKER: &str =
     "Windows privacy shield reinforces Tauri hide by hiding app-owned top-level windows.";
+pub const MACOS_NATIVE_PRIVACY_HIDE_REINFORCEMENT_MARKER: &str =
+    "macOS privacy shield reinforces Tauri hide by ordering out all app windows through NSWindow.";
 pub const COMPANION_WINDOW_RESTORE_PRIVACY_PAUSE_MARKER: &str =
     "Companion app window restore stays paused after a native privacy denial.";
 const COMPANION_WINDOW_MIN_WIDTH: u32 = 1024;
@@ -146,6 +148,7 @@ pub fn configure_overlay_security(app: &mut tauri::App) -> bool {
 }
 
 pub fn hide_app_windows_for_native_privacy_shield(app: &tauri::AppHandle) {
+    reinforce_native_privacy_hide();
     let _ = set_overlay_window_visible(app, false, true);
     let _ = set_companion_windows_visible(app, false, true);
     reinforce_native_privacy_hide();
@@ -189,7 +192,21 @@ fn reinforce_native_privacy_hide() {
     let _ = unsafe { EnumWindows(Some(hide_matching_window), lparam) };
 }
 
-#[cfg(not(target_os = "windows"))]
+#[cfg(target_os = "macos")]
+fn reinforce_native_privacy_hide() {
+    std::hint::black_box(MACOS_NATIVE_PRIVACY_HIDE_REINFORCEMENT_MARKER);
+    let Some(main_thread) = objc2::MainThreadMarker::new() else {
+        return;
+    };
+
+    let app = objc2_app_kit::NSApplication::sharedApplication(main_thread);
+    let windows = app.windows();
+    for index in 0..windows.count() {
+        windows.objectAtIndex(index).orderOut(None);
+    }
+}
+
+#[cfg(not(any(target_os = "windows", target_os = "macos")))]
 fn reinforce_native_privacy_hide() {}
 
 pub fn startup_privacy_shield_hide_reason(
@@ -1553,10 +1570,35 @@ fn force_repair_companion_window_bounds(
         COMPANION_WINDOW_MIN_WIDTH.min(forced_bounds.width.max(1)),
         COMPANION_WINDOW_MIN_HEIGHT.min(forced_bounds.height.max(1)),
     )));
+    let mut native_frame_repaired = false;
+    #[cfg(target_os = "macos")]
+    {
+        if let Ok(ns_window) = window.ns_window() {
+            if !ns_window.is_null() {
+                let ns_window = unsafe { &*(ns_window.cast::<objc2_app_kit::NSWindow>()) };
+                let frame = objc2_core_foundation::CGRect::new(
+                    objc2_core_foundation::CGPoint::new(
+                        f64::from(forced_bounds.x),
+                        f64::from(forced_bounds.y),
+                    ),
+                    objc2_core_foundation::CGSize::new(
+                        f64::from(forced_bounds.width),
+                        f64::from(forced_bounds.height),
+                    ),
+                );
+                ns_window.setFrame_display(frame, true);
+                if ns_window.isMiniaturized() {
+                    ns_window.deminiaturize(None);
+                }
+                ns_window.orderFrontRegardless();
+                native_frame_repaired = true;
+            }
+        }
+    }
     let size_result = window.set_size(LogicalSize::new(forced_bounds.width, forced_bounds.height));
     let position_result =
         window.set_position(LogicalPosition::new(forced_bounds.x, forced_bounds.y));
-    size_result.is_ok() || position_result.is_ok()
+    native_frame_repaired || size_result.is_ok() || position_result.is_ok()
 }
 
 fn native_show_was_denied(status: &OverlayProtectionStatus) -> bool {

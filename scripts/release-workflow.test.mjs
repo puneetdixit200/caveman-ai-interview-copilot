@@ -760,6 +760,27 @@ test("companion bounds watchdog pauses repairs during active share-risk", async 
   );
 });
 
+test("macOS native hide reinforcement brackets Tauri window hiding", async () => {
+  const overlayRs = normalizeLineEndings(await readFile("src-tauri/src/overlay/mod.rs", "utf8"));
+  const hideStart = overlayRs.indexOf("pub fn hide_app_windows_for_native_privacy_shield");
+  const hideEnd = overlayRs.indexOf("#[cfg(target_os = \"windows\")]", hideStart);
+
+  assert.notEqual(hideStart, -1, "native privacy hide helper must exist");
+  assert.notEqual(hideEnd, -1, "native privacy hide helper body must be bounded");
+
+  const hideBody = overlayRs.slice(hideStart, hideEnd);
+  const firstNativeHide = hideBody.indexOf("reinforce_native_privacy_hide()");
+  const overlayHide = hideBody.indexOf("set_overlay_window_visible(app, false, true)");
+  const companionHide = hideBody.indexOf("set_companion_windows_visible(app, false, true)", overlayHide);
+  const secondNativeHide = hideBody.indexOf("reinforce_native_privacy_hide()", companionHide);
+
+  assert.notEqual(firstNativeHide, -1, "native hide reinforcement must run before Tauri hide");
+  assert.notEqual(overlayHide, -1, "overlay hide must still run");
+  assert.notEqual(companionHide, -1, "companion hide must still run");
+  assert.notEqual(secondNativeHide, -1, "native hide reinforcement must run after Tauri hide");
+  assert.ok(firstNativeHide < overlayHide && overlayHide < companionHide && companionHide < secondNativeHide);
+});
+
 test("macOS process guard short-circuits before window-title scan", async () => {
   const screenShareRs = normalizeLineEndings(await readFile("src-tauri/src/screen_share.rs", "utf8"));
   const macosBranchStart = indexOfRegex(screenShareRs, /#\[cfg\(target_os = "macos"\)\]\s*\{/);

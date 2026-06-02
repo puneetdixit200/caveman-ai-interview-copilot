@@ -321,6 +321,7 @@ export const MACOS_NATIVE_PRIVACY_SHIELD_MARKERS = [
   "Native privacy shield checks macOS CoreGraphics visible window titles before app windows can show.",
   "Native privacy shield scans macOS CoreGraphics visible window titles every 250ms for browser Meet and Teams risk.",
   "macOS CoreGraphics title guard hides when a visible browser window title is unavailable.",
+  "macOS privacy shield reinforces Tauri hide by ordering out all app windows through NSWindow.",
   "Companion app windows use a privacy-gated reopen restore when the bundle is reopened."
 ];
 

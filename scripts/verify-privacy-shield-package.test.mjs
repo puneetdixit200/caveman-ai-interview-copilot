@@ -34,6 +34,8 @@ const WINDOWS_TOOLHELP_PROCESS_MARKER =
   "Native privacy shield enumerates Windows processes with ToolHelp before tasklist fallback.";
 const WINDOWS_NATIVE_HIDE_REINFORCEMENT_MARKER =
   "Windows privacy shield reinforces Tauri hide by hiding app-owned top-level windows.";
+const MACOS_NATIVE_HIDE_REINFORCEMENT_MARKER =
+  "macOS privacy shield reinforces Tauri hide by ordering out all app windows through NSWindow.";
 
 function assertDesktopProcessMarker(marker) {
   for (const target of DESKTOP_PROCESS_TARGETS) {
@@ -569,6 +571,11 @@ test("requires packaged protection refresh fail-closed marker", () => {
   assert.ok(!TARGET_PRIVACY_SHIELD_MARKERS["macos-arm64"].includes(WINDOWS_NATIVE_HIDE_REINFORCEMENT_MARKER));
   assert.ok(!TARGET_PRIVACY_SHIELD_MARKERS["macos-x64"].includes(WINDOWS_NATIVE_HIDE_REINFORCEMENT_MARKER));
   assert.ok(!TARGET_PRIVACY_SHIELD_MARKERS["linux-x64"].includes(WINDOWS_NATIVE_HIDE_REINFORCEMENT_MARKER));
+  assert.ok(MACOS_NATIVE_PRIVACY_SHIELD_MARKERS.includes(MACOS_NATIVE_HIDE_REINFORCEMENT_MARKER));
+  assert.ok(TARGET_PRIVACY_SHIELD_MARKERS["macos-arm64"].includes(MACOS_NATIVE_HIDE_REINFORCEMENT_MARKER));
+  assert.ok(TARGET_PRIVACY_SHIELD_MARKERS["macos-x64"].includes(MACOS_NATIVE_HIDE_REINFORCEMENT_MARKER));
+  assert.ok(!TARGET_PRIVACY_SHIELD_MARKERS["windows-x64"].includes(MACOS_NATIVE_HIDE_REINFORCEMENT_MARKER));
+  assert.ok(!TARGET_PRIVACY_SHIELD_MARKERS["linux-x64"].includes(MACOS_NATIVE_HIDE_REINFORCEMENT_MARKER));
   assert.ok(
     TARGET_PRIVACY_SHIELD_MARKERS["macos-arm64"].includes(
       "macOS process screen-share guard skips window-title scan after direct capture-process match."
