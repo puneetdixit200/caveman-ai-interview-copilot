@@ -1162,6 +1162,7 @@ pub fn windows_pre_show_capture_exclusion_can_recheck_after_show(
             || message.contains(
                 "Windows rejected WDA_EXCLUDEFROMCAPTURE and legacy WDA_MONITOR fallback.",
             )
+            || message.contains("the underlying handle is not available")
     })
 }
 

@@ -1255,11 +1255,7 @@ pub fn detect_screen_share_status_for_native_privacy_shield() -> anyhow::Result<
 
     #[cfg(target_os = "windows")]
     {
-        if let Some(status) = detect_windows_visible_window_title_privacy_status() {
-            return Ok(status);
-        }
-
-        detect_screen_share_status()
+        Ok(detect_windows_native_privacy_status())
     }
 
     #[cfg(not(any(target_os = "macos", target_os = "windows")))]
@@ -1707,11 +1703,35 @@ fn detect_windows_visible_window_title_processes() -> Vec<ScreenShareProcess> {
 }
 
 #[cfg(target_os = "windows")]
-fn detect_windows_visible_window_title_privacy_status() -> Option<ScreenShareStatus> {
+fn detect_windows_native_privacy_status() -> ScreenShareStatus {
     std::hint::black_box(NATIVE_PRIVACY_SHIELD_WINDOWS_ENUMWINDOWS_FAST_GATE_MARKER);
 
-    let status = screen_share_status_for_processes(detect_windows_visible_window_title_processes());
-    status.active.then_some(status)
+    windows_native_privacy_status_from_fast_sources(
+        detect_windows_visible_window_title_processes(),
+        detect_windows_toolhelp_processes(),
+    )
+}
+
+#[cfg(target_os = "windows")]
+fn windows_native_privacy_status_from_fast_sources(
+    visible_window_title_processes: Vec<ScreenShareProcess>,
+    toolhelp_processes: Vec<ScreenShareProcess>,
+) -> ScreenShareStatus {
+    let visible_title_status = screen_share_status_for_processes(visible_window_title_processes);
+    if visible_title_status.active {
+        return visible_title_status;
+    }
+
+    let toolhelp_status = screen_share_status_for_processes(toolhelp_processes);
+    if toolhelp_status.active {
+        return toolhelp_status;
+    }
+
+    ScreenShareStatus {
+        active: false,
+        matched_processes: Vec::new(),
+        message: None,
+    }
 }
 
 #[cfg(target_os = "windows")]
@@ -4051,6 +4071,50 @@ mod tests {
         assert_eq!(
             native_privacy_shield_decision(Ok(status)),
             NativePrivacyShieldDecision::Allow
+        );
+    }
+
+    #[test]
+    #[cfg(target_os = "windows")]
+    fn windows_native_privacy_fast_sources_skip_idle_title_hosts_without_tasklist() {
+        let clear_status = windows_native_privacy_status_from_fast_sources(
+            vec![
+                ScreenShareProcess {
+                    name: "msedgewebview2.exe".to_string(),
+                    pid: Some(31),
+                    window_title: Some("(1) WhatsApp".to_string()),
+                },
+                ScreenShareProcess {
+                    name: "zen.exe".to_string(),
+                    pid: Some(32),
+                    window_title: Some("Recipe - Zen Browser".to_string()),
+                },
+            ],
+            vec![ScreenShareProcess {
+                name: "notepad.exe".to_string(),
+                pid: Some(33),
+                window_title: None,
+            }],
+        );
+        assert!(!clear_status.active);
+        assert!(clear_status.matched_processes.is_empty());
+
+        let active_status = windows_native_privacy_status_from_fast_sources(
+            Vec::new(),
+            vec![ScreenShareProcess {
+                name: "obs64.exe".to_string(),
+                pid: Some(34),
+                window_title: None,
+            }],
+        );
+        assert!(active_status.active);
+        assert_eq!(
+            active_status
+                .matched_processes
+                .iter()
+                .map(|process| process.pid)
+                .collect::<Vec<_>>(),
+            vec![Some(34)]
         );
     }
 

@@ -242,6 +242,34 @@ fn windows_pre_show_capture_exclusion_can_retry_after_native_show() {
 }
 
 #[test]
+fn windows_pre_show_capture_exclusion_retries_when_hidden_handle_is_unavailable() {
+    let hidden_handle_unavailable = OverlayProtectionStatus {
+        always_on_top: false,
+        skip_taskbar: false,
+        capture_exclusion: "failed".to_string(),
+        click_through: false,
+        visible: false,
+        message: Some("the underlying handle is not available".to_string()),
+    };
+
+    assert!(windows_pre_show_capture_exclusion_can_recheck_after_show(
+        &hidden_handle_unavailable
+    ));
+    assert_eq!(
+        capture_exclusion_show_block_reason(&hidden_handle_unavailable, true),
+        None
+    );
+
+    let visible_handle_unavailable = OverlayProtectionStatus {
+        visible: true,
+        ..hidden_handle_unavailable
+    };
+    assert!(!windows_pre_show_capture_exclusion_can_recheck_after_show(
+        &visible_handle_unavailable
+    ));
+}
+
+#[test]
 fn native_visibility_gate_blocks_show_when_share_or_capture_risk_is_active() {
     let protected = capture_exclusion_enabled_status(false);
 
