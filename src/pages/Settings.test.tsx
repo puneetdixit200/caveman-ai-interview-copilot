@@ -515,6 +515,69 @@ describe("Settings", { timeout: 20_000 }, () => {
     expect(downloadInstallAndRelaunchSignedUpdate).not.toHaveBeenCalled();
     expect(screen.getByText("Signed update checks are blocked by local-only mode.")).toBeInTheDocument();
   });
+
+  it("exercises remaining safe Settings action buttons", async () => {
+    const user = userEvent.setup();
+    const writeText = vi.fn(async () => undefined);
+    Object.defineProperty(window.navigator, "clipboard", {
+      configurable: true,
+      value: { writeText }
+    });
+    render(<Settings />);
+
+    expect(await screen.findByText("Settings loaded")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Refresh Runtime Budget" }));
+    expect(await screen.findByText("Runtime budget refreshed")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Copy Preflight Report" }));
+    expect(writeText).toHaveBeenCalledWith(expect.stringContaining("# Caveman Preflight Report"));
+    expect(await screen.findByText("Preflight report copied")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Save" }));
+    expect(localStorage.getItem(APP_CONFIG_SETTING_KEY)).toContain("selectedProviderId");
+    expect(await screen.findByText("Settings saved")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Read Overlay Position" }));
+    expect(await screen.findByText("Overlay position read from current display")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Apply Overlay Position" }));
+    expect(await screen.findByText("Overlay position applied on current display")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Auto Detect Whisper" }));
+    expect(
+      await screen.findByText("Native Whisper setup detection is available only inside the Caveman desktop app.")
+    ).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Download Base.en Model" }));
+    expect(
+      await screen.findByText("Whisper model download failed: Native Whisper model download is available only inside the Caveman desktop app.")
+    ).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Test Local Whisper" }));
+    expect(await screen.findByText("Local Whisper returned 0 transcript segments")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Test Cloud STT" }));
+    expect(await screen.findByText("Choose Deepgram, AssemblyAI, or Google STT before testing cloud transcription.")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Save STT Key" }));
+    expect(await screen.findByText("Choose a cloud STT provider before saving a key.")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Delete STT Key" }));
+    expect(await screen.findByText("Cloud STT key removed from OS keychain")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Preview Voice" }));
+    expect(await screen.findByText("TTS playback is not available in this environment")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Stop Voice" }));
+    expect(await screen.findByText("TTS playback stopped")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Refresh Activity" }));
+    expect(screen.getByText("No sensitive activity recorded yet.")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Load Plugins" }));
+    expect(await screen.findByText("Enable local plugins before loading manifests.")).toBeInTheDocument();
+  });
 });
 
 function storeConfig(patch: Partial<AppConfig>) {

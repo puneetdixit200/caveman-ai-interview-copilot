@@ -165,4 +165,28 @@ describe("Practice", () => {
       })
     );
   });
+
+  it("moves to the next question and copies the rubric prompt", async () => {
+    const user = userEvent.setup();
+    const writeText = vi.fn(async () => undefined);
+    Object.defineProperty(window.navigator, "clipboard", {
+      configurable: true,
+      value: { writeText }
+    });
+
+    render(<Practice />);
+
+    expect(await screen.findByText("Design a URL shortener for heavy read traffic.")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Next Question" }));
+    expect(await screen.findByText("Design a notification system that supports email, SMS, and push.")).toBeInTheDocument();
+
+    await user.type(screen.getByRole("textbox", { name: "Your answer" }), "Use queues and retries.");
+    await user.click(screen.getByRole("button", { name: "Copy LLM Rubric" }));
+
+    expect(writeText).toHaveBeenCalledWith(
+      expect.stringContaining("Design a notification system that supports email, SMS, and push.")
+    );
+    expect(await screen.findByText("Scoring prompt copied")).toBeInTheDocument();
+  });
 });

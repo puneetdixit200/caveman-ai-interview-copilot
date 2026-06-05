@@ -2,8 +2,17 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-li
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { PLUGIN_CATALOG_SETTING_KEY, serializePluginCatalog } from "../lib/pluginLoader";
+import * as sessionExport from "../lib/sessionExport";
 import * as tauri from "../lib/tauri";
 import { Sessions } from "./Sessions";
+
+vi.mock("../lib/sessionExport", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../lib/sessionExport")>();
+  return {
+    ...actual,
+    downloadSessionPdf: vi.fn(async () => undefined)
+  };
+});
 
 const firstTranscriptPage = {
   items: [
@@ -265,5 +274,52 @@ describe("Sessions", () => {
     await waitFor(() => expect(writeText).toHaveBeenCalledWith(expect.stringContaining("Brief: Stripe Interview")));
     expect(writeText).toHaveBeenCalledWith(expect.stringContaining("INTERVIEWER: How would you design retries?"));
     expect(await screen.findByText("Interview Brief export copied")).toBeInTheDocument();
+  });
+
+  it("copies markdown and JSON exports and saves the PDF export", async () => {
+    const user = userEvent.setup();
+    const writeText = vi.fn(async () => undefined);
+    Object.defineProperty(window.navigator, "clipboard", {
+      configurable: true,
+      value: { writeText }
+    });
+    render(<Sessions />);
+
+    expect((await screen.findAllByText("Stripe Interview")).length).toBeGreaterThan(0);
+
+    await user.click(screen.getByRole("button", { name: "Copy Markdown" }));
+    await waitFor(() => expect(writeText).toHaveBeenCalledWith(expect.stringContaining("# Stripe Interview")));
+    expect(await screen.findByText("Markdown export copied")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Copy JSON" }));
+    expect(writeText).toHaveBeenCalledWith(expect.stringContaining('"title": "Stripe Interview"'));
+    expect(await screen.findByText("JSON export copied")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Save PDF" }));
+    expect(sessionExport.downloadSessionPdf).toHaveBeenCalledWith(
+      expect.objectContaining({
+        session: expect.objectContaining({ id: "s1", title: "Stripe Interview" })
+      })
+    );
+    expect(await screen.findByText("PDF export saved")).toBeInTheDocument();
+  });
+
+  it("cancels session and transcript editors without saving changes", async () => {
+    const user = userEvent.setup();
+    render(<Sessions />);
+
+    expect(await screen.findByText("How would you design retries?")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Edit session details" }));
+    expect(screen.getByRole("button", { name: "Cancel session details" })).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Cancel session details" }));
+    expect(tauri.updateSession).not.toHaveBeenCalled();
+    expect(screen.getByRole("button", { name: "Edit session details" })).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Edit transcript line 1" }));
+    expect(screen.getByRole("button", { name: "Cancel transcript line 1" })).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Cancel transcript line 1" }));
+    expect(tauri.updateTranscript).not.toHaveBeenCalled();
+    expect(screen.getByRole("button", { name: "Edit transcript line 1" })).toBeInTheDocument();
   });
 });

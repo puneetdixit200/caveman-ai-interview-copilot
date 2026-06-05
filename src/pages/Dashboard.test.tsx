@@ -736,4 +736,120 @@ describe("Dashboard collaboration helper", () => {
     expect(ttsMocks.stopTtsPlayback).toHaveBeenCalled();
     expect(await screen.findByText("TTS playback stopped")).toBeInTheDocument();
   });
+
+  it("copies, dismisses, and stops the helper link controls", async () => {
+    const user = userEvent.setup();
+    const writeText = vi.fn(async () => undefined);
+    Object.defineProperty(window.navigator, "clipboard", {
+      configurable: true,
+      value: { writeText }
+    });
+    render(<Dashboard />);
+
+    expect(await screen.findByText("Live Interview Session")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Start Helper Link" }));
+    expect(await screen.findByRole("textbox", { name: "Helper share link" })).toHaveValue(
+      "http://127.0.0.1:43125/?token=secret"
+    );
+
+    await user.click(screen.getByRole("button", { name: "Copy Helper Link" }));
+    expect(writeText).toHaveBeenCalledWith("http://127.0.0.1:43125/?token=secret");
+    expect(await screen.findByText("Helper link copied")).toBeInTheDocument();
+
+    expect(await screen.findByText("Mention exponential backoff tradeoffs.")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Dismiss helper hint hint-1" }));
+    expect(tauri.clearCollaborationHint).toHaveBeenCalledWith("hint-1");
+    expect(screen.queryByText("Mention exponential backoff tradeoffs.")).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Stop Helper Link" }));
+    expect(tauri.stopCollaborationServer).toHaveBeenCalled();
+    expect(await screen.findByText("Helper link stopped")).toBeInTheDocument();
+  });
+
+  it("saves a manual transcript line from the transcript button", async () => {
+    vi.mocked(tauri.addTranscript).mockResolvedValueOnce({
+      id: 2,
+      sessionId: "s1",
+      speaker: "candidate",
+      content: "I would use retry budgets.",
+      timestampMs: 2400,
+      confidence: 1,
+      source: "manual",
+      createdAt: "2026-05-21T00:00:04.000Z"
+    });
+    const user = userEvent.setup();
+    render(<Dashboard />);
+
+    expect(await screen.findByText("Live Interview Session")).toBeInTheDocument();
+
+    await user.selectOptions(screen.getByRole("combobox", { name: "Speaker" }), "candidate");
+    await user.type(
+      screen.getByPlaceholderText("Paste or type what was just said in the interview..."),
+      "I would use retry budgets."
+    );
+    await user.click(screen.getByRole("button", { name: "Save Transcript" }));
+
+    expect(tauri.addTranscript).toHaveBeenCalledWith(
+      expect.objectContaining({
+        sessionId: "s1",
+        speaker: "candidate",
+        content: "I would use retry budgets.",
+        confidence: 1,
+        source: "manual"
+      })
+    );
+    expect(await screen.findByText("Transcript saved")).toBeInTheDocument();
+  });
+
+  it("types the latest saved answer and stops a running manual capture", async () => {
+    vi.mocked(tauri.getSetting)
+      .mockResolvedValueOnce(
+        serializeAppConfig({
+          ...DEFAULT_APP_CONFIG,
+          audio: {
+            ...DEFAULT_APP_CONFIG.audio,
+            captureMode: "manual",
+            dualStreamEnabled: false,
+            sttMode: "manual"
+          },
+          stt: {
+            ...DEFAULT_APP_CONFIG.stt,
+            selectedMode: "manual"
+          }
+        })
+      )
+      .mockResolvedValueOnce(undefined)
+      .mockResolvedValueOnce(undefined);
+    vi.mocked(tauri.typeTextIntoActiveWindow).mockResolvedValueOnce({
+      characterCount: 21,
+      inputEventCount: 42
+    });
+    vi.mocked(tauri.stopCapture).mockResolvedValueOnce({
+      running: false,
+      systemDeviceId: "default",
+      microphoneDeviceId: "default",
+      sampleRateHz: 16000,
+      channels: 1,
+      microphoneLevel: 0,
+      systemLevel: 0,
+      gainDb: 0,
+      noiseGateDb: -80,
+      systemCaptureSupported: false
+    });
+    const user = userEvent.setup();
+    render(<Dashboard />);
+
+    expect(await screen.findByText("Live Interview Session")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Type Latest" }));
+    expect(tauri.typeTextIntoActiveWindow).toHaveBeenCalledWith("Use idempotency keys.");
+    expect(await screen.findByText("Typed 21 answer characters into the active window")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Start" }));
+    expect(await screen.findByRole("button", { name: "Stop" })).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Stop" }));
+    expect(tauri.stopCapture).toHaveBeenCalled();
+    expect(await screen.findByText("Audio capture stopped")).toBeInTheDocument();
+  });
 });

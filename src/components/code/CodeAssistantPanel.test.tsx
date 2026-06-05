@@ -80,6 +80,33 @@ describe("CodeAssistantPanel", () => {
     expect(await screen.findByText("Code copied")).toBeInTheDocument();
   });
 
+  it("copies the latest full answer to the clipboard", async () => {
+    const user = userEvent.setup();
+    const writeText = vi.spyOn(navigator.clipboard, "writeText").mockResolvedValue(undefined);
+
+    render(
+      <CodeAssistantPanel
+        responses={[
+          {
+            id: 1,
+            sessionId: "s1",
+            provider: "ollama",
+            model: "llama3.1:8b",
+            response: "Use a cache-aside read path with explicit invalidation.",
+            createdAt: "2026-05-20T00:00:00.000Z"
+          }
+        ]}
+      />
+    );
+
+    await user.click(screen.getByRole("button", { name: "Copy Latest Answer" }));
+
+    await waitFor(() =>
+      expect(writeText).toHaveBeenCalledWith("Use a cache-aside read path with explicit invalidation.")
+    );
+    expect(await screen.findByText("Latest answer copied")).toBeInTheDocument();
+  });
+
   it("types an extracted code suggestion into the active editor", async () => {
     tauriMocks.typeTextIntoActiveWindow.mockResolvedValue({ characterCount: 18, inputEventCount: 36 });
     const user = userEvent.setup();
