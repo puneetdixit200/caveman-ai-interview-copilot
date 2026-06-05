@@ -9,6 +9,7 @@
         "minWidth": 1024,
         "minHeight": 720,
         "contentProtected": true,
+        "skipTaskbar": true,
         "resizable": true,
         "visible": false
       },

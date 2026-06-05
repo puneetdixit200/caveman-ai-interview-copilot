@@ -254,6 +254,8 @@ test("packaged desktop windows opt into OS content protection before runtime set
   for (const label of ["main", "overlay"]) {
     assert.equal(windowsByLabel.get(label)?.contentProtected, true);
     assert.equal(releaseWindowsByLabel.get(label)?.contentProtected, true);
+    assert.equal(windowsByLabel.get(label)?.skipTaskbar, true);
+    assert.equal(releaseWindowsByLabel.get(label)?.skipTaskbar, true);
   }
 });
 

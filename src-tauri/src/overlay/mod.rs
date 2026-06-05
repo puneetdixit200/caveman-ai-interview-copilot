@@ -565,6 +565,7 @@ fn set_companion_windows_visible_with_repair_focus(
 
         missing_required_windows.retain(|required| *required != label.as_str());
 
+        let _ = window.set_skip_taskbar(true);
         let protection = apply_capture_exclusion(&window, capture_exclusion_enabled);
         protection_results.push((label.clone(), protection));
         companion_windows.push((label, window));
@@ -1194,7 +1195,7 @@ pub fn post_show_privacy_recheck_message(
 
 fn companion_window_status(mut status: OverlayProtectionStatus) -> OverlayProtectionStatus {
     status.always_on_top = false;
-    status.skip_taskbar = false;
+    status.skip_taskbar = true;
     status.click_through = false;
     status
 }

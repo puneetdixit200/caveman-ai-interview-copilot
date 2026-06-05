@@ -195,6 +195,21 @@ fn treats_every_non_overlay_window_as_sensitive_companion_window() {
 }
 
 #[test]
+fn companion_windows_report_skip_taskbar_for_ui_privacy() {
+    let visible =
+        companion_visibility_success_status(true, true, capture_exclusion_enabled_status(true));
+
+    assert!(visible.visible);
+    assert!(visible.skip_taskbar);
+
+    let hidden =
+        companion_visibility_success_status(false, true, capture_exclusion_enabled_status(false));
+
+    assert!(!hidden.visible);
+    assert!(hidden.skip_taskbar);
+}
+
+#[test]
 fn reports_enabled_capture_exclusion_when_windows_uses_legacy_monitor_fallback() {
     let status = windows_capture_exclusion_status(false, false, false, true, true);
 
